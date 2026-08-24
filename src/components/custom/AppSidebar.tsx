@@ -30,23 +30,27 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible='icon'>
       <SidebarHeader>
-        <div className='flex items-center gap-2 px-2 py-1.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0'>
-          <div className='flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground'>
-            <HugeiconsIcon
-              icon={ShuffleIcon}
-              strokeWidth={2}
-              className='size-4'
-            />
-          </div>
-          <div className='flex flex-col truncate group-data-[collapsible=icon]:hidden'>
-            <h1 className='truncate text-lg font-semibold leading-tight tracking-tight'>
-              XPM
-            </h1>
-            <p className='truncate text-xs text-muted-foreground'>
-              Cross-Server Process Manager
-            </p>
-          </div>
-        </div>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton size='lg' className='cursor-default hover:bg-transparent active:bg-transparent'>
+              <div className='flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground'>
+                <HugeiconsIcon
+                  icon={ShuffleIcon}
+                  strokeWidth={2}
+                  className='size-4'
+                />
+              </div>
+              <div className='grid flex-1 text-left leading-tight'>
+                <span className='truncate text-md font-semibold tracking-tight'>
+                  XPM
+                </span>
+                <span className='truncate text-xs text-muted-foreground'>
+                  Cross-Server Process Manager
+                </span>
+              </div>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarHeader>
 
       <SidebarContent>
