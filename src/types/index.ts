@@ -20,6 +20,7 @@ export interface ProcessInfo {
     instances: number;
     interpreter: string;
     cpu: number;
+    ip_address: string;
     memory: number;
     cwd: string;
     watch: boolean;
