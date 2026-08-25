@@ -27,8 +27,47 @@ import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { fetchRegisteredProcesses } from '@/api/services/process'
 import { useState, useEffect } from 'react'
+import { cn } from '@/lib/utils'
+
+const STATUS_BADGE: Record<string, string> = {
+  online:
+    'bg-green-500/15 text-green-600 dark:text-green-400 border-green-500/30',
+  stopping:
+    'bg-yellow-500/15 text-yellow-600 dark:text-yellow-400 border-yellow-500/30',
+  launching:
+    'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30',
+  stopped: 'bg-destructive/15 text-destructive border-destructive/30',
+  errored: 'bg-destructive/15 text-destructive border-destructive/30',
+  'one-launch-status': 'bg-muted text-muted-foreground border-border',
+}
+
+function getBadgeClass(status: string) {
+  return STATUS_BADGE[status] ?? STATUS_BADGE['one-launch-status']
+}
+
+function Field({
+  label,
+  value,
+}: {
+  label: string
+  value: string | number | undefined | null
+}) {
+  const hasValue =
+    value !== undefined && value !== null && String(value).trim() !== ''
+  return (
+    <div>
+      <dt>
+        <Label className='text-xs text-muted-foreground'>{label}</Label>
+      </dt>
+      <dd className='mt-1 text-sm wrap-break-words'>
+        {hasValue ? value : '-'}
+      </dd>
+    </div>
+  )
+}
 
 export function Dashboard() {
   const [showTileDrawer, setShowTileDrawer] = useState(false)
@@ -119,47 +158,88 @@ export function Dashboard() {
         onOpenChange={setShowTileDrawer}
       >
         <DrawerContent>
-          <DrawerHeader>
-            <DrawerTitle>
-              {tileInfo?.namespace} · {tileInfo?.name}
-            </DrawerTitle>
-            <DrawerDescription>{tileInfo?.ip_address}</DrawerDescription>
+          <DrawerHeader className='border-b pb-4'>
+            <div className='flex items-start justify-between gap-2'>
+              <div>
+                <DrawerTitle>
+                  {tileInfo?.namespace} · {tileInfo?.name}
+                </DrawerTitle>
+                <DrawerDescription>{tileInfo?.ip_address}</DrawerDescription>
+              </div>
+              {tileInfo && (
+                <Badge
+                  variant='outline'
+                  className={cn(
+                    'shrink-0 text-[10px] font-medium uppercase tracking-wide',
+                    getBadgeClass(tileInfo.status),
+                  )}
+                >
+                  {tileInfo.status}
+                </Badge>
+              )}
+            </div>
           </DrawerHeader>
-          <div className='space-y-4 p-4'>
+
+          <ScrollArea className='flex-1'>
             {tileInfo && (
-              <dl className='grid grid-cols-2 gap-x-4 gap-y-3'>
-                {(
-                  [
-                    ['PID', tileInfo.pid],
-                    ['PM ID', tileInfo.pm_id],
-                    ['Name', tileInfo.name],
-                    ['Namespace', tileInfo.namespace],
-                    ['Status', tileInfo.status],
-                    ['Uptime', tileInfo.uptime],
-                    ['Restarts', tileInfo.restarts],
-                    ['Unstable Restarts', tileInfo.unstable_restarts],
-                    ['Exec Mode', tileInfo.exec_mode],
-                    ['Instances', tileInfo.instances],
-                    ['Interpreter', tileInfo.interpreter],
-                    ['CPU', `${tileInfo.cpu}%`],
-                    ['Memory', tileInfo.memory],
-                    ['CWD', tileInfo.cwd],
-                    ['Watch', tileInfo.watch.toString()],
-                    ['Autorestart', tileInfo.autorestart.toString()],
-                  ] as const
-                ).map(([label, value]) => (
-                  <div key={label}>
-                    <dt>
-                      <Label>{label}</Label>
-                    </dt>
-                    <dd className='mt-1 wrap-break-words text-sm text-muted-foreground'>
-                      {value}
-                    </dd>
+              <div className='space-y-4 p-4'>
+                <div>
+                  <p className='mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground'>
+                    Process
+                  </p>
+                  <dl className='grid grid-cols-2 gap-x-4 gap-y-3'>
+                    <Field label='PID' value={tileInfo.pid} />
+                    <Field label='PM ID' value={tileInfo.pm_id} />
+                    <Field label='Exec mode' value={tileInfo.exec_mode} />
+                    <Field label='Instances' value={tileInfo.instances} />
+                    <Field label='Interpreter' value={tileInfo.interpreter} />
+                    <Field label='Uptime' value={tileInfo.uptime} />
+                  </dl>
+                </div>
+
+                <Separator />
+
+                <div>
+                  <p className='mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground'>
+                    Performance
+                  </p>
+                  <dl className='grid grid-cols-2 gap-x-4 gap-y-3'>
+                    <Field label='CPU' value={`${tileInfo.cpu}%`} />
+                    <Field label='Memory' value={tileInfo.memory} />
+                    <Field label='Restarts' value={tileInfo.restarts} />
+                    <Field
+                      label='Unstable restarts'
+                      value={tileInfo.unstable_restarts}
+                    />
+                  </dl>
+                </div>
+
+                <Separator />
+
+                <div>
+                  <p className='mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground'>
+                    Configuration
+                  </p>
+                  <div className='mb-3'>
+                    <Field label='CWD' value={tileInfo.cwd} />
                   </div>
-                ))}
-              </dl>
+                  <div className='flex items-center justify-between py-1'>
+                    <Label className='text-sm font-normal'>Watch</Label>
+                    <span className='text-sm font-medium'>
+                      {tileInfo.watch ? 'YES' : 'NO'}
+                    </span>
+                  </div>
+                  <div className='flex items-center justify-between py-1'>
+                    <Label className='text-sm font-normal'>Autorestart</Label>
+                    <span className='text-sm font-medium'>
+                      {tileInfo.autorestart ? 'YES' : 'NO'}
+                    </span>
+                  </div>
+                </div>
+              </div>
             )}
-          </div>
+          </ScrollArea>
+
           <DrawerFooter>
             <Separator />
             <div className='grid grid-cols-2 gap-2'>
@@ -175,7 +255,6 @@ export function Dashboard() {
                 <HugeiconsIcon icon={PowerOffIcon} strokeWidth={2} />
                 Stop
               </Button>
-
               <Button variant='destructive'>
                 <HugeiconsIcon icon={Delete02Icon} strokeWidth={2} />
                 Delete
