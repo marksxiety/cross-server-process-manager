@@ -1,10 +1,10 @@
 import { NavLink, useLocation } from 'react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
-  DashboardSquare01Icon,
-  LayoutGridIcon,
-  PackageProcessIcon,
-  ShuffleIcon,
+  DashboardSquareSettingIcon,
+  FormIcon,
+  ArtificialIntelligence07Icon,
+  ChartRelationshipIcon,
 } from '@hugeicons/core-free-icons'
 import {
   Sidebar,
@@ -16,39 +16,59 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  useSidebar,
 } from '@/components/ui/sidebar'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 const navItems = [
-  { title: 'Dashboard', url: '/', icon: DashboardSquare01Icon },
-  { title: 'Template', url: '/template', icon: LayoutGridIcon },
-  { title: 'Process', url: '/process', icon: PackageProcessIcon },
+  { title: 'Dashboard', url: '/', icon: DashboardSquareSettingIcon },
+  { title: 'Templates', url: '/template', icon: FormIcon },
+  { title: 'Process', url: '/process', icon: ArtificialIntelligence07Icon },
 ]
 
 export function AppSidebar() {
   const { pathname } = useLocation()
+  const { state, isMobile } = useSidebar()
 
   return (
     <Sidebar collapsible='icon'>
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size='lg' className='cursor-default hover:bg-transparent active:bg-transparent'>
-              <div className='flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground'>
-                <HugeiconsIcon
-                  icon={ShuffleIcon}
-                  strokeWidth={2}
-                  className='size-4'
-                />
-              </div>
-              <div className='grid flex-1 text-left leading-tight'>
-                <span className='truncate text-md font-semibold tracking-tight'>
-                  XPM
-                </span>
-                <span className='truncate text-xs text-muted-foreground'>
-                  Cross-Server Process Manager
-                </span>
-              </div>
-            </SidebarMenuButton>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <SidebarMenuButton size='lg' className='cursor-default'>
+                    <div className='relative flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground'>
+                      <HugeiconsIcon
+                        icon={ChartRelationshipIcon}
+                        strokeWidth={2}
+                        className='size-4'
+                      />
+                    </div>
+                    <div className='grid flex-1 text-left leading-tight'>
+                      <span className='truncate text-sm font-semibold tracking-tight'>
+                        XPM
+                      </span>
+                      <span className='truncate text-xs text-muted-foreground'>
+                        Cross-Server Process Manager
+                      </span>
+                    </div>
+                  </SidebarMenuButton>
+                }
+              />
+              <TooltipContent
+                side='right'
+                align='start'
+                hidden={state !== 'collapsed' || isMobile}
+              >
+                XPM · Cross-Server Process Manager
+              </TooltipContent>
+            </Tooltip>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
