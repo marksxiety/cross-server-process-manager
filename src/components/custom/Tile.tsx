@@ -2,12 +2,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { ProcessInfo } from "@/types"
 
 interface TileProps {
-  process: ProcessInfo
+  process: ProcessInfo,
+  onClick: (process: ProcessInfo) => void
 }
 
-export function Tile({ process }: TileProps) {
+export function Tile({ process, onClick }: TileProps) {
   return (
-    <Card className="flex h-full flex-col">
+    <Card className="flex h-full flex-col cursor-pointer"
+      onClick={() => onClick(process)}>
       <CardHeader>
         <CardTitle>{process.name}</CardTitle>
       </CardHeader>
