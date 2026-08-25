@@ -123,8 +123,8 @@ export function Dashboard() {
               </DrawerTrigger>
               <DrawerContent>
                 <DrawerHeader>
-                  <DrawerTitle>Register Process</DrawerTitle>
-                  <DrawerDescription>Register description</DrawerDescription>
+                  <DrawerTitle>Register a Process</DrawerTitle>
+                  <DrawerDescription>Enter the details to register a new process to the manager.</DrawerDescription>
                 </DrawerHeader>
                 <div className='p-4'>{/* Content here */}</div>
                 <DrawerFooter>
