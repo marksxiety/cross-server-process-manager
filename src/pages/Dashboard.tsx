@@ -1,6 +1,7 @@
 import { Tile } from '@/components/custom/Tile'
 import { DashboardAlerts } from '@/components/custom/DashboardAlert'
 import { TileContainer } from '@/components/custom/TileContainer'
+import { ConfirmDialog } from '@/components/custom/ConfirmDialog'
 import { Button } from '@/components/ui/button'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
@@ -243,22 +244,69 @@ export function Dashboard() {
           <DrawerFooter>
             <Separator />
             <div className='grid grid-cols-2 gap-2'>
-              <Button>
-                <HugeiconsIcon icon={Refresh01Icon} strokeWidth={2} />
-                Restart
-              </Button>
-              <Button variant='secondary'>
-                <HugeiconsIcon icon={Refresh04Icon} strokeWidth={2} />
-                Reload
-              </Button>
-              <Button variant='outline'>
-                <HugeiconsIcon icon={PowerOffIcon} strokeWidth={2} />
-                Stop
-              </Button>
-              <Button variant='destructive'>
-                <HugeiconsIcon icon={Delete02Icon} strokeWidth={2} />
-                Delete
-              </Button>
+              <ConfirmDialog
+                title='Restart process?'
+                description='The process will be restarted. Continue?'
+                mediaIcon={Refresh01Icon}
+                dialogSize='sm'
+                actionVariant='default'
+                actionLabel='Continue'
+                onContinue={() => console.log('restart')}
+                trigger={
+                  <>
+                    <HugeiconsIcon icon={Refresh01Icon} strokeWidth={2} />
+                    Restart
+                  </>
+                }
+              />
+              <ConfirmDialog
+                title='Reload process?'
+                description='The process will be reloaded. Continue?'
+                mediaIcon={Refresh04Icon}
+                dialogSize='sm'
+                actionVariant='default'
+                actionLabel='Continue'
+                triggerVariant='secondary'
+                onContinue={() => console.log('reload')}
+                trigger={
+                  <>
+                    <HugeiconsIcon icon={Refresh04Icon} strokeWidth={2} />
+                    Reload
+                  </>
+                }
+              />
+              <ConfirmDialog
+                title='Stop process?'
+                description='The process will be stopped. Continue?'
+                mediaIcon={PowerOffIcon}
+                dialogSize='sm'
+                actionVariant='destructive'
+                actionLabel='Continue'
+                triggerVariant='outline'
+                onContinue={() => console.log('stop')}
+                trigger={
+                  <>
+                    <HugeiconsIcon icon={PowerOffIcon} strokeWidth={2} />
+                    Stop
+                  </>
+                }
+              />
+              <ConfirmDialog
+                title='Delete process?'
+                description='The process will be removed. Continue?'
+                mediaIcon={Delete02Icon}
+                dialogSize='sm'
+                actionVariant='destructive'
+                actionLabel='Continue'
+                triggerVariant='destructive'
+                onContinue={() => console.log('delete')}
+                trigger={
+                  <>
+                    <HugeiconsIcon icon={Delete02Icon} strokeWidth={2} />
+                    Delete
+                  </>
+                }
+              />
             </div>
           </DrawerFooter>
         </DrawerContent>
