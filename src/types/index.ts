@@ -26,3 +26,16 @@ export interface ProcessInfo {
     watch: boolean;
     autorestart: boolean;
 }
+
+export interface Server {
+    server: string;
+    url: string
+    data?: ProcessInfo[];
+    alerts?: ServerAlert[];
+}
+
+export interface ServerAlert {
+    type: "info" | "alert" | null | undefined;
+    title: string;
+    description: string;
+}
