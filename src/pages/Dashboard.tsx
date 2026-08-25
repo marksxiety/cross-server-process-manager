@@ -9,8 +9,9 @@ import {
   PowerOffIcon,
   Delete02Icon,
 } from '@hugeicons/core-free-icons'
-import type { ProcessInfo } from '@/types'
+import type { ProcessInfo, Server } from '@/types'
 import processes from '@/data/data.json'
+import servers from '@/data/servers.json'
 import {
   Drawer,
   DrawerClose,
@@ -23,6 +24,9 @@ import {
 } from '@/components/ui/drawer'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+
 import { useState } from 'react'
 
 export function Dashboard() {
@@ -30,9 +34,22 @@ export function Dashboard() {
   const [tileInfo, setTileInfo] = useState<ProcessInfo | null>(null)
   const processList = processes as ProcessInfo[]
 
+  const allServer: Server = {
+    server: 'All Server(s)',
+    url: 'none',
+  }
+
+  const serverList: Server[] = servers.length > 0 ? [allServer, ...servers] : []
+
   const handleTileClick = (process: ProcessInfo) => {
     setShowTileDrawer(true)
     setTileInfo(process)
+  }
+
+  const [selectedServer, setSelectedServer] = useState<Server>(allServer)
+
+  const handleServerClick = (server: Server) => {
+    setSelectedServer(server)
   }
 
   return (
@@ -110,10 +127,10 @@ export function Dashboard() {
       </Drawer>
       <div className='space-y-4'>
         <div className='flex items-center justify-between gap-4'>
-          <h1 className='text-2xl font-semibold tracking-tight'>Dashboard</h1>
+          <h1 className='text-2xl font-semibold tracking-tight'>Services</h1>
           <div className='flex items-center gap-3'>
             <Drawer swipeDirection='right'>
-              <DrawerTrigger render={<Button size='sm' />}>
+              <DrawerTrigger render={<Button size='sm' />} className='p-4'>
                 <HugeiconsIcon
                   icon={PlusSignIcon}
                   strokeWidth={2}
@@ -124,7 +141,9 @@ export function Dashboard() {
               <DrawerContent>
                 <DrawerHeader>
                   <DrawerTitle>Register a Process</DrawerTitle>
-                  <DrawerDescription>Enter the details to register a new process to the manager.</DrawerDescription>
+                  <DrawerDescription>
+                    Enter the details to register a new process to the manager.
+                  </DrawerDescription>
                 </DrawerHeader>
                 <div className='p-4'>{/* Content here */}</div>
                 <DrawerFooter>
@@ -136,6 +155,26 @@ export function Dashboard() {
               </DrawerContent>
             </Drawer>
           </div>
+        </div>
+        <div className='flex items-center justify-between gap-4'>
+          <div className='flex flex-row gap-3'>
+            {serverList.map((server) => (
+              <Badge
+                className={`cursor-pointer ${server.url !== selectedServer.url ? 'hover:bg-secondary' : ''}`}
+                key={server.server}
+                variant={
+                  server.url === selectedServer.url ? 'default' : 'outline'
+                }
+                onClick={() => handleServerClick(server)}
+              >
+                {server.server}
+              </Badge>
+            ))}
+          </div>
+          <Input
+            placeholder='Search name, namespace, or server'
+            className='w-[25%]'
+          />
         </div>
         <TileContainer>
           {processList.map((process) => (
