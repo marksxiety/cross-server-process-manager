@@ -1,4 +1,5 @@
 import { Tile } from '@/components/custom/Tile'
+import { DashboardAlerts } from '@/components/custom/DashboardAlert'
 import { TileContainer } from '@/components/custom/TileContainer'
 import { Button } from '@/components/ui/button'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -9,8 +10,7 @@ import {
   PowerOffIcon,
   Delete02Icon,
 } from '@hugeicons/core-free-icons'
-import type { ProcessInfo, Server } from '@/types'
-import processes from '@/data/data.json'
+import type { ProcessInfo, Server, ServerAlert } from '@/types'
 import servers from '@/data/servers.json'
 import {
   Drawer,
@@ -26,20 +26,24 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-
-import { useState } from 'react'
+import { Spinner } from '@/components/ui/spinner'
+import { fetchRegisteredProcesses } from '@/api/services/process'
+import { useState, useEffect } from 'react'
 
 export function Dashboard() {
   const [showTileDrawer, setShowTileDrawer] = useState(false)
   const [tileInfo, setTileInfo] = useState<ProcessInfo | null>(null)
-  const processList = processes as ProcessInfo[]
 
   const allServer: Server = {
     server: 'All Server(s)',
     url: 'none',
   }
 
-  const serverList: Server[] = servers.length > 0 ? [allServer, ...servers] : []
+  const [serverList, setServerList] = useState<Server[]>(() =>
+    servers.length > 0 ? [allServer, ...servers] : [],
+  )
+  const [isLoading, setIsLoading] = useState(() => servers.length > 0)
+  const [alerts, setAlerts] = useState<ServerAlert[]>([])
 
   const handleTileClick = (process: ProcessInfo) => {
     setShowTileDrawer(true)
@@ -51,6 +55,61 @@ export function Dashboard() {
   const handleServerClick = (server: Server) => {
     setSelectedServer(server)
   }
+
+  useEffect(() => {
+    let cancelled = false
+    for (const server of servers) {
+      fetchRegisteredProcesses(server.url)
+        .then((res) => {
+          if (cancelled) return
+          if (res.success) {
+            setServerList((prev) =>
+              prev.map((s) =>
+                s.url === server.url ? { ...s, data: res.info ?? [] } : s,
+              ),
+            )
+          } else {
+            setAlerts((prev) => [
+              ...prev,
+              {
+                type: 'alert',
+                title: 'Fetch failed',
+                description: res.message || `No data from ${server.url}`,
+              },
+            ])
+          }
+        })
+        .catch((err) => {
+          if (cancelled) return
+          setAlerts((prev) => [
+            ...prev,
+            {
+              type: 'alert',
+              title: 'Network error',
+              description: `${server.url}: ${(err as Error).message}`,
+            },
+          ])
+        })
+        .finally(() => {
+          if (!cancelled) setIsLoading(false)
+        })
+    }
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const allProcesses = serverList.flatMap((s) => s.data ?? [])
+  const visibleProcesses =
+    selectedServer.url === allServer.url
+      ? allProcesses
+      : allProcesses.filter(
+          (p) =>
+            p.ip_address ===
+            (selectedServer.url === 'none'
+              ? ''
+              : new URL(selectedServer.url).hostname),
+        )
 
   return (
     <>
@@ -127,7 +186,10 @@ export function Dashboard() {
       </Drawer>
       <div className='space-y-4'>
         <div className='flex items-center justify-between gap-4'>
-          <h1 className='text-2xl font-semibold tracking-tight'>Services</h1>
+          <div className='flex items-center gap-3'>
+            <h1 className='text-2xl font-semibold tracking-tight'>Services</h1>
+            {isLoading && <Spinner />}
+          </div>
           <div className='flex items-center gap-3'>
             <Drawer swipeDirection='right'>
               <DrawerTrigger render={<Button size='sm' />} className='p-4'>
@@ -176,8 +238,9 @@ export function Dashboard() {
             className='w-[25%]'
           />
         </div>
+        <DashboardAlerts alerts={alerts} />
         <TileContainer>
-          {processList.map((process) => (
+          {visibleProcesses.map((process) => (
             <Tile
               key={process.pid}
               process={process}
