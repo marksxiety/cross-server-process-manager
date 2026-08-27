@@ -25,49 +25,26 @@ import {
 } from '@/components/ui/drawer'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
+import { StatusBadge } from '@/components/custom/StatusBadge'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
 import { Spinner } from '@/components/ui/spinner'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { fetchRegisteredProcesses } from '@/api/services/process'
 import { useState, useEffect } from 'react'
-import { cn } from '@/lib/utils'
+import type { RegisterProcessForm } from '@/types'
 
-const STATUS_BADGE: Record<string, string> = {
-  online:
-    'bg-green-500/15 text-green-600 dark:text-green-400 border-green-500/30',
-  stopping:
-    'bg-yellow-500/15 text-yellow-600 dark:text-yellow-400 border-yellow-500/30',
-  launching:
-    'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30',
-  stopped: 'bg-destructive/15 text-destructive border-destructive/30',
-  errored: 'bg-destructive/15 text-destructive border-destructive/30',
-  'one-launch-status': 'bg-muted text-muted-foreground border-border',
-}
-
-function getBadgeClass(status: string) {
-  return STATUS_BADGE[status] ?? STATUS_BADGE['one-launch-status']
-}
-
-function Field({
-  label,
-  value,
-}: {
-  label: string
-  value: string | number | undefined | null
-}) {
-  const hasValue =
-    value !== undefined && value !== null && String(value).trim() !== ''
-  return (
-    <div>
-      <dt>
-        <Label className='text-xs text-muted-foreground'>{label}</Label>
-      </dt>
-      <dd className='mt-1 text-sm wrap-break-words'>
-        {hasValue ? value : '-'}
-      </dd>
-    </div>
-  )
+const REGISTER_FORM_DEFAULT: RegisterProcessForm = {
+  name: '',
+  namespace: '',
+  script: '',
+  cwd: '',
+  instances: '',
+  interpreter: '',
+  watch: false,
+  autorestart: true,
 }
 
 export function Dashboard() {
@@ -94,6 +71,23 @@ export function Dashboard() {
 
   const handleServerClick = (server: Server) => {
     setSelectedServer(server)
+  }
+
+  // Register Process drawer form state
+  const [showRegisterDrawer, setShowRegisterDrawer] = useState(false)
+  const [registerForm, setRegisterForm] = useState<RegisterProcessForm>(
+    REGISTER_FORM_DEFAULT,
+  )
+
+  const updateRegisterField = <K extends keyof RegisterProcessForm>(
+    key: K,
+    value: RegisterProcessForm[K],
+  ) => {
+    setRegisterForm((prev) => ({ ...prev, [key]: value }))
+  }
+
+  const handleRegisterSubmit = () => {
+    console.log('register process', registerForm)
   }
 
   useEffect(() => {
@@ -153,6 +147,7 @@ export function Dashboard() {
 
   return (
     <>
+      {/* ===================== VIEW PROCESS DRAWER ===================== */}
       <Drawer
         swipeDirection='right'
         open={showTileDrawer}
@@ -167,79 +162,134 @@ export function Dashboard() {
                 </DrawerTitle>
                 <DrawerDescription>{tileInfo?.ip_address}</DrawerDescription>
               </div>
-              {tileInfo && (
-                <Badge
-                  variant='outline'
-                  className={cn(
-                    'shrink-0 text-[10px] font-medium uppercase tracking-wide',
-                    getBadgeClass(tileInfo.status),
-                  )}
-                >
-                  {tileInfo.status}
-                </Badge>
-              )}
+              {tileInfo && <StatusBadge status={tileInfo.status} />}
             </div>
           </DrawerHeader>
 
-          <ScrollArea className='flex-1'>
-            {tileInfo && (
-              <div className='space-y-4 p-4'>
-                <div>
-                  <p className='mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground'>
-                    Process
-                  </p>
-                  <dl className='grid grid-cols-2 gap-x-4 gap-y-3'>
-                    <Field label='PID' value={tileInfo.pid} />
-                    <Field label='PM ID' value={tileInfo.pm_id} />
-                    <Field label='Exec mode' value={tileInfo.exec_mode} />
-                    <Field label='Instances' value={tileInfo.instances} />
-                    <Field label='Interpreter' value={tileInfo.interpreter} />
-                    <Field label='Uptime' value={tileInfo.uptime} />
-                  </dl>
-                </div>
+          <Tabs
+            defaultValue='overview'
+            className='flex flex-1 flex-col overflow-hidden'
+          >
+            <TabsList className='mx-4 mt-3 w-auto'>
+              <TabsTrigger value='overview'>Overview</TabsTrigger>
+              <TabsTrigger value='logs'>Logs</TabsTrigger>
+            </TabsList>
 
-                <Separator />
+            <TabsContent value='overview' className='flex-1 overflow-hidden'>
+              <ScrollArea className='h-full'>
+                {tileInfo && (
+                  <div className='space-y-4 p-4'>
+                    <div className='grid grid-cols-2 gap-3'>
+                      <div className='rounded-lg bg-secondary p-3'>
+                        <p className='mb-0.5 text-xs text-muted-foreground'>
+                          CPU
+                        </p>
+                        <p className='text-xl font-semibold'>{tileInfo.cpu}%</p>
+                      </div>
+                      <div className='rounded-lg bg-secondary p-3'>
+                        <p className='mb-0.5 text-xs text-muted-foreground'>
+                          Memory
+                        </p>
+                        <p className='text-xl font-semibold'>
+                          {tileInfo.memory}
+                        </p>
+                      </div>
+                    </div>
 
-                <div>
-                  <p className='mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground'>
-                    Performance
-                  </p>
-                  <dl className='grid grid-cols-2 gap-x-4 gap-y-3'>
-                    <Field label='CPU' value={`${tileInfo.cpu}%`} />
-                    <Field label='Memory' value={tileInfo.memory} />
-                    <Field label='Restarts' value={tileInfo.restarts} />
-                    <Field
-                      label='Unstable restarts'
-                      value={tileInfo.unstable_restarts}
-                    />
-                  </dl>
-                </div>
-
-                <Separator />
-
-                <div>
-                  <p className='mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground'>
-                    Configuration
-                  </p>
-                  <div className='mb-3'>
-                    <Field label='CWD' value={tileInfo.cwd} />
+                    <table className='w-full text-sm'>
+                      <tbody className='divide-y divide-border'>
+                        <tr>
+                          <td className='py-1.5 text-muted-foreground'>PID</td>
+                          <td className='py-1.5 text-right'>{tileInfo.pid}</td>
+                        </tr>
+                        <tr>
+                          <td className='py-1.5 text-muted-foreground'>
+                            PM ID
+                          </td>
+                          <td className='py-1.5 text-right'>
+                            {tileInfo.pm_id}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className='py-1.5 text-muted-foreground'>
+                            Uptime
+                          </td>
+                          <td className='py-1.5 text-right'>
+                            {tileInfo.uptime}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className='py-1.5 text-muted-foreground'>
+                            Restarts
+                          </td>
+                          <td className='py-1.5 text-right'>
+                            {tileInfo.restarts}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className='py-1.5 text-muted-foreground'>
+                            Unstable restarts
+                          </td>
+                          <td className='py-1.5 text-right'>
+                            {tileInfo.unstable_restarts}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className='py-1.5 text-muted-foreground'>
+                            Exec mode
+                          </td>
+                          <td className='py-1.5 text-right'>
+                            {tileInfo.exec_mode}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className='py-1.5 text-muted-foreground'>
+                            Instances
+                          </td>
+                          <td className='py-1.5 text-right'>
+                            {tileInfo.instances ?? '-'}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className='py-1.5 text-muted-foreground'>
+                            Interpreter
+                          </td>
+                          <td className='break-all py-1.5 text-right text-xs'>
+                            {tileInfo.interpreter}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className='py-1.5 text-muted-foreground'>
+                            Watch
+                          </td>
+                          <td className='py-1.5 text-right'>
+                            {tileInfo.watch ? 'on' : 'off'}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className='py-1.5 text-muted-foreground'>
+                            Autorestart
+                          </td>
+                          <td className='py-1.5 text-right'>
+                            {tileInfo.autorestart ? 'on' : 'off'}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className='py-1.5 text-muted-foreground'>cwd</td>
+                          <td className='break-all py-1.5 text-right text-xs'>
+                            {tileInfo.cwd}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
-                  <div className='flex items-center justify-between py-1'>
-                    <Label className='text-sm font-normal'>Watch</Label>
-                    <span className='text-sm font-medium'>
-                      {tileInfo.watch ? 'YES' : 'NO'}
-                    </span>
-                  </div>
-                  <div className='flex items-center justify-between py-1'>
-                    <Label className='text-sm font-normal'>Autorestart</Label>
-                    <span className='text-sm font-medium'>
-                      {tileInfo.autorestart ? 'YES' : 'NO'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </ScrollArea>
+                )}
+              </ScrollArea>
+            </TabsContent>
+
+            {/* Empty for now — logs tail view goes here */}
+            <TabsContent value='logs' className='flex-1' />
+          </Tabs>
 
           <DrawerFooter>
             <Separator />
@@ -311,14 +361,24 @@ export function Dashboard() {
           </DrawerFooter>
         </DrawerContent>
       </Drawer>
-      <div className='space-y-4'>
+
+      <ScrollArea className='h-full'>
+        <div className='space-y-4 p-4'>
         <div className='flex items-center justify-between gap-4'>
           <div className='flex items-center gap-3'>
             <h1 className='text-2xl font-semibold tracking-tight'>Services</h1>
             {isLoading && <Spinner />}
           </div>
           <div className='flex items-center gap-3'>
-            <Drawer swipeDirection='right'>
+            {/* ===================== REGISTER PROCESS DRAWER ===================== */}
+            <Drawer
+              swipeDirection='right'
+              open={showRegisterDrawer}
+              onOpenChange={(open) => {
+                setShowRegisterDrawer(open)
+                if (!open) setRegisterForm(REGISTER_FORM_DEFAULT)
+              }}
+            >
               <DrawerTrigger render={<Button size='sm' />} className='p-4'>
                 <HugeiconsIcon
                   icon={PlusSignIcon}
@@ -334,9 +394,113 @@ export function Dashboard() {
                     Enter the details to register a new process to the manager.
                   </DrawerDescription>
                 </DrawerHeader>
-                <div className='p-4'>{/* Content here */}</div>
+
+                <ScrollArea className='flex-1'>
+                  <div className='space-y-4 p-4'>
+                    <div className='space-y-1.5'>
+                      <Label htmlFor='reg-name'>Name</Label>
+                      <Input
+                        id='reg-name'
+                        placeholder='client'
+                        value={registerForm.name}
+                        onChange={(e) =>
+                          updateRegisterField('name', e.target.value)
+                        }
+                      />
+                    </div>
+
+                    <div className='space-y-1.5'>
+                      <Label htmlFor='reg-namespace'>Namespace</Label>
+                      <Input
+                        id='reg-namespace'
+                        placeholder='DPR'
+                        value={registerForm.namespace}
+                        onChange={(e) =>
+                          updateRegisterField('namespace', e.target.value)
+                        }
+                      />
+                    </div>
+
+                    <div className='space-y-1.5'>
+                      <Label htmlFor='reg-script'>Script path</Label>
+                      <Input
+                        id='reg-script'
+                        placeholder='index.js'
+                        value={registerForm.script}
+                        onChange={(e) =>
+                          updateRegisterField('script', e.target.value)
+                        }
+                      />
+                    </div>
+
+                    <div className='space-y-1.5'>
+                      <Label htmlFor='reg-cwd'>Working directory</Label>
+                      <Input
+                        id='reg-cwd'
+                        placeholder='C:\Users\...\client'
+                        value={registerForm.cwd}
+                        onChange={(e) =>
+                          updateRegisterField('cwd', e.target.value)
+                        }
+                      />
+                    </div>
+
+                    <div className='grid grid-cols-2 gap-3'>
+                      <div className='space-y-1.5'>
+                        <Label htmlFor='reg-instances'>Instances</Label>
+                        <Input
+                          id='reg-instances'
+                          placeholder='1'
+                          value={registerForm.instances}
+                          onChange={(e) =>
+                            updateRegisterField('instances', e.target.value)
+                          }
+                        />
+                      </div>
+                      <div className='space-y-1.5'>
+                        <Label htmlFor='reg-interpreter'>Interpreter</Label>
+                        <Input
+                          id='reg-interpreter'
+                          placeholder='node'
+                          value={registerForm.interpreter}
+                          onChange={(e) =>
+                            updateRegisterField('interpreter', e.target.value)
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    <div className='flex items-center justify-between py-1'>
+                      <Label htmlFor='reg-watch' className='font-normal'>
+                        Watch for changes
+                      </Label>
+                      <Switch
+                        id='reg-watch'
+                        checked={registerForm.watch}
+                        onCheckedChange={(checked) =>
+                          updateRegisterField('watch', checked)
+                        }
+                      />
+                    </div>
+                    <div className='flex items-center justify-between py-1'>
+                      <Label htmlFor='reg-autorestart' className='font-normal'>
+                        Autorestart
+                      </Label>
+                      <Switch
+                        id='reg-autorestart'
+                        checked={registerForm.autorestart}
+                        onCheckedChange={(checked) =>
+                          updateRegisterField('autorestart', checked)
+                        }
+                      />
+                    </div>
+                  </div>
+                </ScrollArea>
+
                 <DrawerFooter>
-                  <Button>Submit</Button>
+                  <Button onClick={handleRegisterSubmit}>Submit</Button>
                   <DrawerClose render={<Button variant='outline' />}>
                     Cancel
                   </DrawerClose>
@@ -375,7 +539,8 @@ export function Dashboard() {
             />
           ))}
         </TileContainer>
-      </div>
+        </div>
+      </ScrollArea>
     </>
   )
 }
