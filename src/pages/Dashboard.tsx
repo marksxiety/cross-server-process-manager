@@ -33,6 +33,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { fetchRegisteredProcesses } from '@/api/services/process'
+import { ProcessLogs } from '@/components/custom/ProcessLogs'
 import { useState, useEffect } from 'react'
 import type { RegisterProcessForm } from '@/types'
 
@@ -144,6 +145,13 @@ export function Dashboard() {
               ? ''
               : new URL(selectedServer.url).hostname),
         )
+
+  const logServerUrl =
+    serverList.find(
+      (s) =>
+        s.url !== 'none' &&
+        new URL(s.url).hostname === tileInfo?.ip_address,
+    )?.url ?? (selectedServer.url !== 'none' ? selectedServer.url : undefined)
 
   return (
     <>
@@ -287,8 +295,12 @@ export function Dashboard() {
               </ScrollArea>
             </TabsContent>
 
-            {/* Empty for now — logs tail view goes here */}
-            <TabsContent value='logs' className='flex-1' />
+            {/* Logs tail view */}
+            <TabsContent value='logs' className='flex-1 overflow-hidden'>
+              {tileInfo && logServerUrl && (
+                <ProcessLogs serverUrl={logServerUrl} processId={tileInfo.pm_id} />
+              )}
+            </TabsContent>
           </Tabs>
 
           <DrawerFooter>
@@ -533,7 +545,7 @@ export function Dashboard() {
         <TileContainer>
           {visibleProcesses.map((process) => (
             <Tile
-              key={process.pid}
+              key={`${process.ip_address}-${process.pm_id}`}
               process={process}
               onClick={handleTileClick}
             />
