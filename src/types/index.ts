@@ -39,3 +39,14 @@ export interface ServerAlert {
     title: string;
     description: string;
 }
+
+export interface RegisterProcessForm {
+    name: string;
+    namespace: string;
+    script: string;
+    cwd: string;
+    instances: string;
+    interpreter: string;
+    watch: boolean;
+    autorestart: boolean;
+}
