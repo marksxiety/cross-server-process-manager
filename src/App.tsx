@@ -4,18 +4,19 @@ import { AppSidebar } from '@/components/custom/AppSidebar'
 
 export function App() {
   return (
-    <SidebarProvider>
+    <SidebarProvider className="h-svh overflow-hidden">
       <AppSidebar />
-      <SidebarInset>
-        {/* Fixed Header Layout */}
-        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 border-b px-4">
+      {/* Ensure SidebarInset is constrained and does not cause page-level scroll */}
+      <SidebarInset className="flex h-full flex-col overflow-hidden">
+        {/* Fixed Header */}
+        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
           <div className="flex items-center gap-2">
             <SidebarTrigger />
           </div>
         </header>
 
-        {/* Page Content */}
-        <div className="min-h-0 flex-1 bg-muted/30">
+        {/* Scrollable Page Content */}
+        <div className="min-h-0 flex-1 overflow-y-auto bg-muted/30">
           <Outlet />
         </div>
       </SidebarInset>
