@@ -15,7 +15,7 @@ export function App() {
         </header>
 
         {/* Page Content */}
-        <div className="flex flex-1 flex-col gap-4 p-4 bg-muted/30">
+        <div className="min-h-0 flex-1 bg-muted/30">
           <Outlet />
         </div>
       </SidebarInset>
