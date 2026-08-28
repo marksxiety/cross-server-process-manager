@@ -11,6 +11,7 @@ export const ENDPOINTS = {
     delete: (id: number) => `${PM2_BASE_PATH}/delete/${id}`,
     flush: (id?: number) =>
         id !== undefined ? `${PM2_BASE_PATH}/flush/${id}` : `${PM2_BASE_PATH}/flush`,
+    logs: (id: number) => `${PM2_BASE_PATH}/logs/${id}`,
 } as const
 
 export function buildEndpointUrl(baseUrl: string, path: string): string {
