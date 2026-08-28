@@ -48,6 +48,21 @@ const STATUS_CONFIG: Record<string, StatusConfig> = {
     dot: 'bg-indigo-500',
     ping: false,
   },
+  warning: {
+    badge: 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30',
+    dot: 'bg-amber-500',
+    ping: true,
+  },
+  critical: {
+    badge: 'bg-destructive/15 text-destructive border-destructive/30',
+    dot: 'bg-destructive',
+    ping: true,
+  },
+  error: {
+    badge: 'bg-destructive/15 text-destructive border-destructive/30',
+    dot: 'bg-destructive',
+    ping: false,
+  },
 }
 
 const DEFAULT_CONFIG: StatusConfig = {
