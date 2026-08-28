@@ -1,7 +1,5 @@
-import { Card, CardHeader, CardContent } from '@/components/ui/card'
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
-import { HugeiconsIcon } from '@hugeicons/react'
-import { CpuIcon, RamMemoryIcon } from '@hugeicons/core-free-icons'
 import type { ProcessInfo } from '@/types'
 import { StatusBadge } from '@/components/custom/StatusBadge'
 
@@ -21,14 +19,16 @@ function getAccentClass(status: string) {
   return STATUS_ACCENT[status.toLowerCase()] ?? DEFAULT_ACCENT
 }
 
-interface TileProps {
+export interface TileProps {
   process: ProcessInfo
   onClick: (process: ProcessInfo) => void
 }
 
 export function Tile({ process, onClick }: TileProps) {
-  const isErrored = process.status.toLowerCase() === 'errored'
-  const isStopped = process.status.toLowerCase() === 'stopped'
+  const status = process.status.toLowerCase()
+  const isErrored = status === 'errored'
+  const isStopped = status === 'stopped'
+  const isWarning = status === 'waiting restart' || status === 'stopping'
 
   return (
     <Card
@@ -38,43 +38,39 @@ export function Tile({ process, onClick }: TileProps) {
         'transition-all duration-150 ease-out hover:-translate-y-1 hover:shadow-md hover:border-muted-foreground/30',
         isErrored && 'border-destructive/50',
         isStopped && 'border-slate-300 dark:border-slate-800 opacity-80',
+        isWarning && 'border-amber-500/50',
       )}
     >
-      <div className={cn('h-0.75 w-full shrink-0', getAccentClass(process.status))} />
+      <div className={cn('h-0.75 w-full shrink-0', getAccentClass(status))} />
 
-      <CardHeader className='pt-4 pb-2'>
-        <div className='flex items-start justify-between gap-2'>
-          <span className='text-sm font-medium leading-snug line-clamp-2 break-all'>
-            {process.name}
-          </span>
-          <StatusBadge status={process.status} />
-        </div>
-        <p className='text-xs text-muted-foreground leading-relaxed truncate pt-0.5'>
-          {process.namespace} · {process.ip_address}
-        </p>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-4">
+        <CardTitle className="text-sm font-medium truncate pr-4">
+          {process.name}
+        </CardTitle>
+        <StatusBadge status={process.status} />
       </CardHeader>
 
-      <CardContent className='mt-auto flex flex-col justify-end pb-4 pt-0'>
-        <div className='flex items-center justify-between border-t pt-3 text-xs'>
-          <div className='flex items-center gap-1.5'>
-            <HugeiconsIcon
-              icon={CpuIcon}
-              size={14}
-              className='text-muted-foreground shrink-0'
-            />
-            <span className='text-muted-foreground'>CPU</span>
-            <span className='font-medium text-foreground'>{process.cpu}%</span>
+      <CardContent className="mt-auto flex flex-col justify-end pt-0 pb-4">
+        <div className="text-xs text-muted-foreground font-mono mb-4 truncate">
+          {process.namespace} <span className="opacity-50">·</span> {process.ip_address}
+        </div>
+
+        <div className="flex items-center justify-between border-t pt-3">
+          <div className="space-y-1">
+            <p className="text-2xl font-bold tracking-tight">
+              {process.cpu}%
+            </p>
+            <p className="text-[10px] font-medium uppercase text-muted-foreground">
+              CPU Usage
+            </p>
           </div>
-          <div className='flex items-center gap-1.5'>
-            <HugeiconsIcon
-              icon={RamMemoryIcon}
-              size={14}
-              className='text-muted-foreground shrink-0'
-            />
-            <span className='text-muted-foreground'>MEM</span>
-            <span className='font-medium text-foreground'>
+          <div className="space-y-1 text-right">
+            <p className="text-2xl font-bold tracking-tight">
               {process.memory}
-            </span>
+            </p>
+            <p className="text-[10px] font-medium uppercase text-muted-foreground">
+              Memory
+            </p>
           </div>
         </div>
       </CardContent>
