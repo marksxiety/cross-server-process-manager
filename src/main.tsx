@@ -5,7 +5,7 @@ import './index.css'
 import { App } from './App.tsx'
 import { Dashboard } from './pages/Dashboard.tsx'
 import { Template } from './pages/Template.tsx'
-import { Process } from './pages/Process.tsx'
+import { Register } from './pages/Register.tsx'
 
 const router = createBrowserRouter([
   {
@@ -14,7 +14,7 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <Dashboard /> },
       { path: 'template', element: <Template /> },
-      { path: 'process', element: <Process /> },
+      { path: 'register', element: <Register /> },
     ],
   },
 ])

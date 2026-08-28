@@ -27,7 +27,7 @@ import {
 const navItems = [
   { title: 'Dashboard', url: '/', icon: DashboardSquareSettingIcon },
   { title: 'Templates', url: '/template', icon: FormIcon },
-  { title: 'Process', url: '/process', icon: ArtificialIntelligence07Icon },
+  { title: 'Register', url: '/register', icon: ArtificialIntelligence07Icon },
 ]
 
 export function AppSidebar() {
