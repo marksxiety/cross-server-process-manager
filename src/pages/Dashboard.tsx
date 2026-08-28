@@ -56,7 +56,9 @@ export function Dashboard() {
   const [showTileDrawer, setShowTileDrawer] = useState(false)
   const [tileInfo, setTileInfo] = useState<ProcessInfo | null>(null)
 
-  const [serverList, setServerList] = useState<DashboardServer[]>(buildInitialServerList)
+  const [serverList, setServerList] = useState<DashboardServer[]>(
+    buildInitialServerList,
+  )
 
   const handleTileClick = (process: ProcessInfo) => {
     setShowTileDrawer(true)
@@ -77,7 +79,9 @@ export function Dashboard() {
               s.id === ip_address
                 ? {
                     ...s,
-                    host: res.success ? (res.info?.overview ?? undefined) : s.host,
+                    host: res.success
+                      ? (res.info?.overview ?? undefined)
+                      : s.host,
                     status: res.success ? 'online' : 'offline',
                     data: res.success ? (res.info?.processes ?? []) : [],
                     isLoading: false,
@@ -114,12 +118,26 @@ export function Dashboard() {
   }, [])
 
   const isLoading = serverList.some((s) => s.isLoading)
-  const allProcesses = serverList.flatMap((s) => s.data ?? [])
+
+  const allProcesses = serverList
+    .flatMap((s) => s.data ?? [])
+    .sort((a, b) => {
+      const statusWeight = (status: string) => {
+        const s = status.toLowerCase()
+        if (s === 'errored') return 0
+        if (s === 'waiting restart' || s === 'stopping') return 1
+        if (s === 'online' || s === 'launching') return 2
+        return 3 // stopped
+      }
+      return statusWeight(a.status) - statusWeight(b.status)
+    })
   const serverErrors = Object.fromEntries(
     serverList.filter((s) => s.error).map((s) => [s.id, s.error as string]),
   )
 
-  const logServerUrl = serverList.find((s) => s.ip_address === tileInfo?.ip_address)?.url
+  const logServerUrl = serverList.find(
+    (s) => s.ip_address === tileInfo?.ip_address,
+  )?.url
 
   return (
     <>
@@ -346,22 +364,50 @@ export function Dashboard() {
       </Drawer>
 
       <ScrollArea className='h-full'>
-        <div className='space-y-4 p-4'>
-          <ServerTileContainer
-            servers={serverList}
-            isLoading={isLoading}
-            errors={serverErrors}
-          />
-          <Separator />
-          <TileContainer isLoading={isLoading}>
-            {allProcesses.map((process) => (
-              <Tile
-                key={`${process.ip_address}-${process.pm_id}`}
-                process={process}
-                onClick={handleTileClick}
-              />
-            ))}
-          </TileContainer>
+        <div className='mx-auto max-w-[2000px] space-y-8 p-6 lg:p-8'>
+          {/* Infrastructure Section */}
+          <section>
+            <div className='mb-4 flex items-center justify-between'>
+              <h2 className='text-lg font-semibold tracking-tight'>
+                Infrastructure Health
+              </h2>
+              {!isLoading && (
+                <span className='text-sm text-muted-foreground'>
+                  {serverList.length} Nodes
+                </span>
+              )}
+            </div>
+            <ServerTileContainer
+              servers={serverList}
+              isLoading={isLoading}
+              errors={serverErrors}
+            />
+          </section>
+
+          <Separator className='opacity-50' />
+
+          {/* Services Section */}
+          <section>
+            <div className='mb-4 flex items-center justify-between'>
+              <h2 className='text-lg font-semibold tracking-tight'>
+                Active Services
+              </h2>
+              {!isLoading && (
+                <span className='text-sm text-muted-foreground'>
+                  {allProcesses.length} Processes
+                </span>
+              )}
+            </div>
+            <TileContainer isLoading={isLoading}>
+              {allProcesses.map((process) => (
+                <Tile
+                  key={`${process.ip_address}-${process.pm_id}`}
+                  process={process}
+                  onClick={handleTileClick}
+                />
+              ))}
+            </TileContainer>
+          </section>
         </div>
       </ScrollArea>
     </>
