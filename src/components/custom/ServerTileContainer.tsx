@@ -2,26 +2,24 @@ import { Skeleton } from '@/components/ui/skeleton'
 import type { ServerInfo } from '@/types'
 import { ServerTile } from './ServerTile'
 
-interface ServerTileContainerProps {
+export interface ServerTileContainerProps {
   servers: ServerInfo[]
   onServerClick?: (server: ServerInfo) => void
   isLoading?: boolean
   errors?: Record<string, string>
 }
 
-const SKELETON_COUNT = 3
-
-export function ServerTileContainer({
-  servers,
-  onServerClick,
-  isLoading = false,
-  errors,
+export function ServerTileContainer({ 
+  servers, 
+  onServerClick, 
+  isLoading = false, 
+  errors 
 }: ServerTileContainerProps) {
   if (isLoading) {
     return (
-      <div className="grid grid-cols-3 gap-2.5">
-        {Array.from({ length: SKELETON_COUNT }).map((_, i) => (
-          <Skeleton key={i} className="h-16 rounded-md bg-muted/40" />
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} className="h-18 rounded-lg bg-muted/40" />
         ))}
       </div>
     )
@@ -30,7 +28,7 @@ export function ServerTileContainer({
   if (servers.length === 0) return null
 
   return (
-    <div className="grid grid-cols-3 gap-2.5">
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
       {servers.map((server) => (
         <ServerTile
           key={server.id}
