@@ -1,20 +1,44 @@
 import { cn } from '@/lib/utils'
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from '@/components/ui/hover-card'
-import { ScrollArea } from '@/components/ui/scroll-area'
+import { useEffect } from 'react'
 import type { ServerInfo } from '@/types'
-
-const STATUS_LED: Record<string, string> = {
-  ok: 'bg-emerald-500',
-  warn: 'bg-amber-500',
-  crit: 'bg-destructive',
-  offline: 'bg-muted-foreground/40',
-}
+import { StatusBadge } from '@/components/custom/StatusBadge'
 
 type ServerSeverity = 'ok' | 'warn' | 'crit' | 'offline'
+
+const SEVERITY_STYLES: Record<
+  ServerSeverity,
+  {
+    bg: string
+    border: string
+    separator: string
+    vent: string
+  }
+> = {
+  ok: {
+    bg: 'bg-emerald-500/10',
+    border: 'border-emerald-500/30',
+    separator: 'bg-emerald-500/30',
+    vent: 'bg-emerald-500',
+  },
+  warn: {
+    bg: 'bg-amber-500/10',
+    border: 'border-amber-500/30',
+    separator: 'bg-amber-500/30',
+    vent: 'bg-amber-500',
+  },
+  crit: {
+    bg: 'bg-destructive/10',
+    border: 'border-destructive/30',
+    separator: 'bg-destructive/30',
+    vent: 'bg-destructive',
+  },
+  offline: {
+    bg: 'bg-destructive/10',
+    border: 'border-destructive/30',
+    separator: 'bg-destructive/30',
+    vent: 'bg-destructive',
+  },
+}
 
 /**
  * Worst-status-wins severity from the system-overview payload.
@@ -22,7 +46,8 @@ type ServerSeverity = 'ok' | 'warn' | 'crit' | 'offline'
  * cpu: loadAvg[0]/cores - green <=0.7, warn 0.7-1.0, crit >1.0.
  * `offline` covers no-data-yet / unreachable-unconfirmed / confirmed-offline.
  */
-function getServerSeverity(server: ServerInfo): ServerSeverity {  if (!server.host || server.status === 'offline') return 'offline'
+function getServerSeverity(server: ServerInfo, hasError?: boolean): ServerSeverity {
+  if (!server.host || server.status === 'offline' || hasError) return 'offline'
 
   const { cpu, memory } = server.host
   const loadRatio = cpu.loadAvg[0] / cpu.cores
@@ -32,12 +57,31 @@ function getServerSeverity(server: ServerInfo): ServerSeverity {  if (!server.ho
   return 'ok'
 }
 
-function Vents() {
+interface VentsProps {
+  severity: ServerSeverity
+}
+
+function Vents({ severity }: VentsProps) {
   return (
     <div className="flex shrink-0 items-center gap-0.5" aria-hidden="true">
       {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="h-5 w-0.5 rounded-full bg-border" />
+        <div key={i} className={cn('h-5 w-0.5 rounded-full', SEVERITY_STYLES[severity].vent)} />
       ))}
+    </div>
+  )
+}
+
+interface MetricProps {
+  label: string
+  value: string
+  danger?: boolean
+}
+
+function Metric({ label, value, danger }: MetricProps) {
+  return (
+    <div className="flex flex-col items-center gap-0.5 px-3">
+      <span className="text-[9px] uppercase tracking-wide text-muted-foreground">{label}</span>
+      <span className={cn('font-mono text-[11px] font-medium', danger && 'text-destructive')}>{value}</span>
     </div>
   )
 }
@@ -49,65 +93,47 @@ interface ServerTileProps {
 }
 
 export function ServerTile({ server, onClick, error }: ServerTileProps) {
-  const severity = getServerSeverity(server)
+  useEffect(() => {
+    if (error) console.error(`[ServerTile] ${server.name} (${server.ip_address}):`, error)
+  }, [error, server])
+
+  const severity = getServerSeverity(server, !!error)
   const isOffline = severity === 'offline'
+  const styles = SEVERITY_STYLES[severity]
+  const badgeStatus = isOffline ? 'error' : severity === 'crit' ? 'critical' : severity === 'warn' ? 'warning' : 'online'
+
   const memPercent = server.host ? Math.round(server.host.memory.percentUsed) : null
   const loadAvg = server.host ? server.host.cpu.loadAvg[0].toFixed(2) : null
+  const loadRatio = server.host ? (server.host.cpu.loadAvg[0] / server.host.cpu.cores).toFixed(2) : null
 
-  const tile = (
+  return (
     <div
       onClick={onClick ? () => onClick(server) : undefined}
       className={cn(
-        'flex min-w-0 items-center gap-2.5 rounded-md border bg-muted/40 px-3 py-2.5',
-        onClick && 'cursor-pointer select-none transition-colors duration-150 ease-out hover:bg-muted/60',
-        severity === 'crit' && 'border-destructive/40',
+        'flex min-w-0 items-center gap-2.5 rounded-md border px-3 py-3 transition-colors duration-150 ease-out',
+        styles.bg,
+        styles.border,
+        onClick && 'cursor-pointer select-none hover:brightness-95 dark:hover:brightness-110',
       )}
     >
-      <span
-        className={cn('h-2 w-2 shrink-0 rounded-full', error ? 'bg-destructive' : STATUS_LED[severity])}
-        aria-hidden="true"
-      />
+      <Vents severity={severity} />
 
-      <Vents />
-
-      <div className="min-w-0 flex-1 border-l pl-2.5">
+      <div className={cn('min-w-0 flex-1 border-l pl-2.5', styles.border)}>
         <p className="truncate font-mono text-xs font-medium tracking-tight">{server.name}</p>
         <p className="truncate font-mono text-[10px] text-muted-foreground">{server.ip_address}</p>
-        {server.host && (
-          <p className="truncate text-[10px] text-muted-foreground/70">{server.host.cpu.model}</p>
-        )}
       </div>
 
-      {isOffline ? (
-        <span className="shrink-0 text-[10px] text-muted-foreground">
-          {error ? 'error' : 'offline'}
-        </span>
-      ) : (
-        <div className="flex shrink-0 flex-col gap-1 border-l pl-2.5">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[9px] text-muted-foreground">load</span>
-            <span className="font-mono text-[11px] font-medium">{loadAvg}</span>
-          </div>
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[9px] text-muted-foreground">mem</span>
-            <span className="font-mono text-[11px] font-medium">{memPercent}%</span>
-          </div>
+      {!isOffline && (
+        <div className={cn('flex shrink-0 items-center pl-2.5', styles.border)}>
+          <Metric label="CPU" value={loadRatio ?? '–'} danger={severity === 'crit'} />
+          <span className={cn('h-5.5 w-px', styles.separator)} />
+          <Metric label="MEM" value={memPercent !== null ? `${memPercent}%` : '–'} danger={severity === 'crit'} />
+          <span className={cn('h-5.5 w-px', styles.separator)} />
+          <Metric label="LOAD" value={loadAvg ?? '–'} />
         </div>
       )}
+
+      <StatusBadge status={badgeStatus} />
     </div>
-  )
-
-  if (!error) return tile
-
-  return (
-    <HoverCard>
-      <HoverCardTrigger className="block w-full">{tile}</HoverCardTrigger>
-      <HoverCardContent side="top" align="start" className="max-w-72">
-        <p className="font-medium text-destructive">Fetch failed</p>
-        <ScrollArea className="mt-1 max-h-40">
-          <p className="wrap-break-word text-muted-foreground">{error}</p>
-        </ScrollArea>
-      </HoverCardContent>
-    </HoverCard>
   )
 }
