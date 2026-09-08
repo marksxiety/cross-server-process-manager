@@ -10,7 +10,6 @@ import {
   Delete02Icon,
 } from '@hugeicons/core-free-icons'
 import type { ProcessInfo, ServerInfo } from '@/types'
-import servers from '@/data/servers.json'
 import {
   Drawer,
   DrawerContent,
@@ -22,10 +21,7 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { StatusBadge } from '@/components/custom/StatusBadge'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { fetchRegisteredProcesses } from '@/api/services/process'
-import { ProcessLogs } from '@/components/custom/ProcessLogs'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 
 type DashboardServer = ServerInfo & {
   url: string
@@ -34,90 +30,124 @@ type DashboardServer = ServerInfo & {
   error?: string
 }
 
-function getHostname(url: string) {
-  return new URL(url).hostname
-}
-
-function buildInitialServerList(): DashboardServer[] {
-  return servers.map((server) => {
-    const ip_address = getHostname(server.url)
-    return {
-      id: ip_address,
-      name: server.server,
-      ip_address,
-      url: server.url,
-      data: [],
-      isLoading: true,
-    }
-  })
-}
+const MOCK_SERVERS: DashboardServer[] = [
+  {
+    id: '192.168.36.212',
+    name: 'SERVER01',
+    ip_address: '192.168.36.212',
+    url: 'http://192.168.36.212:4000',
+    data: [
+      {
+        pid: 8123,
+        pm_id: 0,
+        name: 'api-gateway',
+        namespace: 'backend',
+        status: 'online',
+        uptime: 482100,
+        restarts: 2,
+        unstable_restarts: 0,
+        exec_mode: 'cluster',
+        instances: 4,
+        interpreter: 'node',
+        cpu: 12.4,
+        ip_address: '192.168.36.212',
+        memory: 184467440,
+        cwd: '/opt/apps/api-gateway',
+        watch: false,
+        autorestart: true,
+      },
+      {
+        pid: 9241,
+        pm_id: 1,
+        name: 'worker-queue',
+        namespace: 'backend',
+        status: 'online',
+        uptime: 482100,
+        restarts: 5,
+        unstable_restarts: 1,
+        exec_mode: 'fork',
+        instances: 1,
+        interpreter: 'node',
+        cpu: 3.1,
+        ip_address: '192.168.36.212',
+        memory: 76309760,
+        cwd: '/opt/apps/worker-queue',
+        watch: false,
+        autorestart: true,
+      },
+    ],
+    isLoading: false,
+  },
+  {
+    id: '192.168.1.2',
+    name: 'SERVER02',
+    ip_address: '192.168.1.2',
+    url: 'http://192.168.1.2:4000',
+    data: [
+      {
+        pid: 0,
+        pm_id: 0,
+        name: 'legacy-cron',
+        namespace: 'jobs',
+        status: 'stopped',
+        uptime: 0,
+        restarts: 12,
+        unstable_restarts: 6,
+        exec_mode: 'fork',
+        instances: 1,
+        interpreter: 'python3',
+        cpu: 0,
+        ip_address: '192.168.1.2',
+        memory: 0,
+        cwd: '/opt/jobs/legacy-cron',
+        watch: false,
+        autorestart: false,
+      },
+    ],
+    isLoading: false,
+  },
+  {
+    id: '192.168.1.3',
+    name: 'SERVER03',
+    ip_address: '192.168.1.3',
+    url: 'http://192.168.1.3:4000',
+    data: [
+      {
+        pid: 3301,
+        pm_id: 0,
+        name: 'report-generator',
+        namespace: 'reports',
+        status: 'errored',
+        uptime: 10400,
+        restarts: 22,
+        unstable_restarts: 18,
+        exec_mode: 'fork',
+        instances: 1,
+        interpreter: 'node',
+        cpu: 0.2,
+        ip_address: '192.168.1.3',
+        memory: 41943040,
+        cwd: '/opt/apps/report-generator',
+        watch: true,
+        autorestart: true,
+      },
+    ],
+    isLoading: false,
+  },
+]
 
 export function Dashboard() {
   const [showTileDrawer, setShowTileDrawer] = useState(false)
   const [tileInfo, setTileInfo] = useState<ProcessInfo | null>(null)
 
-  const [serverList, setServerList] = useState<DashboardServer[]>(
-    buildInitialServerList,
-  )
+  const [serverList] = useState<DashboardServer[]>(MOCK_SERVERS)
 
   const handleTileClick = (process: ProcessInfo) => {
     setShowTileDrawer(true)
     setTileInfo(process)
   }
 
-  useEffect(() => {
-    let cancelled = false
-
-    for (const server of servers) {
-      const ip_address = getHostname(server.url)
-
-      fetchRegisteredProcesses(server.url)
-        .then((res) => {
-          if (cancelled) return
-          setServerList((prev) =>
-            prev.map((s) =>
-              s.id === ip_address
-                ? {
-                    ...s,
-                    host: res.success
-                      ? (res.info?.overview ?? undefined)
-                      : s.host,
-                    status: res.success ? 'online' : 'offline',
-                    data: res.success ? (res.info?.processes ?? []) : [],
-                    isLoading: false,
-                    error: res.success
-                      ? undefined
-                      : res.message || `No data from ${server.url}`,
-                  }
-                : s,
-            ),
-          )
-        })
-        .catch((err) => {
-          if (cancelled) return
-          setServerList((prev) =>
-            prev.map((s) =>
-              s.id === ip_address
-                ? {
-                    ...s,
-                    host: undefined,
-                    status: 'offline',
-                    data: [],
-                    isLoading: false,
-                    error: (err as Error).message,
-                  }
-                : s,
-            ),
-          )
-        })
-    }
-
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  const isLoading = serverList.some((s) => s.isLoading)
+  const isLoading = false
 
   const allProcesses = serverList
     .flatMap((s) => s.data ?? [])
@@ -134,10 +164,6 @@ export function Dashboard() {
   const serverErrors = Object.fromEntries(
     serverList.filter((s) => s.error).map((s) => [s.id, s.error as string]),
   )
-
-  const logServerUrl = serverList.find(
-    (s) => s.ip_address === tileInfo?.ip_address,
-  )?.url
 
   return (
     <>
@@ -160,17 +186,7 @@ export function Dashboard() {
             </div>
           </DrawerHeader>
 
-          <Tabs
-            defaultValue='overview'
-            className='flex flex-1 flex-col overflow-hidden'
-          >
-            <TabsList className='mx-4 mt-3 w-auto'>
-              <TabsTrigger value='overview'>Overview</TabsTrigger>
-              <TabsTrigger value='logs'>Logs</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value='overview' className='flex-1 overflow-hidden'>
-              <ScrollArea className='h-full'>
+          <ScrollArea className='h-full'>
                 {tileInfo && (
                   <div className='space-y-4 p-4'>
                     <div className='grid grid-cols-2 gap-3'>
@@ -279,18 +295,6 @@ export function Dashboard() {
                   </div>
                 )}
               </ScrollArea>
-            </TabsContent>
-
-            {/* Logs tail view */}
-            <TabsContent value='logs' className='flex-1 overflow-hidden'>
-              {tileInfo && logServerUrl && (
-                <ProcessLogs
-                  serverUrl={logServerUrl}
-                  processId={tileInfo.pm_id}
-                />
-              )}
-            </TabsContent>
-          </Tabs>
 
           <DrawerFooter>
             <Separator />
