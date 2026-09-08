@@ -2,6 +2,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import type { ProcessInfo } from '@/types'
 import { StatusBadge } from '@/components/custom/StatusBadge'
+import { formatMemory } from '@/utils/memory'
 
 const STATUS_ACCENT: Record<string, string> = {
   online: 'bg-emerald-500',
@@ -43,32 +44,31 @@ export function Tile({ process, onClick }: TileProps) {
     >
       <div className={cn('h-0.75 w-full shrink-0', getAccentClass(status))} />
 
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-4">
-        <CardTitle className="text-sm font-medium truncate pr-4">
+      <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2 pt-4'>
+        <CardTitle className='text-sm font-medium truncate pr-4'>
           {process.name}
         </CardTitle>
         <StatusBadge status={process.status} />
       </CardHeader>
 
-      <CardContent className="mt-auto flex flex-col justify-end pt-0 pb-4">
-        <div className="text-xs text-muted-foreground font-mono mb-4 truncate">
-          {process.namespace} <span className="opacity-50">·</span> {process.ip_address}
+      <CardContent className='mt-auto flex flex-col justify-end pt-0 pb-4'>
+        <div className='text-xs text-muted-foreground font-mono mb-4 truncate'>
+          {process.namespace} <span className='opacity-50'>·</span>{' '}
+          {process.ip_address}
         </div>
 
-        <div className="flex items-center justify-between border-t pt-3">
-          <div className="space-y-1">
-            <p className="text-2xl font-bold tracking-tight">
-              {process.cpu}%
-            </p>
-            <p className="text-[10px] font-medium uppercase text-muted-foreground">
+        <div className='flex items-center justify-between border-t pt-3'>
+          <div className='space-y-1'>
+            <p className='text-2xl font-bold tracking-tight'>{process.cpu}%</p>
+            <p className='text-[10px] font-medium uppercase text-muted-foreground'>
               CPU Usage
             </p>
           </div>
-          <div className="space-y-1 text-right">
-            <p className="text-2xl font-bold tracking-tight">
-              {process.memory}
+          <div className='space-y-1 text-right'>
+            <p className='text-2xl font-bold tracking-tight'>
+              {formatMemory(process.memory)}
             </p>
-            <p className="text-[10px] font-medium uppercase text-muted-foreground">
+            <p className='text-[10px] font-medium uppercase text-muted-foreground'>
               Memory
             </p>
           </div>
