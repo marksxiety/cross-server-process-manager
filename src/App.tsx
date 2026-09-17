@@ -6,6 +6,7 @@ import {
 import { HugeiconsIcon } from '@hugeicons/react'
 import { SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/custom/AppSidebar'
+import { ThemeToggle } from '@/components/custom/ThemeToggle'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useFullscreen } from '@/hooks/use-fullscreen'
@@ -43,8 +44,9 @@ function AppLayout() {
             <SidebarTrigger />
           </div>
 
-          {/* Fullscreen Trigger */}
+          {/* Theme & Fullscreen Triggers */}
           <div className="flex items-center gap-2">
+            <ThemeToggle />
             <Button
               variant="ghost"
               size="icon"
