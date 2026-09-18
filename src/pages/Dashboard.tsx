@@ -1,231 +1,182 @@
 import { useEffect, useMemo, useState } from 'react'
-import { HugeiconsIcon } from '@hugeicons/react'
-import {
-  Delete02Icon,
-  PlayIcon,
-  ReloadIcon,
-  ServerStack01Icon,
-  StopIcon,
-} from '@hugeicons/core-free-icons'
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion'
-import { Badge } from '@/components/ui/badge'
+import { RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardDescription, CardTitle } from '@/components/ui/card'
-import { Progress } from '@/components/ui/progress'
+import { Card } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
-import { StatusDot } from '@/components/custom/status-dot'
-import {
-  percentTone,
-  processTone,
-  serverTone,
-  toneBadgeVariant,
-  toneIconClasses,
-  toneProgressClasses,
-  toneSurfaceClasses,
-  toneTextClasses,
-} from '@/lib/status-tone'
-import type { Tone } from '@/types/tone'
+import { Spinner } from '@/components/ui/spinner'
+import { Process } from '@/components/custom/process'
+import { ServerHeader } from '@/components/custom/server-header'
+import { serverTone, toneSurfaceClasses } from '@/lib/status-tone'
+import { DASHBOARD_AUTO_REFRESH_MS } from '@/lib/swr'
 import { cn } from '@/lib/utils'
 import { useDashboardStore } from '@/stores/dashboard.store'
-import type { ServerProcesses } from '@/types/dashboard'
-import type { ProcessSummary } from '@/types/process'
-import type { RegisteredServer } from '@/types/server'
-
-function formatMemory(bytes: number) {
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
-}
-
-function StatBar({ label, value, tone }: { label: string; value: number; tone: Tone }) {
-  return (
-    <div className='flex-1'>
-      <div className='mb-0.5 flex justify-between text-xs uppercase tracking-wide text-muted-foreground'>
-        <span>{label}</span>
-        <span className={cn('font-semibold', toneTextClasses[tone])}>{value.toFixed(0)}%</span>
-      </div>
-      <Progress
-        value={Math.min(value, 100)}
-        className={cn('**:data-[slot=progress-track]:h-1.5', toneProgressClasses[tone])}
-      />
-    </div>
-  )
-}
-
-function ProcessActions({
-  status,
-  onRestart,
-  onStop,
-  onDelete,
-}: {
-  status: ProcessSummary['status']
-  onRestart: () => void
-  onStop: () => void
-  onDelete: () => void
-}) {
-  return (
-    <div className='flex items-center gap-0.5'>
-      {status === 'stopped' && (
-        <Button variant='ghost' size='icon-sm' onClick={onRestart} aria-label='Start'>
-          <HugeiconsIcon icon={PlayIcon} strokeWidth={2} className='size-3.5' />
-        </Button>
-      )}
-      {(status === 'online' || status === 'errored') && (
-        <Button variant='ghost' size='icon-sm' onClick={onRestart} aria-label='Restart'>
-          <HugeiconsIcon icon={ReloadIcon} strokeWidth={2} className='size-3.5' />
-        </Button>
-      )}
-      {status === 'online' && (
-        <Button variant='ghost' size='icon-sm' onClick={onStop} aria-label='Stop'>
-          <HugeiconsIcon icon={StopIcon} strokeWidth={2} className='size-3.5' />
-        </Button>
-      )}
-      <Separator orientation='vertical' className='mx-1 h-3' />
-      <Button
-        variant='ghost'
-        size='icon-sm'
-        className='text-destructive hover:text-destructive'
-        onClick={onDelete}
-        aria-label='Delete'
-      >
-        <HugeiconsIcon icon={Delete02Icon} strokeWidth={2} className='size-3.5' />
-      </Button>
-    </div>
-  )
-}
-
-function ProcessRow({ process }: { process: ProcessSummary }) {
-  const tone = processTone(process.status)
-
-  const handleRestart = () => console.log('restart', process.pm_id) // TODO: wire to store action
-  const handleStop = () => console.log('stop', process.pm_id) // TODO: wire to store action
-  const handleDelete = () => console.log('delete', process.pm_id) // TODO: wire to store action + confirm dialog
-
-  return (
-    <div
-      className={cn(
-        'flex items-center gap-2 rounded-md px-2 py-1.5',
-        tone === 'danger' && toneSurfaceClasses.danger,
-      )}
-    >
-      <StatusDot tone={tone} />
-      <span
-        className={cn(
-          'w-28 truncate text-xs font-medium',
-          tone === 'danger' && toneTextClasses.danger,
-        )}
-      >
-        {process.name}
-      </span>
-      <span className='flex-1 truncate text-xs text-muted-foreground'>
-        pm_id {process.pm_id} · {process.status}
-        {process.status === 'online' && ` · ${process.cpu}% · ${formatMemory(process.memory)}`}
-        {process.status === 'errored' && ` · ${process.restarts} restarts`}
-      </span>
-      <ProcessActions status={process.status} onRestart={handleRestart} onStop={handleStop} onDelete={handleDelete} />
-    </div>
-  )
-}
-
-function ServerHeader({ server, entry }: { server: RegisteredServer; entry: ServerProcesses | undefined }) {
-  const tone = serverTone(entry)
-  const processes = entry?.status === 'success' ? entry.processes : []
-  const overview = entry?.status === 'success' ? entry.overview : null
-  const loadPct = overview ? Math.min((overview.cpu.loadAvg[0] / overview.cpu.cores) * 100, 100) : null
-
-  return (
-    <div className='flex w-full items-center gap-3'>
-      <div className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-lg', toneIconClasses[tone])}>
-        <HugeiconsIcon icon={ServerStack01Icon} strokeWidth={2} className='size-4.5' />
-      </div>
-      <div className='w-28 text-left'>
-        <CardTitle>{server.server}</CardTitle>
-        <CardDescription>
-          {server.host}:{server.port}
-        </CardDescription>
-      </div>
-
-      {overview && loadPct !== null ? (
-        <>
-          <StatBar label='Load' value={loadPct} tone={percentTone(loadPct)} />
-          <StatBar label='Mem' value={overview.memory.percentUsed} tone={percentTone(overview.memory.percentUsed)} />
-        </>
-      ) : entry?.status === 'error' ? (
-        <div className={cn('flex-1 text-xs font-medium', toneTextClasses.danger)}>
-          {entry.error ?? 'Unreachable'}
-        </div>
-      ) : (
-        <div className='flex-1 text-xs text-muted-foreground'>Loading…</div>
-      )}
-
-      <Badge variant={toneBadgeVariant[tone]} className='text-xs'>
-        {entry?.status === 'success' ? `${processes.length} proc` : '—'}
-      </Badge>
-    </div>
-  )
-}
 
 export function Dashboard() {
   const servers = useDashboardStore((state) => state.servers)
   const serversStatus = useDashboardStore((state) => state.serversStatus)
   const serversError = useDashboardStore((state) => state.serversError)
   const processesByServer = useDashboardStore((state) => state.processesByServer)
+  const isRefreshing = useDashboardStore((state) => state.isRefreshing)
   const load = useDashboardStore((state) => state.load)
+  const refresh = useDashboardStore((state) => state.refresh)
+  const reload = useDashboardStore((state) => state.reload)
 
   const [openServers, setOpenServers] = useState<string[] | null>(null)
 
   const defaultOpen = useMemo(
-    () => servers.filter((s) => serverTone(processesByServer[s.server]) !== 'success').map((s) => s.server),
+    () =>
+      servers
+        .filter((s) => serverTone(processesByServer[s.server]) !== 'success')
+        .map((s) => s.server),
     [servers, processesByServer],
   )
 
   const openList = openServers ?? defaultOpen
 
   const handleOpenChange = (serverName: string, isOpen: boolean) => {
-    setOpenServers(isOpen ? [...openList, serverName] : openList.filter((name) => name !== serverName))
+    setOpenServers(
+      isOpen
+        ? [...openList, serverName]
+        : openList.filter((name) => name !== serverName),
+    )
   }
+
+  const handleRestart = (pmId: number) => console.log('restart', pmId) // TODO: wire to store action
+  const handleStop = (pmId: number) => console.log('stop', pmId) // TODO: wire to store action
+  const handleDelete = (pmId: number) => console.log('delete', pmId) // TODO: wire to store action + confirm dialog
 
   useEffect(() => {
     void load()
   }, [load])
 
+  useEffect(() => {
+    const intervalId = setInterval(
+      () => void refresh(),
+      DASHBOARD_AUTO_REFRESH_MS,
+    )
+    return () => clearInterval(intervalId)
+  }, [refresh])
+
   return (
     <ScrollArea className='h-full'>
       <div className='p-4'>
-        <h1 className='text-2xl font-semibold tracking-tight'>Dashboard</h1>
+        <div className='flex items-center justify-between'>
+          <h1 className='text-2xl font-semibold tracking-tight'>
+            Servers Overview
+          </h1>
 
-        {serversStatus === 'loading' && <p className='mt-4 text-sm text-muted-foreground'>Loading servers…</p>}
-        {serversStatus === 'error' && <p className='mt-4 text-sm text-destructive'>{serversError}</p>}
+          <div className='flex items-center gap-2'>
+            {isRefreshing && (
+              <div className='flex items-center gap-2 text-sm text-muted-foreground'>
+                <Spinner className='size-4' />
+                <span>Refreshing...</span>
+              </div>
+            )}
+            <Button
+              variant='ghost'
+              size='icon-sm'
+              onClick={() => void reload()}
+              disabled={serversStatus === 'loading' || isRefreshing}
+              aria-label='Refresh servers and processes'
+              title='Refresh servers and processes'
+            >
+              <RefreshCw
+                strokeWidth={2}
+                className={cn(isRefreshing && 'animate-spin')}
+              />
+            </Button>
+          </div>
+        </div>
+
+        {serversStatus === 'loading' && (
+          <div className='mt-4 flex items-center gap-2 text-sm text-muted-foreground'>
+            <Spinner className='size-4' />
+            Loading servers…
+          </div>
+        )}
+        {serversError && (
+          <p className='mt-4 text-sm text-destructive'>{serversError}</p>
+        )}
 
         {serversStatus === 'success' && (
           <div className='mt-4 space-y-2'>
             {servers.map((server) => {
               const entry = processesByServer[server.server]
-              const canExpand = entry?.status === 'success' && entry.processes.length > 0
+              const processes =
+                entry?.status === 'success' ? entry.processes : []
+              const canExpand =
+                entry?.status === 'error' || processes.length > 0
 
               return (
                 <Card key={server.server}>
                   <Accordion
-                    value={openList.includes(server.server) ? [server.server] : []}
-                    onValueChange={(value) => handleOpenChange(server.server, value.includes(server.server))}
+                    value={
+                      openList.includes(server.server) ? [server.server] : []
+                    }
+                    onValueChange={(value) =>
+                      handleOpenChange(
+                        server.server,
+                        value.includes(server.server),
+                      )
+                    }
                     className='rounded-none border-0'
                   >
-                    <AccordionItem value={server.server} className='border-0 data-open:bg-transparent'>
-                      <AccordionTrigger className='px-(--card-spacing) py-2.5 hover:no-underline' disabled={!canExpand}>
+                    <AccordionItem
+                      value={server.server}
+                      className='border-0 data-open:bg-transparent'
+                    >
+                      <AccordionTrigger
+                        className='px-(--card-spacing) py-2.5 hover:no-underline'
+                        disabled={!canExpand}
+                      >
                         <ServerHeader server={server} entry={entry} />
                       </AccordionTrigger>
-                      {canExpand && (
+                      {entry?.status === 'error' ? (
+                        <AccordionContent className='relative pb-2 pl-9'>
+                          <Separator
+                            orientation='vertical'
+                            className='absolute left-4 top-0 bottom-2'
+                          />
+                          {entry.error && (
+                            <div
+                              className={cn(
+                                'space-y-1 rounded-md px-2 py-1.5',
+                                toneSurfaceClasses.danger,
+                              )}
+                            >
+                              <p className='whitespace-pre-wrap wrap-break-words text-destructive'>
+                                {entry.error.message}
+                              </p>
+                              <p className='font-mono text-muted-foreground'>
+                                {entry.error.code} · HTTP {entry.error.status}
+                              </p>
+                            </div>
+                          )}
+                        </AccordionContent>
+                      ) : canExpand ? (
                         <AccordionContent className='relative space-y-0.5 pb-2 pl-9'>
-                          <Separator orientation='vertical' className='absolute left-4 top-0 bottom-2' />
-                          {entry.processes.map((process) => (
-                            <ProcessRow key={process.pm_id} process={process} />
+                          <Separator
+                            orientation='vertical'
+                            className='absolute left-4 top-0 bottom-2'
+                          />
+                          {processes.map((process) => (
+                            <Process
+                              key={process.pm_id}
+                              process={process}
+                              onRestart={() => handleRestart(process.pm_id)}
+                              onStop={() => handleStop(process.pm_id)}
+                              onDelete={() => handleDelete(process.pm_id)}
+                            />
                           ))}
                         </AccordionContent>
-                      )}
+                      ) : null}
                     </AccordionItem>
                   </Accordion>
                 </Card>
