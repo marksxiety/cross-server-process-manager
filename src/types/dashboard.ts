@@ -3,9 +3,15 @@ import type { SystemOverview } from "@/types/system";
 
 export type LoadStatus = "idle" | "loading" | "success" | "error";
 
+export interface ServerError {
+    code: string;
+    message: string;
+    status: number;
+}
+
 export interface ServerProcesses {
     status: LoadStatus;
     processes: ProcessSummary[];
     overview: SystemOverview | null;
-    error: string | null;
+    error: ServerError | null;
 }
