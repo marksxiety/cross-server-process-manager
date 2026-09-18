@@ -1,9 +1,5 @@
 import { Outlet } from 'react-router'
-import {
-  FullScreenIcon,
-  ArrowShrink02Icon,
-} from '@hugeicons/core-free-icons'
-import { HugeiconsIcon } from '@hugeicons/react'
+import { Maximize, Minimize2 } from 'lucide-react'
 import { SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/custom/AppSidebar'
 import { ThemeToggle } from '@/components/custom/ThemeToggle'
@@ -55,11 +51,11 @@ function AppLayout() {
               title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
               aria-label={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
             >
-              <HugeiconsIcon
-                icon={isFullscreen ? ArrowShrink02Icon : FullScreenIcon}
-                size={18}
-                strokeWidth={2}
-              />
+              {isFullscreen ? (
+                <Minimize2 size={18} strokeWidth={2} />
+              ) : (
+                <Maximize size={18} strokeWidth={2} />
+              )}
             </Button>
           </div>
         </header>
