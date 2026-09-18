@@ -1,11 +1,10 @@
 import { NavLink, useLocation } from 'react-router'
-import { HugeiconsIcon } from '@hugeicons/react'
 import {
-  DashboardSquareSettingIcon,
-  FormIcon,
-  ArtificialIntelligence07Icon,
-  ChartRelationshipIcon,
-} from '@hugeicons/core-free-icons'
+  Bot,
+  FileText,
+  LayoutDashboard,
+  Network,
+} from 'lucide-react'
 import {
   Sidebar,
   SidebarContent,
@@ -25,9 +24,9 @@ import {
 } from '@/components/ui/tooltip'
 
 const navItems = [
-  { title: 'Dashboard', url: '/', icon: DashboardSquareSettingIcon },
-  { title: 'Templates', url: '/template', icon: FormIcon },
-  { title: 'Register', url: '/register', icon: ArtificialIntelligence07Icon },
+  { title: 'Dashboard', url: '/', icon: LayoutDashboard },
+  { title: 'Templates', url: '/template', icon: FileText },
+  { title: 'Register', url: '/register', icon: Bot },
 ]
 
 export function AppSidebar() {
@@ -44,11 +43,7 @@ export function AppSidebar() {
                 render={
                   <SidebarMenuButton size='lg' className='cursor-default'>
                     <div className='relative flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground'>
-                      <HugeiconsIcon
-                        icon={ChartRelationshipIcon}
-                        strokeWidth={2}
-                        className='size-4'
-                      />
+                      <Network strokeWidth={2} className='size-4' />
                     </div>
                     <div className='grid flex-1 text-left leading-tight'>
                       <span className='truncate text-sm font-semibold tracking-tight'>
@@ -89,11 +84,7 @@ export function AppSidebar() {
                   isActive={pathname === item.url}
                   tooltip={item.title}
                 >
-                  <HugeiconsIcon
-                    icon={item.icon}
-                    strokeWidth={2}
-                    className='size-4 shrink-0'
-                  />
+                  <item.icon strokeWidth={2} className='size-4 shrink-0' />
                   <span className='group-data-[collapsible=icon]:hidden'>
                     {item.title}
                   </span>
