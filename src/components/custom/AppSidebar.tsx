@@ -1,10 +1,6 @@
 import { NavLink, useLocation } from 'react-router'
-import {
-  Bot,
-  FileText,
-  LayoutDashboard,
-  Network,
-} from 'lucide-react'
+import { Bot, FileText, LayoutDashboard } from 'lucide-react'
+import xpmIcon from '@/assets/xpm-icon.svg'
 import {
   Sidebar,
   SidebarContent,
@@ -22,6 +18,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { Separator } from "@/components/ui/separator"
 
 const navItems = [
   { title: 'Dashboard', url: '/', icon: LayoutDashboard },
@@ -36,20 +33,22 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible='icon'>
       <SidebarHeader>
-        <SidebarMenu>
+        <SidebarMenu className='p-1'>
           <SidebarMenuItem>
             <Tooltip>
               <TooltipTrigger
                 render={
-                  <SidebarMenuButton size='lg' className='cursor-default'>
-                    <div className='relative flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground'>
-                      <Network strokeWidth={2} className='size-4' />
-                    </div>
+                  <SidebarMenuButton size='lg' className='cursor-default p-0.5'>
+                    <img
+                      src={xpmIcon}
+                      alt='XPM logo'
+                      className='size-8 shrink-0 rounded-lg border border-sidebar-border'
+                    />
                     <div className='grid flex-1 text-left leading-tight'>
                       <span className='truncate text-sm font-semibold tracking-tight'>
                         XPM
                       </span>
-                      <span className='truncate text-xs text-muted-foreground'>
+                      <span className='text-xs text-muted-foreground text-wrap'>
                         Cross-Server Process Manager
                       </span>
                     </div>
@@ -66,8 +65,8 @@ export function AppSidebar() {
             </Tooltip>
           </SidebarMenuItem>
         </SidebarMenu>
+        <Separator className='mx-2' />
       </SidebarHeader>
-
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>General</SidebarGroupLabel>
