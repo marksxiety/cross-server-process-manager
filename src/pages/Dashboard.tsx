@@ -73,12 +73,6 @@ export function Dashboard() {
           </h1>
 
           <div className='flex items-center gap-2'>
-            {isRefreshing && (
-              <div className='flex items-center gap-2 text-sm text-muted-foreground'>
-                <Spinner className='size-4' />
-                <span>Refreshing...</span>
-              </div>
-            )}
             <Button
               variant='ghost'
               size='icon-sm'
