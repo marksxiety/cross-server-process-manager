@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { fetchRegisteredServers } from "@/api/services/registry.service";
+import { serverService } from "@/api/services/server.service";
 import { processService } from "@/api/services/process.service";
 import {
     UNKNOWN_ERROR_CODE,
@@ -44,7 +44,8 @@ export const useDashboardStore = create<DashboardState>()(
                     typeof candidate.server === "string" &&
                     (candidate.protocol === "http" || candidate.protocol === "https") &&
                     typeof candidate.host === "string" &&
-                    typeof candidate.port === "number"
+                    typeof candidate.port === "number" &&
+                    typeof candidate.is_active === "boolean"
                 );
             }
 
@@ -128,7 +129,7 @@ export const useDashboardStore = create<DashboardState>()(
             // Fetches the registered servers and stores them with serversFetchedAt, which
             // drives the SWR freshness check. Used by runLoad and reload.
             async function fetchAndStoreRegistry(): Promise<string | null> {
-                const result = await fetchRegisteredServers();
+                const result = await serverService().list();
                 const servers = result.info;
 
                 if (!result.success || !servers) return result.message;
