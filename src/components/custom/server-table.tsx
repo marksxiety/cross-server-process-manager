@@ -25,16 +25,24 @@ export function ServerTable({ servers }: ServerTableProps) {
           <TableHead>Host</TableHead>
           <TableHead>Port</TableHead>
           <TableHead>Status</TableHead>
-          <TableHead className='text-right'>Actions</TableHead>
+          <TableHead className='w-0 text-right'>Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {servers.map((server) => (
           <TableRow key={server.server}>
             <TableCell className='font-medium'>{server.server}</TableCell>
-            <TableCell className='uppercase'>{server.protocol}</TableCell>
-            <TableCell className='font-mono'>{server.host}</TableCell>
-            <TableCell className='font-mono'>{server.port}</TableCell>
+            <TableCell>
+              <Badge variant='outline' className='font-mono text-xs font-normal'>
+                {server.protocol.toUpperCase()}
+              </Badge>
+            </TableCell>
+            <TableCell className='font-mono text-muted-foreground'>
+              {server.host}
+            </TableCell>
+            <TableCell className='font-mono text-muted-foreground'>
+              {server.port}
+            </TableCell>
             <TableCell>
               <Badge variant={server.is_active ? 'success' : 'secondary'}>
                 {server.is_active ? 'Active' : 'Inactive'}
