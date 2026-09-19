@@ -1,4 +1,4 @@
-import { Outlet } from 'react-router'
+import { Outlet, useMatches } from 'react-router'
 import { Maximize, Minimize2 } from 'lucide-react'
 import { SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/custom/AppSidebar'
@@ -6,6 +6,8 @@ import { ThemeToggle } from '@/components/custom/ThemeToggle'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useFullscreen } from '@/hooks/use-fullscreen'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import type { PageHandle } from '@/types/page'
 
 export function App() {
   return (
@@ -18,6 +20,9 @@ export function App() {
 function AppLayout() {
   const { isFullscreen, toggleFullscreen } = useFullscreen()
   const { setOpenMobile } = useSidebar()
+  const matches = useMatches()
+  const { title, description, center } = (matches.at(-1)?.handle ??
+    {}) as PageHandle
 
   const handleToggleFullscreen = () => {
     if (!isFullscreen) setOpenMobile(false)
@@ -61,8 +66,31 @@ function AppLayout() {
         </header>
 
         {/* Scrollable Page Content */}
-        <div className="min-h-0 flex-1 overflow-y-auto bg-muted/30">
-          <Outlet />
+        <div className="min-h-0 flex-1 overflow-hidden bg-muted/30">
+          <ScrollArea className="h-full">
+            <div className="flex min-h-full flex-col px-6 py-4">
+              {title && (
+                <div className="space-y-1 mb-4">
+                  <h1 className="text-2xl font-semibold tracking-tight">
+                    {title}
+                  </h1>
+                  {description && (
+                    <p className="text-sm text-muted-foreground">
+                      {description}
+                    </p>
+                  )}
+                </div>
+              )}
+              <div
+                className={cn(
+                  'flex-1',
+                  center && 'flex items-center justify-center',
+                )}
+              >
+                <Outlet />
+              </div>
+            </div>
+          </ScrollArea>
         </div>
       </SidebarInset>
     </>
