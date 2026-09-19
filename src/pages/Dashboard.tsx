@@ -1,13 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router'
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion'
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, ServerOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { Spinner } from '@/components/ui/spinner'
@@ -99,7 +108,25 @@ export function Dashboard() {
           <p className='mt-4 text-sm text-destructive'>{serversError}</p>
         )}
 
-        {serversStatus === 'success' && (
+        {serversStatus === 'success' && servers.length === 0 && (
+          <Empty className='mt-4'>
+            <EmptyHeader>
+              <EmptyMedia variant='icon'>
+                <ServerOff strokeWidth={2} />
+              </EmptyMedia>
+              <EmptyTitle>No registered servers</EmptyTitle>
+              <EmptyDescription>
+                No servers are registered yet. Register a server to start
+                monitoring its processes.
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button render={<Link to='/server' />}>Register a server</Button>
+            </EmptyContent>
+          </Empty>
+        )}
+
+        {serversStatus === 'success' && servers.length > 0 && (
           <div className='mt-4 space-y-2'>
             {servers.map((server) => {
               const entry = processesByServer[server.server]
