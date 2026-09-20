@@ -36,9 +36,18 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { Spinner } from '@/components/ui/spinner'
+import { toast } from '@/components/ui/toast'
 import { PageHeader } from '@/components/custom/page-header'
 import { ServerTable } from '@/components/custom/server-table'
 import { useServerStore } from '@/stores/server.store'
+import { serverService } from '@/api/services/server.service'
+import {
+  registerServerSchema,
+  type RegisterServerInput,
+  type RegisterServerValues,
+} from '@/schemas/server.schema'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { Controller, useForm } from 'react-hook-form'
 
 type StatusFilter = 'all' | 'active' | 'inactive'
 
@@ -49,10 +58,57 @@ export function Server() {
   const status = useServerStore((state) => state.status)
   const error = useServerStore((state) => state.error)
   const load = useServerStore((state) => state.load)
+  const reload = useServerStore((state) => state.reload)
+
+  const {
+    register,
+    control,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<RegisterServerInput, unknown, RegisterServerValues>({
+    resolver: zodResolver(registerServerSchema),
+    defaultValues: {
+      server: '',
+      protocol: 'http',
+      host: '',
+      port: 4000,
+      is_active: true,
+    },
+  })
 
   useEffect(() => {
     void load()
   }, [load])
+
+  const onSubmit = handleSubmit(async (values) => {
+    const request = serverService()
+      .register(values)
+      .then((result) => {
+        if (!result.success) throw new Error(result.message)
+        return result
+      })
+
+    try {
+      await toast.promise(request, {
+        loading: { title: 'Registering server…' },
+        success: {
+          title: 'Server registered',
+          description: `${values.server} was added.`,
+        },
+        error: (error) => ({
+          title: 'Registration failed',
+          description: error instanceof Error ? error.message : String(error),
+        }),
+      })
+
+      await reload()
+      reset()
+      setIsSheetOpen(false)
+    } catch {
+      // toast.promise already surfaced the error; keep the sheet open.
+    }
+  })
 
   const counts = useMemo(
     () => ({
@@ -104,41 +160,63 @@ export function Server() {
             </SheetHeader>
 
             <div className='flex-1 overflow-y-auto px-6'>
-              <form id='register-server-form'>
+              <form id='register-server-form' onSubmit={onSubmit}>
                 <FieldSet>
                   <FieldGroup className='grid grid-cols-2 gap-3'>
-                    <Field>
+                    <Field data-invalid={!!errors.server}>
                       <FieldLabel htmlFor='server'>Server</FieldLabel>
-                      <Input id='server' placeholder='prod-web-1' />
-                      <FieldError />
+                      <Input id='server' aria-invalid={!!errors.server} {...register('server')} />
+                      <FieldError errors={[errors.server]} />
                     </Field>
-
-                    <Field>
+                    <Field data-invalid={!!errors.protocol}>
                       <FieldLabel htmlFor='protocol'>Protocol</FieldLabel>
-                      <Select>
-                        <SelectTrigger id='protocol'>
-                          <SelectValue placeholder='http' />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value='http'>http</SelectItem>
-                          <SelectItem value='https'>https</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FieldError />
+                      <Controller
+                        control={control}
+                        name='protocol'
+                        render={({ field }) => (
+                          <Select
+                            value={field.value}
+                            onValueChange={field.onChange}
+                          >
+                            <SelectTrigger
+                              id='protocol'
+                              aria-invalid={!!errors.protocol}
+                            >
+                              <SelectValue placeholder='http' />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value='http'>http</SelectItem>
+                              <SelectItem value='https'>https</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                      <FieldError errors={[errors.protocol]} />
                     </Field>
                   </FieldGroup>
 
                   <FieldGroup className='grid grid-cols-3 gap-3 mt-3'>
-                    <Field className='col-span-2'>
+                    <Field className='col-span-2' data-invalid={!!errors.host}>
                       <FieldLabel htmlFor='host'>Host</FieldLabel>
-                      <Input id='host' placeholder='192.168.1.10' />
-                      <FieldError />
+                      <Input
+                        id='host'
+                        placeholder='192.168.1.10'
+                        aria-invalid={!!errors.host}
+                        {...register('host')}
+                      />
+                      <FieldError errors={[errors.host]} />
                     </Field>
 
-                    <Field>
+                    <Field data-invalid={!!errors.port}>
                       <FieldLabel htmlFor='port'>Port</FieldLabel>
-                      <Input id='port' type='number' placeholder='4000' />
-                      <FieldError />
+                      <Input
+                        id='port'
+                        type='number'
+                        placeholder='4000'
+                        aria-invalid={!!errors.port}
+                        {...register('port')}
+                      />
+                      <FieldError errors={[errors.port]} />
                     </Field>
                   </FieldGroup>
 
@@ -154,21 +232,39 @@ export function Server() {
                         Include in dashboard display.
                       </FieldDescription>
                     </div>
-                    <Switch id='is_active' />
+                    <Controller
+                      control={control}
+                      name='is_active'
+                      render={({ field }) => (
+                        <Switch
+                          id='is_active'
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      )}
+                    />
                   </Field>
                 </FieldSet>
               </form>
             </div>
 
             <SheetFooter className='grid grid-cols-2'>
-              <Button type='button' variant='outline' className='w-full'>
+              <Button
+                type='button'
+                variant='outline'
+                className='w-full'
+                disabled={isSubmitting}
+                onClick={() => reset()}
+              >
                 Clear
               </Button>
               <Button
                 type='submit'
                 form='register-server-form'
                 className='w-full'
+                disabled={isSubmitting}
               >
+                {isSubmitting && <Spinner className='size-4' />}
                 Register
               </Button>
             </SheetFooter>
