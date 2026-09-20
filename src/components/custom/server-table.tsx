@@ -19,7 +19,7 @@ export function ServerTable({ servers }: ServerTableProps) {
   return (
     <Table>
       <TableHeader>
-        <TableRow>
+        <TableRow className='bg-muted/50'>
           <TableHead>Server</TableHead>
           <TableHead>Protocol</TableHead>
           <TableHead>Host</TableHead>
