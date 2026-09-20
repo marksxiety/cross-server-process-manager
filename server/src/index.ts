@@ -1,12 +1,10 @@
 import express from 'express';
 import type { NextFunction, Request, Response } from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
+import './config/env';
 import { health } from './controllers/healthController';
-import { index as servers } from './controllers/serverController';
+import { index as servers, register } from './controllers/serverController';
 import { fail } from './utils/response';
-
-dotenv.config();
 
 const app = express();
 const port = parseInt(process.env.PORT || '3000', 10);
@@ -16,6 +14,7 @@ app.use(express.json());
 
 app.get('/', health);
 app.get('/servers', servers);
+app.post('/register', register);
 
 app.use((req: Request, res: Response) => {
     fail(res, 404, `Route ${req.method} ${req.originalUrl} not found`, 'NOT_FOUND');
