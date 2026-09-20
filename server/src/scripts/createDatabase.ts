@@ -1,7 +1,5 @@
 import { Client } from 'pg';
-import dotenv from 'dotenv';
-
-dotenv.config();
+import '../config/env';
 
 const MAINTENANCE_DB = process.env.DB_MAINTENANCE || 'postgres';
 
@@ -15,7 +13,7 @@ function quoteIdentifier(name: string): string {
 async function createDatabase(): Promise<void> {
     const database = process.env.DB_NAME;
     if (!database) {
-        throw new Error('DB_NAME is not set — check server/.env');
+        throw new Error('DB_NAME is not set — check .env');
     }
 
     const client = new Client({
