@@ -40,6 +40,12 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         ok(res, 'Server registered successfully', rows[0]);
     } catch (err) {
         console.error(err);
-        fail(res, 500, 'Failed to register server', 'INTERNAL_SERVER_ERROR');
+        const dbError = err as { detail?: string; code?: string; message?: string };
+        fail(
+            res,
+            dbError.code === '23505' ? 409 : 500,
+            dbError.detail ?? dbError.message ?? 'Failed to register server',
+            dbError.code ?? 'INTERNAL_SERVER_ERROR'
+        );
     }
 };
