@@ -22,7 +22,5 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-public/data/*.json
-src/data/*.json
 
 *.env
