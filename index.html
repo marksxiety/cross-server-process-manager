@@ -2,21 +2,115 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" href="./src/assets/xpm-icon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>XPM</title>
     <script>
       (function () {
-        var stored = localStorage.getItem('theme')
+        var stored = localStorage.getItem("theme");
         var isDark = stored
-          ? stored === 'dark'
-          : window.matchMedia('(prefers-color-scheme: dark)').matches
-        document.documentElement.classList.toggle('dark', isDark)
-      })()
+          ? stored === "dark"
+          : window.matchMedia("(prefers-color-scheme: dark)").matches;
+        document.documentElement.classList.toggle("dark", isDark);
+      })();
     </script>
+    <style>
+      :root {
+        color-scheme: light;
+        --xpm-bg: oklch(1 0 0);
+        --xpm-border: oklch(0.922 0 0);
+        --xpm-muted-fg: oklch(0.556 0 0);
+        --xpm-primary: oklch(0.205 0 0);
+      }
+      html.dark {
+        color-scheme: dark;
+        --xpm-bg: oklch(0.145 0 0);
+        --xpm-border: oklch(1 0 0 / 10%);
+        --xpm-muted-fg: oklch(0.708 0 0);
+        --xpm-primary: oklch(0.922 0 0);
+      }
+
+      #initial-loader {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--xpm-bg);
+        z-index: 9999;
+        transition: opacity 0.2s ease;
+      }
+      #initial-loader .icon-wrap {
+        width: 64px;
+        height: 64px;
+        animation: xpm-breathe 2.4s ease-in-out infinite;
+      }
+      #initial-loader .progress-track {
+        position: absolute;
+        top: calc(50% + 52px);
+        left: 50%;
+        transform: translateX(-50%);
+        width: 120px;
+        height: 3px;
+        border-radius: 3px;
+        overflow: hidden;
+        background: var(--xpm-border);
+      }
+      #initial-loader .progress-fill {
+        position: absolute;
+        top: 0;
+        left: -45%;
+        height: 100%;
+        width: 40%;
+        border-radius: 3px;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          var(--xpm-muted-fg),
+          var(--xpm-primary),
+          transparent
+        );
+        animation: xpm-slide 1.3s ease-in-out infinite;
+      }
+
+      #initial-loader .xpm-icon {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      @keyframes xpm-breathe {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.045);
+        }
+      }
+      @keyframes xpm-slide {
+        0% {
+          left: -45%;
+        }
+        100% {
+          left: 105%;
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="initial-loader">
+        <div class="icon-wrap">
+          <img
+            src="./src/assets/xpm-icon.svg"
+            class="xpm-icon"
+            alt=""
+          />
+        </div>
+        <div class="progress-track"><div class="progress-fill"></div></div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
