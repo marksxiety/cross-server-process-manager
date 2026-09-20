@@ -27,11 +27,18 @@ PM2 is a process manager — the engine that keeps your apps alive in the backgr
 git clone https://github.com/marksxiety/xpm-agent
 cd xpm-agent && bun install && bun run start
 
-# 2. Run the XPM dashboard anywhere that can reach those servers
+# 2. Clone XPM and install dependencies for the dashboard and server workspace
 git clone https://github.com/marksxiety/x-process-manager
-cd x-process-manager && npm install && npm run dev
+cd x-process-manager && npm install
 
-# 3. Add your servers to src/data/servers.json, and watch your fleet appear
+# 3. Create/migrate the database, then start the XPM server
+npm run db:setup -w server
+npm run dev -w server
+
+# 4. In a second terminal, start the dashboard
+npm run dev
+
+# 5. Register your servers in the database, and watch your fleet appear
 ```
 
 ## What you can do
