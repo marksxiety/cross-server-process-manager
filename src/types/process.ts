@@ -20,3 +20,29 @@ export interface ProcessSummary {
     autorestart?: boolean;
     logs?: { out: string[]; error: string[] };
 }
+
+export interface ProcessDescribeDetails {
+    version: string;
+    script_path: string;
+    script_args: string | null;
+    error_log_path: string;
+    out_log_path: string;
+    pid_path: string;
+    interpreter_args: string | null;
+    node_version: string;
+    node_env: string;
+    created_at: string;
+}
+
+export interface ProcessMetric {
+    historic: boolean;
+    unit?: string;
+    type: string;
+    value: string | number;
+}
+
+export interface ProcessDescribe {
+    summary: ProcessSummary;
+    describe: ProcessDescribeDetails;
+    metrics: Record<string, ProcessMetric>;
+}
