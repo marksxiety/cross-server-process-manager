@@ -6,6 +6,7 @@ import {
     UNKNOWN_ERROR_CODE,
     UNREACHABLE_ERROR_CODE,
 } from "@/lib/error-code";
+import { withRetry } from "@/lib/retry";
 import { isCacheFresh } from "@/lib/swr";
 import { toSystemOverview } from "@/lib/system-overview";
 import type { ApiResponse } from "@/types/api";
@@ -118,7 +119,9 @@ export const useDashboardStore = create<DashboardState>()(
             async function syncProcesses(servers: RegisteredServer[]): Promise<void> {
                 await Promise.all(
                     servers.map(async (server) => {
-                        const entry = await settle(processService(server).overview());
+                        const entry = await settle(
+                            withRetry(() => processService(server).overview())
+                        );
                         set((state) => ({
                             processesByServer: { ...state.processesByServer, [server.server]: toServerProcesses(entry) },
                         }));
