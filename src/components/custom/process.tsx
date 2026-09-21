@@ -1,9 +1,8 @@
-import { Play, RotateCcw, Square, Trash2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
+import { Badge } from '@/components/ui/badge'
 import { StatusDot } from '@/components/custom/status-dot'
 import {
   processTone,
+  toneBadgeVariant,
   toneSurfaceClasses,
   toneTextClasses,
 } from '@/lib/status-tone'
@@ -16,24 +15,28 @@ function formatMemory(bytes: number) {
 
 type ProcessProps = {
   process: ProcessSummary
-  onRestart: () => void
-  onStop: () => void
-  onDelete: () => void
+  onSelect?: () => void
 }
 
-export function Process({
-  process,
-  onRestart,
-  onStop,
-  onDelete,
-}: ProcessProps) {
+export function Process({ process, onSelect }: ProcessProps) {
   const tone = processTone(process.status)
 
   return (
     <div
+      role='button'
+      tabIndex={0}
+      onClick={onSelect}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          onSelect?.()
+        }
+      }}
       className={cn(
-        'flex items-center gap-2 rounded-md px-2 py-1.5',
-        tone === 'danger' && toneSurfaceClasses.danger,
+        'flex cursor-pointer items-center gap-2 rounded-md p-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        tone === 'danger'
+          ? cn(toneSurfaceClasses.danger, 'hover:bg-destructive/15')
+          : 'hover:bg-muted/50',
       )}
     >
       <StatusDot tone={tone} />
@@ -45,55 +48,10 @@ export function Process({
       >
         {process.name}
       </span>
-      <span className='flex-1 truncate text-xs text-muted-foreground'>
-        pm_id {process.pm_id} · {process.status}
-        {process.status === 'online' &&
-          ` · ${process.cpu}% · ${formatMemory(process.memory)}`}
-        {process.status === 'errored' && ` · ${process.restarts} restarts`}
+      <Badge variant={toneBadgeVariant[tone]}>{process.status}</Badge>
+      <span className='ml-auto shrink-0 text-xs tabular-nums text-muted-foreground'>
+        {process.cpu}% · {formatMemory(process.memory)}
       </span>
-
-      <div className='flex items-center gap-0.5'>
-        {process.status === 'stopped' && (
-          <Button
-            variant='ghost'
-            size='icon-sm'
-            onClick={onRestart}
-            aria-label='Start'
-          >
-            <Play strokeWidth={2} className='size-3.5' />
-          </Button>
-        )}
-        {(process.status === 'online' || process.status === 'errored') && (
-          <Button
-            variant='ghost'
-            size='icon-sm'
-            onClick={onRestart}
-            aria-label='Restart'
-          >
-            <RotateCcw strokeWidth={2} className='size-3.5' />
-          </Button>
-        )}
-        {process.status === 'online' && (
-          <Button
-            variant='ghost'
-            size='icon-sm'
-            onClick={onStop}
-            aria-label='Stop'
-          >
-            <Square strokeWidth={2} className='size-3.5' />
-          </Button>
-        )}
-        <Separator orientation='vertical' className='mx-1 h-3' />
-        <Button
-          variant='ghost'
-          size='icon-sm'
-          className='text-destructive hover:text-destructive'
-          onClick={onDelete}
-          aria-label='Delete'
-        >
-          <Trash2 strokeWidth={2} className='size-3.5' />
-        </Button>
-      </div>
     </div>
   )
 }
