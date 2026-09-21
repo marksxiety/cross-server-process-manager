@@ -18,6 +18,13 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
 import { Separator } from '@/components/ui/separator'
 import { Spinner } from '@/components/ui/spinner'
 import { Process } from '@/components/custom/process'
@@ -26,6 +33,8 @@ import { serverTone, toneSurfaceClasses } from '@/lib/status-tone'
 import { DASHBOARD_AUTO_REFRESH_MS } from '@/lib/swr'
 import { cn } from '@/lib/utils'
 import { useDashboardStore } from '@/stores/dashboard.store'
+import type { ProcessSummary } from '@/types/process'
+import type { RegisteredServer } from '@/types/server'
 
 export function Dashboard() {
   const servers = useDashboardStore((state) => state.servers)
@@ -38,6 +47,10 @@ export function Dashboard() {
   const reload = useDashboardStore((state) => state.reload)
 
   const [openServers, setOpenServers] = useState<string[] | null>(null)
+  const [selected, setSelected] = useState<{
+    server: RegisteredServer
+    process: ProcessSummary
+  } | null>(null)
 
   const defaultOpen = useMemo(
     () =>
@@ -56,10 +69,6 @@ export function Dashboard() {
         : openList.filter((name) => name !== serverName),
     )
   }
-
-  const handleRestart = (pmId: number) => console.log('restart', pmId) // TODO: wire to store action
-  const handleStop = (pmId: number) => console.log('stop', pmId) // TODO: wire to store action
-  const handleDelete = (pmId: number) => console.log('delete', pmId) // TODO: wire to store action + confirm dialog
 
   useEffect(() => {
     void load()
@@ -191,9 +200,7 @@ export function Dashboard() {
                             <Process
                               key={process.pm_id}
                               process={process}
-                              onRestart={() => handleRestart(process.pm_id)}
-                              onStop={() => handleStop(process.pm_id)}
-                              onDelete={() => handleDelete(process.pm_id)}
+                              onSelect={() => setSelected({ server, process })}
                             />
                           ))}
                         </AccordionContent>
@@ -206,6 +213,20 @@ export function Dashboard() {
           </div>
         )}
       </div>
+
+      <Sheet
+        open={selected !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelected(null)
+        }}
+      >
+        <SheetContent className='sm:max-w-md'>
+          <SheetHeader>
+            <SheetTitle>{selected?.server.server ?? ''}</SheetTitle>
+            <SheetDescription>{selected?.server.host ?? ''}</SheetDescription>
+          </SheetHeader>
+        </SheetContent>
+      </Sheet>
     </ScrollArea>
   )
 }
