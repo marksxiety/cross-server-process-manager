@@ -28,7 +28,9 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { Spinner } from '@/components/ui/spinner'
 import { Process } from '@/components/custom/process'
+import { ProcessDescribe } from '@/components/custom/process-describe'
 import { ServerHeader } from '@/components/custom/server-header'
+import { useProcessDescribe } from '@/hooks/use-process-describe'
 import { serverTone, toneSurfaceClasses } from '@/lib/status-tone'
 import { DASHBOARD_AUTO_REFRESH_MS } from '@/lib/swr'
 import { cn } from '@/lib/utils'
@@ -51,6 +53,11 @@ export function Dashboard() {
     server: RegisteredServer
     process: ProcessSummary
   } | null>(null)
+
+  const describe = useProcessDescribe(
+    selected?.server ?? null,
+    selected?.process.pm_id ?? null,
+  )
 
   const defaultOpen = useMemo(
     () =>
@@ -225,6 +232,21 @@ export function Dashboard() {
             <SheetTitle>{selected?.server.server ?? ''}</SheetTitle>
             <SheetDescription>{selected?.server.host ?? ''}</SheetDescription>
           </SheetHeader>
+
+          {describe.status === 'loading' && (
+            <div className='flex flex-1 items-center justify-center gap-2 px-6 pb-6 text-muted-foreground'>
+              <Spinner className='size-4' />
+              Loading details…
+            </div>
+          )}
+          {describe.status === 'error' && (
+            <p className='flex-1 px-6 pb-6 text-destructive'>
+              {describe.error}
+            </p>
+          )}
+          {describe.status === 'success' && describe.data && (
+            <ProcessDescribe data={describe.data} />
+          )}
         </SheetContent>
       </Sheet>
     </ScrollArea>
