@@ -6,9 +6,26 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion'
-import { Play, RefreshCw, RotateCcw, RotateCw, ServerOff, Trash2 } from 'lucide-react'
+import {
+  Check,
+  ChevronDown,
+  Circle,
+  Play,
+  RefreshCw,
+  RotateCcw,
+  RotateCw,
+  ServerOff,
+  Trash2,
+  X,
+} from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
 import {
   Empty,
   EmptyContent,
@@ -31,12 +48,301 @@ import { Spinner } from '@/components/ui/spinner'
 import { Process } from '@/components/custom/process'
 import { ServerHeader } from '@/components/custom/server-header'
 import { useProcessDescribe } from '@/hooks/use-process-describe'
-import { serverTone, toneSurfaceClasses } from '@/lib/status-tone'
+import {
+  processTone,
+  serverTone,
+  toneBadgeVariant,
+  toneSurfaceClasses,
+} from '@/lib/status-tone'
 import { DASHBOARD_AUTO_REFRESH_MS } from '@/lib/swr'
 import { cn } from '@/lib/utils'
 import { useDashboardStore } from '@/stores/dashboard.store'
-import type { ProcessSummary } from '@/types/process'
+import type { ProcessDescribe, ProcessSummary } from '@/types/process'
 import type { RegisteredServer } from '@/types/server'
+
+// ---------------------------------------------------------------------------
+// Formatting helpers
+// ---------------------------------------------------------------------------
+
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes)) return '—'
+  const mib = bytes / 1024 / 1024
+  return `${mib.toFixed(1)} MiB`
+}
+
+function formatUptime(startedAtMs: number): string {
+  if (!Number.isFinite(startedAtMs) || startedAtMs <= 0) return '—'
+  const elapsed = Date.now() - startedAtMs
+  if (elapsed < 0) return '—'
+
+  const seconds = Math.floor(elapsed / 1000)
+  const days = Math.floor(seconds / 86400)
+  const hours = Math.floor((seconds % 86400) / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+
+  if (days > 0) return `${days}d ${hours}h`
+  if (hours > 0) return `${hours}h ${minutes}m`
+  if (minutes > 0) return `${minutes}m`
+  return `${seconds}s`
+}
+
+function formatDate(iso: string): string {
+  if (!iso) return '—'
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return iso
+  return date.toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function toNumber(value: string | number | undefined): number | null {
+  if (value === undefined) return null
+  const num = typeof value === 'number' ? value : Number.parseFloat(value)
+  return Number.isFinite(num) ? num : null
+}
+
+function truncatePath(path: string | null | undefined, segments = 2): string {
+  if (!path) return '—'
+  const parts = path.split(/[\\/]/).filter(Boolean)
+  if (parts.length <= segments) return path
+  return `…\\${parts.slice(-segments).join('\\')}`
+}
+
+// ---------------------------------------------------------------------------
+// Tone helpers — decide when a value needs to stand out
+// ---------------------------------------------------------------------------
+
+type Tone = 'default' | 'warning' | 'danger'
+
+function statToneClasses(tone: Tone): string {
+  if (tone === 'danger') return toneSurfaceClasses.danger
+  if (tone === 'warning') return toneSurfaceClasses.warning
+  return 'bg-muted/50'
+}
+
+function statLabelClasses(tone: Tone): string {
+  if (tone === 'danger') return 'text-destructive'
+  if (tone === 'warning') return 'text-amber-600 dark:text-amber-400'
+  return 'text-muted-foreground'
+}
+
+function heapUsageTone(value: number | null): Tone {
+  if (value === null) return 'default'
+  if (value >= 90) return 'danger'
+  if (value >= 70) return 'warning'
+  return 'default'
+}
+
+// ---------------------------------------------------------------------------
+// Small presentational building blocks
+// ---------------------------------------------------------------------------
+
+function StatTile({
+  label,
+  value,
+  tone = 'default',
+}: {
+  label: string
+  value: string
+  tone?: Tone
+}) {
+  return (
+    <div className={cn('rounded-lg p-3', statToneClasses(tone))}>
+      <p className={cn('text-xs', statLabelClasses(tone))}>{label}</p>
+      <p className={cn('mt-0.5 text-base font-medium', tone !== 'default' && statLabelClasses(tone))}>
+        {value}
+      </p>
+    </div>
+  )
+}
+
+function FlagBadge({ label, active }: { label: string; active: boolean }) {
+  return (
+    <Badge variant='secondary' className='gap-1 font-normal text-muted-foreground'>
+      {active ? (
+        <Check className='size-3 text-emerald-600 dark:text-emerald-400' strokeWidth={2.5} />
+      ) : (
+        <X className='size-3' strokeWidth={2.5} />
+      )}
+      {label}
+    </Badge>
+  )
+}
+
+function KeyValueRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className='flex items-center justify-between py-0.5 text-sm'>
+      <span className='text-muted-foreground'>{label}</span>
+      <span className='min-w-0 truncate text-right'>{value}</span>
+    </div>
+  )
+}
+
+function PathRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className='flex items-start justify-between gap-3 py-0.5 font-mono text-xs'>
+      <span className='shrink-0 text-muted-foreground'>{label}</span>
+      <span className='min-w-0 break-all text-right text-foreground/80'>{value}</span>
+    </div>
+  )
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return <p className='mb-2.5 text-xs font-medium text-muted-foreground'>{children}</p>
+}
+
+// ---------------------------------------------------------------------------
+// Process detail sheet body
+// ---------------------------------------------------------------------------
+
+function ProcessSheetBody({ data }: { data: ProcessDescribe }) {
+  const { summary, describe, metrics } = data
+
+  const heapUsage = toNumber(metrics['Heap Usage']?.value)
+  const heapSize = toNumber(metrics['Heap Size']?.value)
+  const usedHeapSize = toNumber(metrics['Used Heap Size']?.value)
+  const loopP50 = toNumber(metrics['Event Loop Latency']?.value)
+  const loopP95 = toNumber(metrics['Event Loop Latency p95']?.value)
+  const activeHandles = toNumber(metrics['Active handles']?.value)
+  const activeRequests = toNumber(metrics['Active requests']?.value)
+
+  const tone = processTone(summary.status)
+
+  return (
+    <div className='space-y-5'>
+      {/* Identity + status */}
+      <div className='flex items-start justify-between gap-3'>
+        <div>
+          <div className='flex items-center gap-2'>
+            <span className='font-medium'>{summary.name}</span>
+            <Badge variant='outline' className='font-normal'>
+              {summary.namespace}
+            </Badge>
+          </div>
+          <p className='mt-0.5 font-mono text-xs text-muted-foreground'>
+            pid {summary.pid} · pm_id {summary.pm_id}
+          </p>
+        </div>
+        <Badge variant={toneBadgeVariant[tone]} className='gap-1.5 font-normal'>
+          <Circle
+            className={cn('fill-current', tone === 'success' && 'animate-pulse')}
+            strokeWidth={0}
+          />
+          {summary.status}
+        </Badge>
+      </div>
+
+      <Separator />
+
+      {/* Health */}
+      <section>
+        <div className='mb-2.5 flex items-center justify-between'>
+          <SectionLabel>Health</SectionLabel>
+          <div className='flex gap-1.5'>
+            <FlagBadge label='autorestart' active={summary.autorestart ?? false} />
+            <FlagBadge label='watch' active={summary.watch} />
+          </div>
+        </div>
+        <div className='grid grid-cols-3 gap-3'>
+          <StatTile label='Uptime' value={formatUptime(summary.uptime)} />
+          <StatTile
+            label='Restarts'
+            value={String(summary.restarts)}
+            tone={summary.restarts > 0 ? 'warning' : 'default'}
+          />
+          <StatTile
+            label='Unstable restarts'
+            value={String(summary.unstable_restarts)}
+            tone={summary.unstable_restarts > 0 ? 'danger' : 'default'}
+          />
+        </div>
+      </section>
+
+      <Separator />
+
+      {/* Resource usage */}
+      <section>
+        <SectionLabel>Resource usage</SectionLabel>
+        <div className='grid grid-cols-3 gap-3'>
+          <StatTile label='CPU' value={`${summary.cpu}%`} />
+          <StatTile label='Memory' value={formatBytes(summary.memory)} />
+          <StatTile
+            label='Heap size'
+            value={heapSize !== null ? `${heapSize} MiB` : '—'}
+          />
+          <StatTile
+            label='Used heap size'
+            value={usedHeapSize !== null ? `${usedHeapSize} MiB` : '—'}
+          />
+          <StatTile
+            label='Heap usage'
+            value={heapUsage !== null ? `${heapUsage}%` : '—'}
+            tone={heapUsageTone(heapUsage)}
+          />
+          <StatTile
+            label='Loop latency p50'
+            value={loopP50 !== null ? `${loopP50} ms` : '—'}
+          />
+          <StatTile
+            label='Loop latency p95'
+            value={loopP95 !== null ? `${loopP95} ms` : '—'}
+          />
+          <StatTile
+            label='Active handles'
+            value={activeHandles !== null ? String(activeHandles) : '—'}
+          />
+          <StatTile
+            label='Active requests'
+            value={activeRequests !== null ? String(activeRequests) : '—'}
+          />
+        </div>
+      </section>
+
+      <Separator />
+
+      {/* Runtime */}
+      <section>
+        <SectionLabel>Runtime</SectionLabel>
+        <div className='grid grid-cols-2 gap-x-6'>
+          <KeyValueRow label='Exec mode' value={summary.exec_mode} />
+          <KeyValueRow label='Interpreter' value={summary.interpreter} />
+          <KeyValueRow label='Node version' value={describe.node_version} />
+          <KeyValueRow label='Node env' value={describe.node_env} />
+          <KeyValueRow label='App version' value={describe.version} />
+          <KeyValueRow label='IP address' value={summary.ip_address} />
+        </div>
+      </section>
+
+      <Separator />
+
+      {/* Paths and logs — collapsed by default, low priority during triage */}
+      <Collapsible>
+        <CollapsibleTrigger className='group flex w-full items-center justify-between'>
+          <SectionLabel>Paths and logs</SectionLabel>
+          <ChevronDown className='size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180' />
+        </CollapsibleTrigger>
+        <CollapsibleContent className='space-y-1 pt-1'>
+          <PathRow label='cwd' value={truncatePath(summary.cwd)} />
+          <PathRow label='script path' value={truncatePath(describe.script_path)} />
+          <PathRow label='script args' value={describe.script_args ?? '—'} />
+          <PathRow label='interpreter args' value={describe.interpreter_args ?? '—'} />
+          <PathRow label='out log' value={truncatePath(describe.out_log_path)} />
+          <PathRow label='error log' value={truncatePath(describe.error_log_path)} />
+          <PathRow label='pid file' value={truncatePath(describe.pid_path)} />
+          <PathRow label='created' value={formatDate(describe.created_at)} />
+        </CollapsibleContent>
+      </Collapsible>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Dashboard
+// ---------------------------------------------------------------------------
 
 export function Dashboard() {
   const servers = useDashboardStore((state) => state.servers)
@@ -227,14 +533,14 @@ export function Dashboard() {
           if (!open) setSelected(null)
         }}
       >
-        <SheetContent className='sm:max-w-md'>
+        <SheetContent size='lg'>
           <SheetHeader>
             <SheetTitle>{selected?.server.server ?? ''}</SheetTitle>
             <SheetDescription>{selected?.server.host ?? ''}</SheetDescription>
           </SheetHeader>
 
           <ScrollArea className='flex-1 min-h-0'>
-            <div className='space-y-4 px-6 pb-6'>
+            <div className='px-6 pb-6'>
               {describe.status === 'loading' && (
                 <div className='flex items-center justify-center gap-2 py-8 text-muted-foreground'>
                   <Spinner className='size-4' />
@@ -245,290 +551,7 @@ export function Dashboard() {
                 <p className='text-destructive'>{describe.error}</p>
               )}
               {describe.status === 'success' && describe.data && (
-                <div className='space-y-4'>
-                  <section className='space-y-1.5'>
-                    <h3 className='font-medium text-foreground'>summary</h3>
-                    <div className='space-y-1.5 pl-3'>
-                      <div className='flex items-start justify-between gap-4 py-0.5'>
-                        <span className='shrink-0 text-muted-foreground'>pid</span>
-                        <span className='min-w-0 break-all text-right'>{String(describe.data.summary.pid)}</span>
-                      </div>
-                      <div className='flex items-start justify-between gap-4 py-0.5'>
-                        <span className='shrink-0 text-muted-foreground'>pm_id</span>
-                        <span className='min-w-0 break-all text-right'>{String(describe.data.summary.pm_id)}</span>
-                      </div>
-                      <div className='flex items-start justify-between gap-4 py-0.5'>
-                        <span className='shrink-0 text-muted-foreground'>name</span>
-                        <span className='min-w-0 break-all text-right'>{String(describe.data.summary.name)}</span>
-                      </div>
-                      <div className='flex items-start justify-between gap-4 py-0.5'>
-                        <span className='shrink-0 text-muted-foreground'>namespace</span>
-                        <span className='min-w-0 break-all text-right'>{String(describe.data.summary.namespace)}</span>
-                      </div>
-                      <div className='flex items-start justify-between gap-4 py-0.5'>
-                        <span className='shrink-0 text-muted-foreground'>status</span>
-                        <span className='min-w-0 break-all text-right'>{String(describe.data.summary.status)}</span>
-                      </div>
-                      <div className='flex items-start justify-between gap-4 py-0.5'>
-                        <span className='shrink-0 text-muted-foreground'>uptime</span>
-                        <span className='min-w-0 break-all text-right'>{String(describe.data.summary.uptime)}</span>
-                      </div>
-                      <div className='flex items-start justify-between gap-4 py-0.5'>
-                        <span className='shrink-0 text-muted-foreground'>restarts</span>
-                        <span className='min-w-0 break-all text-right'>{String(describe.data.summary.restarts)}</span>
-                      </div>
-                      <div className='flex items-start justify-between gap-4 py-0.5'>
-                        <span className='shrink-0 text-muted-foreground'>unstable_restarts</span>
-                        <span className='min-w-0 break-all text-right'>{String(describe.data.summary.unstable_restarts)}</span>
-                      </div>
-                      <div className='flex items-start justify-between gap-4 py-0.5'>
-                        <span className='shrink-0 text-muted-foreground'>exec_mode</span>
-                        <span className='min-w-0 break-all text-right'>{String(describe.data.summary.exec_mode)}</span>
-                      </div>
-                      <div className='flex items-start justify-between gap-4 py-0.5'>
-                        <span className='shrink-0 text-muted-foreground'>instances</span>
-                        <span className='min-w-0 break-all text-right'>{String(describe.data.summary.instances ?? '')}</span>
-                      </div>
-                      <div className='flex items-start justify-between gap-4 py-0.5'>
-                        <span className='shrink-0 text-muted-foreground'>interpreter</span>
-                        <span className='min-w-0 break-all text-right'>{String(describe.data.summary.interpreter)}</span>
-                      </div>
-                      <div className='flex items-start justify-between gap-4 py-0.5'>
-                        <span className='shrink-0 text-muted-foreground'>cpu</span>
-                        <span className='min-w-0 break-all text-right'>{String(describe.data.summary.cpu)}</span>
-                      </div>
-                      <div className='flex items-start justify-between gap-4 py-0.5'>
-                        <span className='shrink-0 text-muted-foreground'>memory</span>
-                        <span className='min-w-0 break-all text-right'>{String(describe.data.summary.memory)}</span>
-                      </div>
-                      <div className='flex items-start justify-between gap-4 py-0.5'>
-                        <span className='shrink-0 text-muted-foreground'>cwd</span>
-                        <span className='min-w-0 break-all text-right'>{String(describe.data.summary.cwd ?? '')}</span>
-                      </div>
-                      <div className='flex items-start justify-between gap-4 py-0.5'>
-                        <span className='shrink-0 text-muted-foreground'>ip_address</span>
-                        <span className='min-w-0 break-all text-right'>{String(describe.data.summary.ip_address)}</span>
-                      </div>
-                      <div className='flex items-start justify-between gap-4 py-0.5'>
-                        <span className='shrink-0 text-muted-foreground'>watch</span>
-                        <span className='min-w-0 break-all text-right'>{String(describe.data.summary.watch)}</span>
-                      </div>
-                      <div className='flex items-start justify-between gap-4 py-0.5'>
-                        <span className='shrink-0 text-muted-foreground'>autorestart</span>
-                        <span className='min-w-0 break-all text-right'>{String(describe.data.summary.autorestart ?? '')}</span>
-                      </div>
-                      <div className='flex items-start justify-between gap-4 py-0.5'>
-                        <span className='shrink-0 text-muted-foreground'>logs</span>
-                        <span className='min-w-0 break-all text-right'>{JSON.stringify(describe.data.summary.logs)}</span>
-                      </div>
-                    </div>
-                  </section>
-
-                  <section className='space-y-1.5'>
-                    <h3 className='font-medium text-foreground'>describe</h3>
-                    <div className='space-y-1.5 pl-3'>
-                      <div className='flex items-start justify-between gap-4 py-0.5'>
-                        <span className='shrink-0 text-muted-foreground'>version</span>
-                        <span className='min-w-0 break-all text-right'>{String(describe.data.describe.version)}</span>
-                      </div>
-                      <div className='flex items-start justify-between gap-4 py-0.5'>
-                        <span className='shrink-0 text-muted-foreground'>script_path</span>
-                        <span className='min-w-0 break-all text-right'>{String(describe.data.describe.script_path)}</span>
-                      </div>
-                      <div className='flex items-start justify-between gap-4 py-0.5'>
-                        <span className='shrink-0 text-muted-foreground'>script_args</span>
-                        <span className='min-w-0 break-all text-right'>{String(describe.data.describe.script_args ?? '')}</span>
-                      </div>
-                      <div className='flex items-start justify-between gap-4 py-0.5'>
-                        <span className='shrink-0 text-muted-foreground'>error_log_path</span>
-                        <span className='min-w-0 break-all text-right'>{String(describe.data.describe.error_log_path)}</span>
-                      </div>
-                      <div className='flex items-start justify-between gap-4 py-0.5'>
-                        <span className='shrink-0 text-muted-foreground'>out_log_path</span>
-                        <span className='min-w-0 break-all text-right'>{String(describe.data.describe.out_log_path)}</span>
-                      </div>
-                      <div className='flex items-start justify-between gap-4 py-0.5'>
-                        <span className='shrink-0 text-muted-foreground'>pid_path</span>
-                        <span className='min-w-0 break-all text-right'>{String(describe.data.describe.pid_path)}</span>
-                      </div>
-                      <div className='flex items-start justify-between gap-4 py-0.5'>
-                        <span className='shrink-0 text-muted-foreground'>interpreter_args</span>
-                        <span className='min-w-0 break-all text-right'>{String(describe.data.describe.interpreter_args ?? '')}</span>
-                      </div>
-                      <div className='flex items-start justify-between gap-4 py-0.5'>
-                        <span className='shrink-0 text-muted-foreground'>node_version</span>
-                        <span className='min-w-0 break-all text-right'>{String(describe.data.describe.node_version)}</span>
-                      </div>
-                      <div className='flex items-start justify-between gap-4 py-0.5'>
-                        <span className='shrink-0 text-muted-foreground'>node_env</span>
-                        <span className='min-w-0 break-all text-right'>{String(describe.data.describe.node_env)}</span>
-                      </div>
-                      <div className='flex items-start justify-between gap-4 py-0.5'>
-                        <span className='shrink-0 text-muted-foreground'>created_at</span>
-                        <span className='min-w-0 break-all text-right'>{String(describe.data.describe.created_at)}</span>
-                      </div>
-                    </div>
-                  </section>
-
-                  <section className='space-y-1.5'>
-                    <h3 className='font-medium text-foreground'>metrics</h3>
-                    <div className='space-y-1.5 pl-3'>
-                      <section className='space-y-1.5'>
-                        <h4 className='font-medium text-foreground'>Heap Size</h4>
-                        <div className='space-y-1.5 pl-3'>
-                          <div className='flex items-start justify-between gap-4 py-0.5'>
-                            <span className='shrink-0 text-muted-foreground'>historic</span>
-                            <span className='min-w-0 break-all text-right'>{String(describe.data.metrics['Heap Size']?.historic ?? '')}</span>
-                          </div>
-                          <div className='flex items-start justify-between gap-4 py-0.5'>
-                            <span className='shrink-0 text-muted-foreground'>unit</span>
-                            <span className='min-w-0 break-all text-right'>{String(describe.data.metrics['Heap Size']?.unit ?? '')}</span>
-                          </div>
-                          <div className='flex items-start justify-between gap-4 py-0.5'>
-                            <span className='shrink-0 text-muted-foreground'>type</span>
-                            <span className='min-w-0 break-all text-right'>{String(describe.data.metrics['Heap Size']?.type ?? '')}</span>
-                          </div>
-                          <div className='flex items-start justify-between gap-4 py-0.5'>
-                            <span className='shrink-0 text-muted-foreground'>value</span>
-                            <span className='min-w-0 break-all text-right'>{String(describe.data.metrics['Heap Size']?.value ?? '')}</span>
-                          </div>
-                        </div>
-                      </section>
-
-                      <section className='space-y-1.5'>
-                        <h4 className='font-medium text-foreground'>Heap Usage</h4>
-                        <div className='space-y-1.5 pl-3'>
-                          <div className='flex items-start justify-between gap-4 py-0.5'>
-                            <span className='shrink-0 text-muted-foreground'>historic</span>
-                            <span className='min-w-0 break-all text-right'>{String(describe.data.metrics['Heap Usage']?.historic ?? '')}</span>
-                          </div>
-                          <div className='flex items-start justify-between gap-4 py-0.5'>
-                            <span className='shrink-0 text-muted-foreground'>unit</span>
-                            <span className='min-w-0 break-all text-right'>{String(describe.data.metrics['Heap Usage']?.unit ?? '')}</span>
-                          </div>
-                          <div className='flex items-start justify-between gap-4 py-0.5'>
-                            <span className='shrink-0 text-muted-foreground'>type</span>
-                            <span className='min-w-0 break-all text-right'>{String(describe.data.metrics['Heap Usage']?.type ?? '')}</span>
-                          </div>
-                          <div className='flex items-start justify-between gap-4 py-0.5'>
-                            <span className='shrink-0 text-muted-foreground'>value</span>
-                            <span className='min-w-0 break-all text-right'>{String(describe.data.metrics['Heap Usage']?.value ?? '')}</span>
-                          </div>
-                        </div>
-                      </section>
-
-                      <section className='space-y-1.5'>
-                        <h4 className='font-medium text-foreground'>Used Heap Size</h4>
-                        <div className='space-y-1.5 pl-3'>
-                          <div className='flex items-start justify-between gap-4 py-0.5'>
-                            <span className='shrink-0 text-muted-foreground'>historic</span>
-                            <span className='min-w-0 break-all text-right'>{String(describe.data.metrics['Used Heap Size']?.historic ?? '')}</span>
-                          </div>
-                          <div className='flex items-start justify-between gap-4 py-0.5'>
-                            <span className='shrink-0 text-muted-foreground'>unit</span>
-                            <span className='min-w-0 break-all text-right'>{String(describe.data.metrics['Used Heap Size']?.unit ?? '')}</span>
-                          </div>
-                          <div className='flex items-start justify-between gap-4 py-0.5'>
-                            <span className='shrink-0 text-muted-foreground'>type</span>
-                            <span className='min-w-0 break-all text-right'>{String(describe.data.metrics['Used Heap Size']?.type ?? '')}</span>
-                          </div>
-                          <div className='flex items-start justify-between gap-4 py-0.5'>
-                            <span className='shrink-0 text-muted-foreground'>value</span>
-                            <span className='min-w-0 break-all text-right'>{String(describe.data.metrics['Used Heap Size']?.value ?? '')}</span>
-                          </div>
-                        </div>
-                      </section>
-
-                      <section className='space-y-1.5'>
-                        <h4 className='font-medium text-foreground'>Active requests</h4>
-                        <div className='space-y-1.5 pl-3'>
-                          <div className='flex items-start justify-between gap-4 py-0.5'>
-                            <span className='shrink-0 text-muted-foreground'>historic</span>
-                            <span className='min-w-0 break-all text-right'>{String(describe.data.metrics['Active requests']?.historic ?? '')}</span>
-                          </div>
-                          <div className='flex items-start justify-between gap-4 py-0.5'>
-                            <span className='shrink-0 text-muted-foreground'>unit</span>
-                            <span className='min-w-0 break-all text-right'>{String(describe.data.metrics['Active requests']?.unit ?? '')}</span>
-                          </div>
-                          <div className='flex items-start justify-between gap-4 py-0.5'>
-                            <span className='shrink-0 text-muted-foreground'>type</span>
-                            <span className='min-w-0 break-all text-right'>{String(describe.data.metrics['Active requests']?.type ?? '')}</span>
-                          </div>
-                          <div className='flex items-start justify-between gap-4 py-0.5'>
-                            <span className='shrink-0 text-muted-foreground'>value</span>
-                            <span className='min-w-0 break-all text-right'>{String(describe.data.metrics['Active requests']?.value ?? '')}</span>
-                          </div>
-                        </div>
-                      </section>
-
-                      <section className='space-y-1.5'>
-                        <h4 className='font-medium text-foreground'>Active handles</h4>
-                        <div className='space-y-1.5 pl-3'>
-                          <div className='flex items-start justify-between gap-4 py-0.5'>
-                            <span className='shrink-0 text-muted-foreground'>historic</span>
-                            <span className='min-w-0 break-all text-right'>{String(describe.data.metrics['Active handles']?.historic ?? '')}</span>
-                          </div>
-                          <div className='flex items-start justify-between gap-4 py-0.5'>
-                            <span className='shrink-0 text-muted-foreground'>unit</span>
-                            <span className='min-w-0 break-all text-right'>{String(describe.data.metrics['Active handles']?.unit ?? '')}</span>
-                          </div>
-                          <div className='flex items-start justify-between gap-4 py-0.5'>
-                            <span className='shrink-0 text-muted-foreground'>type</span>
-                            <span className='min-w-0 break-all text-right'>{String(describe.data.metrics['Active handles']?.type ?? '')}</span>
-                          </div>
-                          <div className='flex items-start justify-between gap-4 py-0.5'>
-                            <span className='shrink-0 text-muted-foreground'>value</span>
-                            <span className='min-w-0 break-all text-right'>{String(describe.data.metrics['Active handles']?.value ?? '')}</span>
-                          </div>
-                        </div>
-                      </section>
-
-                      <section className='space-y-1.5'>
-                        <h4 className='font-medium text-foreground'>Event Loop Latency</h4>
-                        <div className='space-y-1.5 pl-3'>
-                          <div className='flex items-start justify-between gap-4 py-0.5'>
-                            <span className='shrink-0 text-muted-foreground'>historic</span>
-                            <span className='min-w-0 break-all text-right'>{String(describe.data.metrics['Event Loop Latency']?.historic ?? '')}</span>
-                          </div>
-                          <div className='flex items-start justify-between gap-4 py-0.5'>
-                            <span className='shrink-0 text-muted-foreground'>unit</span>
-                            <span className='min-w-0 break-all text-right'>{String(describe.data.metrics['Event Loop Latency']?.unit ?? '')}</span>
-                          </div>
-                          <div className='flex items-start justify-between gap-4 py-0.5'>
-                            <span className='shrink-0 text-muted-foreground'>type</span>
-                            <span className='min-w-0 break-all text-right'>{String(describe.data.metrics['Event Loop Latency']?.type ?? '')}</span>
-                          </div>
-                          <div className='flex items-start justify-between gap-4 py-0.5'>
-                            <span className='shrink-0 text-muted-foreground'>value</span>
-                            <span className='min-w-0 break-all text-right'>{String(describe.data.metrics['Event Loop Latency']?.value ?? '')}</span>
-                          </div>
-                        </div>
-                      </section>
-
-                      <section className='space-y-1.5'>
-                        <h4 className='font-medium text-foreground'>Event Loop Latency p95</h4>
-                        <div className='space-y-1.5 pl-3'>
-                          <div className='flex items-start justify-between gap-4 py-0.5'>
-                            <span className='shrink-0 text-muted-foreground'>historic</span>
-                            <span className='min-w-0 break-all text-right'>{String(describe.data.metrics['Event Loop Latency p95']?.historic ?? '')}</span>
-                          </div>
-                          <div className='flex items-start justify-between gap-4 py-0.5'>
-                            <span className='shrink-0 text-muted-foreground'>unit</span>
-                            <span className='min-w-0 break-all text-right'>{String(describe.data.metrics['Event Loop Latency p95']?.unit ?? '')}</span>
-                          </div>
-                          <div className='flex items-start justify-between gap-4 py-0.5'>
-                            <span className='shrink-0 text-muted-foreground'>type</span>
-                            <span className='min-w-0 break-all text-right'>{String(describe.data.metrics['Event Loop Latency p95']?.type ?? '')}</span>
-                          </div>
-                          <div className='flex items-start justify-between gap-4 py-0.5'>
-                            <span className='shrink-0 text-muted-foreground'>value</span>
-                            <span className='min-w-0 break-all text-right'>{String(describe.data.metrics['Event Loop Latency p95']?.value ?? '')}</span>
-                          </div>
-                        </div>
-                      </section>
-                    </div>
-                  </section>
-                </div>
+                <ProcessSheetBody data={describe.data} />
               )}
             </div>
           </ScrollArea>
