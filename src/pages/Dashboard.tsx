@@ -38,7 +38,6 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Sheet,
   SheetContent,
-  SheetDescription,
   SheetFooter,
   SheetHeader,
   SheetTitle,
@@ -64,32 +63,71 @@ import type { RegisteredServer } from '@/types/server'
 // Formatting helpers
 // ---------------------------------------------------------------------------
 
+/** Renders null/undefined/empty-string values as an em dash instead of blank. */
+function orDash(value: string | number | null | undefined): string {
+  if (value === null || value === undefined) return '—'
+  if (typeof value === 'string' && value.trim() === '') return '—'
+  if (typeof value === 'number' && !Number.isFinite(value)) return '—'
+  return String(value)
+}
+
 function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes)) return '—'
   const mib = bytes / 1024 / 1024
   return `${mib.toFixed(1)} MiB`
 }
 
+const SECOND = 1
+const MINUTE = 60 * SECOND
+const HOUR = 60 * MINUTE
+const DAY = 24 * HOUR
+const MONTH = 30 * DAY
+const YEAR = 365 * DAY
+
+/**
+ * Formats a process start timestamp (ms since epoch) as elapsed uptime,
+ * scaling the unit to whatever is most meaningful — seconds up through
+ * years — with one secondary unit for precision (e.g. "2y 3mo", "5d 4h").
+ */
 function formatUptime(startedAtMs: number): string {
   if (!Number.isFinite(startedAtMs) || startedAtMs <= 0) return '—'
-  const elapsed = Date.now() - startedAtMs
-  if (elapsed < 0) return '—'
+  const elapsedMs = Date.now() - startedAtMs
+  if (elapsedMs < 0) return '—'
 
-  const seconds = Math.floor(elapsed / 1000)
-  const days = Math.floor(seconds / 86400)
-  const hours = Math.floor((seconds % 86400) / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
+  const seconds = Math.floor(elapsedMs / 1000)
 
-  if (days > 0) return `${days}d ${hours}h`
-  if (hours > 0) return `${hours}h ${minutes}m`
-  if (minutes > 0) return `${minutes}m`
+  if (seconds >= YEAR) {
+    const years = Math.floor(seconds / YEAR)
+    const months = Math.floor((seconds % YEAR) / MONTH)
+    return months > 0 ? `${years}y ${months}mo` : `${years}y`
+  }
+  if (seconds >= MONTH) {
+    const months = Math.floor(seconds / MONTH)
+    const days = Math.floor((seconds % MONTH) / DAY)
+    return days > 0 ? `${months}mo ${days}d` : `${months}mo`
+  }
+  if (seconds >= DAY) {
+    const days = Math.floor(seconds / DAY)
+    const hours = Math.floor((seconds % DAY) / HOUR)
+    return hours > 0 ? `${days}d ${hours}h` : `${days}d`
+  }
+  if (seconds >= HOUR) {
+    const hours = Math.floor(seconds / HOUR)
+    const minutes = Math.floor((seconds % HOUR) / MINUTE)
+    return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`
+  }
+  if (seconds >= MINUTE) {
+    const minutes = Math.floor(seconds / MINUTE)
+    const secs = seconds % MINUTE
+    return secs > 0 ? `${minutes}m ${secs}s` : `${minutes}m`
+  }
   return `${seconds}s`
 }
 
 function formatDate(iso: string): string {
   if (!iso) return '—'
   const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return iso
+  if (Number.isNaN(date.getTime())) return '—'
   return date.toLocaleString(undefined, {
     year: 'numeric',
     month: 'short',
@@ -106,7 +144,7 @@ function toNumber(value: string | number | undefined): number | null {
 }
 
 function truncatePath(path: string | null | undefined, segments = 2): string {
-  if (!path) return '—'
+  if (!path || path.trim() === '') return '—'
   const parts = path.split(/[\\/]/).filter(Boolean)
   if (parts.length <= segments) return path
   return `…\\${parts.slice(-segments).join('\\')}`
@@ -173,20 +211,34 @@ function FlagBadge({ label, active }: { label: string; active: boolean }) {
   )
 }
 
-function KeyValueRow({ label, value }: { label: string; value: string }) {
+function KeyValueRow({
+  label,
+  value,
+}: {
+  label: string
+  value: string | number | null | undefined
+}) {
   return (
     <div className='flex items-center justify-between py-0.5 text-sm'>
       <span className='text-muted-foreground'>{label}</span>
-      <span className='min-w-0 truncate text-right'>{value}</span>
+      <span className='min-w-0 truncate text-right'>{orDash(value)}</span>
     </div>
   )
 }
 
-function PathRow({ label, value }: { label: string; value: string }) {
+function PathRow({
+  label,
+  value,
+}: {
+  label: string
+  value: string | null | undefined
+}) {
   return (
     <div className='flex items-start justify-between gap-3 py-0.5 font-mono text-xs'>
       <span className='shrink-0 text-muted-foreground'>{label}</span>
-      <span className='min-w-0 break-all text-right text-foreground/80'>{value}</span>
+      <span className='min-w-0 break-all text-right text-foreground/80'>
+        {value && value.trim() !== '' ? value : '—'}
+      </span>
     </div>
   )
 }
@@ -210,34 +262,8 @@ function ProcessSheetBody({ data }: { data: ProcessDescribe }) {
   const activeHandles = toNumber(metrics['Active handles']?.value)
   const activeRequests = toNumber(metrics['Active requests']?.value)
 
-  const tone = processTone(summary.status)
-
   return (
     <div className='space-y-5'>
-      {/* Identity + status */}
-      <div className='flex items-start justify-between gap-3'>
-        <div>
-          <div className='flex items-center gap-2'>
-            <span className='font-medium'>{summary.name}</span>
-            <Badge variant='outline' className='font-normal'>
-              {summary.namespace}
-            </Badge>
-          </div>
-          <p className='mt-0.5 font-mono text-xs text-muted-foreground'>
-            pid {summary.pid} · pm_id {summary.pm_id}
-          </p>
-        </div>
-        <Badge variant={toneBadgeVariant[tone]} className='gap-1.5 font-normal'>
-          <Circle
-            className={cn('fill-current', tone === 'success' && 'animate-pulse')}
-            strokeWidth={0}
-          />
-          {summary.status}
-        </Badge>
-      </div>
-
-      <Separator />
-
       {/* Health */}
       <section>
         <div className='mb-2.5 flex items-center justify-between'>
@@ -251,12 +277,12 @@ function ProcessSheetBody({ data }: { data: ProcessDescribe }) {
           <StatTile label='Uptime' value={formatUptime(summary.uptime)} />
           <StatTile
             label='Restarts'
-            value={String(summary.restarts)}
+            value={orDash(summary.restarts)}
             tone={summary.restarts > 0 ? 'warning' : 'default'}
           />
           <StatTile
             label='Unstable restarts'
-            value={String(summary.unstable_restarts)}
+            value={orDash(summary.unstable_restarts)}
             tone={summary.unstable_restarts > 0 ? 'danger' : 'default'}
           />
         </div>
@@ -268,7 +294,7 @@ function ProcessSheetBody({ data }: { data: ProcessDescribe }) {
       <section>
         <SectionLabel>Resource usage</SectionLabel>
         <div className='grid grid-cols-3 gap-3'>
-          <StatTile label='CPU' value={`${summary.cpu}%`} />
+          <StatTile label='CPU' value={Number.isFinite(summary.cpu) ? `${summary.cpu}%` : '—'} />
           <StatTile label='Memory' value={formatBytes(summary.memory)} />
           <StatTile
             label='Heap size'
@@ -328,8 +354,8 @@ function ProcessSheetBody({ data }: { data: ProcessDescribe }) {
         <CollapsibleContent className='space-y-1 pt-1'>
           <PathRow label='cwd' value={truncatePath(summary.cwd)} />
           <PathRow label='script path' value={truncatePath(describe.script_path)} />
-          <PathRow label='script args' value={describe.script_args ?? '—'} />
-          <PathRow label='interpreter args' value={describe.interpreter_args ?? '—'} />
+          <PathRow label='script args' value={describe.script_args} />
+          <PathRow label='interpreter args' value={describe.interpreter_args} />
           <PathRow label='out log' value={truncatePath(describe.out_log_path)} />
           <PathRow label='error log' value={truncatePath(describe.error_log_path)} />
           <PathRow label='pid file' value={truncatePath(describe.pid_path)} />
@@ -364,6 +390,10 @@ export function Dashboard() {
     selected?.server ?? null,
     selected?.process.pm_id ?? null,
   )
+
+  const selectedTone = selected
+    ? processTone(selected.process.status)
+    : 'neutral'
 
   const defaultOpen = useMemo(
     () =>
@@ -535,12 +565,71 @@ export function Dashboard() {
       >
         <SheetContent size='lg'>
           <SheetHeader>
-            <SheetTitle>{selected?.server.server ?? ''}</SheetTitle>
-            <SheetDescription>{selected?.server.host ?? ''}</SheetDescription>
+            <div className='flex items-start justify-between gap-3 pr-6'>
+              <div className='flex min-w-0 items-center gap-2'>
+                <SheetTitle className='truncate'>
+                  {selected?.process.name ?? ''}
+                </SheetTitle>
+                {selected && (
+                  <Badge
+                    variant='outline'
+                    className='shrink-0 font-normal text-muted-foreground'
+                  >
+                    {selected.process.namespace}
+                  </Badge>
+                )}
+              </div>
+              {selected && (
+                <Badge
+                  variant={toneBadgeVariant[selectedTone]}
+                  className='shrink-0 gap-1.5 font-normal'
+                >
+                  <Circle
+                    className={cn(
+                      'fill-current',
+                      selectedTone === 'success' && 'animate-pulse',
+                    )}
+                    strokeWidth={0}
+                  />
+                  {selected.process.status}
+                </Badge>
+              )}
+            </div>
           </SheetHeader>
 
           <ScrollArea className='flex-1 min-h-0'>
             <div className='px-6 pb-6'>
+              {selected && (
+                <>
+                  <div className='grid grid-cols-2 gap-3'>
+                    <div className='rounded-lg bg-muted/50 p-3'>
+                      <p className='text-xs text-muted-foreground'>Server</p>
+                      <p className='mt-0.5 truncate font-mono text-sm font-medium'>
+                        {orDash(selected.server.server)}
+                      </p>
+                    </div>
+                    <div className='rounded-lg bg-muted/50 p-3'>
+                      <p className='text-xs text-muted-foreground'>Host</p>
+                      <p className='mt-0.5 truncate font-mono text-sm font-medium'>
+                        {selected.server.host}:{selected.server.port}
+                      </p>
+                    </div>
+                    <div className='rounded-lg bg-muted/50 p-3'>
+                      <p className='text-xs text-muted-foreground'>PID</p>
+                      <p className='mt-0.5 truncate font-mono text-sm font-medium'>
+                        {orDash(selected.process.pid)}
+                      </p>
+                    </div>
+                    <div className='rounded-lg bg-muted/50 p-3'>
+                      <p className='text-xs text-muted-foreground'>PM ID</p>
+                      <p className='mt-0.5 truncate font-mono text-sm font-medium'>
+                        {orDash(selected.process.pm_id)}
+                      </p>
+                    </div>
+                  </div>
+                  <Separator className='my-5' />
+                </>
+              )}
               {describe.status === 'loading' && (
                 <div className='flex items-center justify-center gap-2 py-8 text-muted-foreground'>
                   <Spinner className='size-4' />
