@@ -7,10 +7,15 @@
     "server"
   ],
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev": "concurrently -n ui,api -c cyan,magenta \"vite\" \"npm run dev --workspace=server\"",
+    "dev:ui": "vite",
+    "dev:server": "npm run dev --workspace=server",
+    "build": "tsc -b && vite build && npm run build --workspace=server",
+    "build:ui": "tsc -b && vite build",
+    "build:server": "npm run build --workspace=server",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "run:built": "concurrently -n ui,api -c cyan,magenta \"vite preview\" \"npm run start --workspace=server\""
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
@@ -44,6 +49,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.4",
     "babel-plugin-react-compiler": "^1.0.0",
+    "concurrently": "^10.0.5",
     "eslint": "^10.8.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
