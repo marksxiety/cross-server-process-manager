@@ -151,7 +151,7 @@ export function Server() {
             <Plus strokeWidth={2} />
             Register server
           </Button>
-          <SheetContent className='sm:max-w-md'>
+          <SheetContent size='md'>
             <SheetHeader>
               <SheetTitle>Register server</SheetTitle>
               <SheetDescription>
