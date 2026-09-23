@@ -23,16 +23,19 @@ export interface ProcessSummary {
 }
 
 export interface ProcessDescribeDetails {
-    version: string;
-    script_path: string;
-    script_args: string | null;
-    error_log_path: string;
-    out_log_path: string;
-    pid_path: string;
-    interpreter_args: string | null;
-    node_version: string;
-    node_env: string;
-    created_at: string;
+    version: string | null;
+    script_path: string | null;
+    script_args: string | string[] | null;
+    error_log_path: string | null;
+    out_log_path: string | null;
+    pid_path: string | null;
+    interpreter_args: string[] | null;
+    node_version: string | null;
+    node_env: string | null;
+    created_at: string | null;
+    entire_log_path?: string;
+    cron_restart?: string;
+    max_memory_restart?: number | string;
 }
 
 export interface ProcessMetric {
