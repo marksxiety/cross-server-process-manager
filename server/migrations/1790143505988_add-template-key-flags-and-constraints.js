@@ -8,7 +8,7 @@ export const shorthands = undefined
  * @param run {() => void | undefined}
  * @returns {Promise<void> | void}
  */
-export const up = (pgm) => {
+export const up = async (pgm) => {
   pgm.addColumns('template_keys', {
     is_hidden: {
       type: 'boolean',
@@ -20,17 +20,30 @@ export const up = (pgm) => {
       notNull: true,
       default: false,
     },
-  })
+  }, { ifNotExists: true })
 
-  // Natural key required by the seeder's ON CONFLICT upsert. The composite
-  // index also covers template_id lookups and cascades.
-  pgm.addConstraint('template_keys', 'template_keys_template_id_property_key_unique', {
-    unique: ['template_id', 'property_key'],
-  })
+  // addConstraint has no ifNotExists option in node-pg-migrate v9, so guard
+  // manually against the pg catalog. This makes re-runs safe without
+  // hiding real schema drift.
+  const hasUnique = await pgm.db.query(
+    "SELECT 1 FROM pg_constraint WHERE conname = 'template_keys_template_id_property_key_unique'"
+  )
+  if (hasUnique.rowCount === 0) {
+    // Natural key required by the seeder's ON CONFLICT upsert. The composite
+    // index also covers template_id lookups and cascades.
+    pgm.addConstraint('template_keys', 'template_keys_template_id_property_key_unique', {
+      unique: ['template_id', 'property_key'],
+    })
+  }
 
-  pgm.addConstraint('template_keys', 'template_keys_data_type_check', {
-    check: "data_type IN ('string', 'boolean', 'number', 'array', 'object')",
-  })
+  const hasCheck = await pgm.db.query(
+    "SELECT 1 FROM pg_constraint WHERE conname = 'template_keys_data_type_check'"
+  )
+  if (hasCheck.rowCount === 0) {
+    pgm.addConstraint('template_keys', 'template_keys_data_type_check', {
+      check: "data_type IN ('string', 'boolean', 'number', 'array', 'object')",
+    })
+  }
 }
 
 /**
@@ -39,7 +52,7 @@ export const up = (pgm) => {
  * @returns {Promise<void> | void}
  */
 export const down = (pgm) => {
-  pgm.dropConstraint('template_keys', 'template_keys_data_type_check')
-  pgm.dropConstraint('template_keys', 'template_keys_template_id_property_key_unique')
-  pgm.dropColumns('template_keys', ['is_hidden', 'is_locked'])
+  pgm.dropConstraint('template_keys', 'template_keys_data_type_check', { ifExists: true })
+  pgm.dropConstraint('template_keys', 'template_keys_template_id_property_key_unique', { ifExists: true })
+  pgm.dropColumns('template_keys', ['is_hidden', 'is_locked'], { ifExists: true })
 }

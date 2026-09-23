@@ -45,7 +45,7 @@ export const up = (pgm) => {
       notNull: true,
       default: pgm.func('current_timestamp'),
     },
-  })
+  }, { ifNotExists: true })
 }
 
 /**
@@ -54,5 +54,5 @@ export const up = (pgm) => {
  * @returns {Promise<void> | void}
  */
 export const down = (pgm) => {
-  pgm.dropTable('template_keys')
+  pgm.dropTable('template_keys', { ifExists: true })
 }
