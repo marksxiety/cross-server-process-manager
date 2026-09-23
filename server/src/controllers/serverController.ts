@@ -1,5 +1,7 @@
 import type { Request, Response } from 'express';
+import { z } from 'zod';
 import db from '../config/db';
+import { serverInputSchema } from '../schemas/serverSchema';
 import { fail, ok } from '../utils/response';
 
 export interface ServerRecord {
@@ -14,6 +16,8 @@ export interface ServerRecord {
 }
 
 const DUPLICATE_KEY_CODE = '23505';
+const DUPLICATE_SERVER_CODE = 'DUPLICATE_SERVER';
+const VALIDATION_FAILED_CODE = 'VALIDATION_FAILED';
 const INVALID_ID_MESSAGE = 'Server id must be a positive integer';
 const NOT_FOUND_MESSAGE = 'Server not found';
 
@@ -21,6 +25,20 @@ function parseIdParam(value: string | string[] | undefined): number | null {
     if (typeof value !== 'string') return null;
     const id = Number(value);
     return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+function duplicateServerMessage(name: string): string {
+    return `Server "${name}" is already registered`;
+}
+
+function sendValidationError(res: Response, error: z.ZodError): void {
+    fail(
+        res,
+        400,
+        'Invalid server payload',
+        VALIDATION_FAILED_CODE,
+        z.flattenError(error).fieldErrors
+    );
 }
 
 export const index = async (req: Request, res: Response): Promise<void> => {
@@ -39,8 +57,14 @@ export const index = async (req: Request, res: Response): Promise<void> => {
 };
 
 export const register = async (req: Request, res: Response): Promise<void> => {
-    const { server, protocol, host, port, is_active } = req.body;
-    const active = typeof is_active === 'boolean' ? is_active : true;
+    const parsed = serverInputSchema.safeParse(req.body);
+    if (!parsed.success) {
+        sendValidationError(res, parsed.error);
+        return;
+    }
+
+    const { server, protocol, host, port, is_active } = parsed.data;
+    const active = is_active ?? true;
 
     try {
         const { rows } = await db.query<ServerRecord>(
@@ -51,9 +75,15 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     } catch (err) {
         console.error(err);
         const dbError = err as { detail?: string; code?: string; message?: string };
+
+        if (dbError.code === DUPLICATE_KEY_CODE) {
+            fail(res, 409, duplicateServerMessage(server), DUPLICATE_SERVER_CODE);
+            return;
+        }
+
         fail(
             res,
-            dbError.code === DUPLICATE_KEY_CODE ? 409 : 500,
+            500,
             dbError.detail ?? dbError.message ?? 'Failed to register server',
             dbError.code ?? 'INTERNAL_SERVER_ERROR'
         );
@@ -67,10 +97,35 @@ export const update = async (req: Request, res: Response): Promise<void> => {
         return;
     }
 
-    const { server, protocol, host, port, is_active } = req.body;
-    const active = typeof is_active === 'boolean' ? is_active : null;
+    const parsed = serverInputSchema.safeParse(req.body);
+    if (!parsed.success) {
+        sendValidationError(res, parsed.error);
+        return;
+    }
+
+    const { server, protocol, host, port, is_active } = parsed.data;
+    const active = is_active ?? null;
 
     try {
+        const { rows: stateRows } = await db.query<{
+            target_exists: boolean;
+            name_taken: boolean;
+        }>(
+            `SELECT EXISTS (SELECT 1 FROM servers WHERE id = $2) AS target_exists,
+                    EXISTS (SELECT 1 FROM servers WHERE server = $1 AND id <> $2) AS name_taken`,
+            [server, id]
+        );
+
+        const state = stateRows[0];
+        if (!state || !state.target_exists) {
+            fail(res, 404, NOT_FOUND_MESSAGE, 'NOT_FOUND');
+            return;
+        }
+        if (state.name_taken) {
+            fail(res, 409, duplicateServerMessage(server), DUPLICATE_SERVER_CODE);
+            return;
+        }
+
         const { rows } = await db.query<ServerRecord>(
             `UPDATE servers
              SET server = $1,
@@ -94,9 +149,15 @@ export const update = async (req: Request, res: Response): Promise<void> => {
     } catch (err) {
         console.error(err);
         const dbError = err as { detail?: string; code?: string; message?: string };
+
+        if (dbError.code === DUPLICATE_KEY_CODE) {
+            fail(res, 409, duplicateServerMessage(server), DUPLICATE_SERVER_CODE);
+            return;
+        }
+
         fail(
             res,
-            dbError.code === DUPLICATE_KEY_CODE ? 409 : 500,
+            500,
             dbError.detail ?? dbError.message ?? 'Failed to update server',
             dbError.code ?? 'INTERNAL_SERVER_ERROR'
         );
