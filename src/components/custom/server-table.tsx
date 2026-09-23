@@ -13,9 +13,10 @@ import type { RegisteredServer } from '@/types/server'
 
 type ServerTableProps = {
   servers: RegisteredServer[]
+  onEdit: (server: RegisteredServer) => void
 }
 
-export function ServerTable({ servers }: ServerTableProps) {
+export function ServerTable({ servers, onEdit }: ServerTableProps) {
   return (
     <Table>
       <TableHeader>
@@ -30,7 +31,7 @@ export function ServerTable({ servers }: ServerTableProps) {
       </TableHeader>
       <TableBody>
         {servers.map((server) => (
-          <TableRow key={server.server}>
+          <TableRow key={server.id}>
             <TableCell className='font-medium'>{server.server}</TableCell>
             <TableCell>
               <Badge variant='outline' className='font-mono text-xs font-normal'>
@@ -56,6 +57,7 @@ export function ServerTable({ servers }: ServerTableProps) {
                   size='icon-sm'
                   aria-label={`Edit ${server.server}`}
                   title={`Edit ${server.server}`}
+                  onClick={() => onEdit(server)}
                 >
                   <Pencil strokeWidth={2} />
                 </Button>
