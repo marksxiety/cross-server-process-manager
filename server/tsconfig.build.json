@@ -1,0 +1,5 @@
+{
+  // Production build: extends the base config but keeps test files out of dist.
+  "extends": "./tsconfig.json",
+  "exclude": ["src/tests"]
+}
