@@ -1,4 +1,4 @@
-export interface RegisteredServer {
+export interface ServerInput {
     server: string
     protocol: 'http' | 'https'
     host: string
@@ -6,4 +6,6 @@ export interface RegisteredServer {
     is_active: boolean
 }
 
-export type RegisterServer = RegisteredServer
+export interface RegisteredServer extends ServerInput {
+    id: number
+}
