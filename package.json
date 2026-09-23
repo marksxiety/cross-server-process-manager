@@ -14,7 +14,7 @@
     "build:ui": "tsc -b && vite build",
     "build:server": "npm run build --workspace=server",
     "lint": "eslint .",
-    "test": "vitest run",
+    "test": "vitest run && npm run test --workspace=server",
     "test:watch": "vitest",
     "preview": "vite preview",
     "run:built": "concurrently -n ui,api -c cyan,magenta \"vite preview\" \"npm run start --workspace=server\""
