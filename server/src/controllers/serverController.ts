@@ -17,7 +17,10 @@ export interface ServerRecord {
 
 const DUPLICATE_KEY_CODE = '23505';
 const DUPLICATE_SERVER_CODE = 'DUPLICATE_SERVER';
+const DUPLICATE_HOST_CODE = 'DUPLICATE_HOST';
 const VALIDATION_FAILED_CODE = 'VALIDATION_FAILED';
+const SERVER_UNIQUE_CONSTRAINT = 'servers_server_key';
+const HOST_UNIQUE_CONSTRAINT = 'servers_host_unique';
 const INVALID_ID_MESSAGE = 'Server id must be a positive integer';
 const NOT_FOUND_MESSAGE = 'Server not found';
 
@@ -29,6 +32,23 @@ function parseIdParam(value: string | string[] | undefined): number | null {
 
 function duplicateServerMessage(name: string): string {
     return `Server "${name}" is already registered`;
+}
+
+function duplicateHostMessage(host: string): string {
+    return `Host "${host}" is already registered`;
+}
+
+function duplicateResponse(
+    constraint: string | undefined,
+    values: { server: string; host: string }
+): { code: string; message: string } | null {
+    if (constraint === SERVER_UNIQUE_CONSTRAINT) {
+        return { code: DUPLICATE_SERVER_CODE, message: duplicateServerMessage(values.server) };
+    }
+    if (constraint === HOST_UNIQUE_CONSTRAINT) {
+        return { code: DUPLICATE_HOST_CODE, message: duplicateHostMessage(values.host) };
+    }
+    return null;
 }
 
 function sendValidationError(res: Response, error: z.ZodError): void {
@@ -74,10 +94,14 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         ok(res, 'Server registered successfully', rows[0]);
     } catch (err) {
         console.error(err);
-        const dbError = err as { detail?: string; code?: string; message?: string };
+        const dbError = err as { detail?: string; code?: string; constraint?: string; message?: string };
 
         if (dbError.code === DUPLICATE_KEY_CODE) {
-            fail(res, 409, duplicateServerMessage(server), DUPLICATE_SERVER_CODE);
+            const duplicate = duplicateResponse(dbError.constraint, { server, host }) ?? {
+                code: DUPLICATE_SERVER_CODE,
+                message: duplicateServerMessage(server),
+            };
+            fail(res, 409, duplicate.message, duplicate.code);
             return;
         }
 
@@ -110,10 +134,12 @@ export const update = async (req: Request, res: Response): Promise<void> => {
         const { rows: stateRows } = await db.query<{
             target_exists: boolean;
             name_taken: boolean;
+            host_taken: boolean;
         }>(
             `SELECT EXISTS (SELECT 1 FROM servers WHERE id = $2) AS target_exists,
-                    EXISTS (SELECT 1 FROM servers WHERE server = $1 AND id <> $2) AS name_taken`,
-            [server, id]
+                    EXISTS (SELECT 1 FROM servers WHERE server = $1 AND id <> $2) AS name_taken,
+                    EXISTS (SELECT 1 FROM servers WHERE host = $3 AND id <> $2) AS host_taken`,
+            [server, id, host]
         );
 
         const state = stateRows[0];
@@ -123,6 +149,10 @@ export const update = async (req: Request, res: Response): Promise<void> => {
         }
         if (state.name_taken) {
             fail(res, 409, duplicateServerMessage(server), DUPLICATE_SERVER_CODE);
+            return;
+        }
+        if (state.host_taken) {
+            fail(res, 409, duplicateHostMessage(host), DUPLICATE_HOST_CODE);
             return;
         }
 
@@ -148,10 +178,14 @@ export const update = async (req: Request, res: Response): Promise<void> => {
         ok(res, 'Server updated successfully', updated);
     } catch (err) {
         console.error(err);
-        const dbError = err as { detail?: string; code?: string; message?: string };
+        const dbError = err as { detail?: string; code?: string; constraint?: string; message?: string };
 
         if (dbError.code === DUPLICATE_KEY_CODE) {
-            fail(res, 409, duplicateServerMessage(server), DUPLICATE_SERVER_CODE);
+            const duplicate = duplicateResponse(dbError.constraint, { server, host }) ?? {
+                code: DUPLICATE_SERVER_CODE,
+                message: duplicateServerMessage(server),
+            };
+            fail(res, 409, duplicate.message, duplicate.code);
             return;
         }
 
