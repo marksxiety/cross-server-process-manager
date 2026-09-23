@@ -1,7 +1,7 @@
 import { httpRequest } from "@/api/http";
 import type { RegisteredServer } from "@/types/server";
 
-type Method = "GET" | "POST" | "DELETE";
+type Method = "GET" | "POST" | "PUT" | "DELETE";
 
 export type ApiTarget = Pick<RegisteredServer, "protocol" | "host" | "port">;
 
@@ -17,6 +17,7 @@ export function createConnection(target: ApiTarget) {
     return {
         get: <T = unknown>(path: string) => request<T>(path, "GET"),
         post: <T = unknown>(path: string, body?: unknown) => request<T>(path, "POST", body),
+        put: <T = unknown>(path: string, body?: unknown) => request<T>(path, "PUT", body),
         del: <T = unknown>(path: string) => request<T>(path, "DELETE"),
     };
 }
