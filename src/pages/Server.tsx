@@ -46,13 +46,33 @@ import {
   type RegisterServerInput,
   type RegisterServerValues,
 } from '@/schemas/server.schema'
+import type { RegisteredServer } from '@/types/server'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Controller, useForm } from 'react-hook-form'
 
 type StatusFilter = 'all' | 'active' | 'inactive'
 
+const DEFAULT_FORM_VALUES: RegisterServerInput = {
+  server: '',
+  protocol: 'http',
+  host: '',
+  port: 4000,
+  is_active: true,
+}
+
+function toFormValues(server: RegisteredServer): RegisterServerValues {
+  return {
+    server: server.server,
+    protocol: server.protocol,
+    host: server.host,
+    port: server.port,
+    is_active: server.is_active,
+  }
+}
+
 export function Server() {
   const [isSheetOpen, setIsSheetOpen] = useState(false)
+  const [editingServer, setEditingServer] = useState<RegisteredServer | null>(null)
   const [filter, setFilter] = useState<StatusFilter>('all')
   const servers = useServerStore((state) => state.servers)
   const status = useServerStore((state) => state.status)
@@ -68,43 +88,64 @@ export function Server() {
     formState: { errors, isSubmitting },
   } = useForm<RegisterServerInput, unknown, RegisterServerValues>({
     resolver: zodResolver(registerServerSchema),
-    defaultValues: {
-      server: '',
-      protocol: 'http',
-      host: '',
-      port: 4000,
-      is_active: true,
-    },
+    defaultValues: DEFAULT_FORM_VALUES,
   })
 
   useEffect(() => {
     void load()
   }, [load])
 
+  const openRegister = () => {
+    setEditingServer(null)
+    reset(DEFAULT_FORM_VALUES)
+    setIsSheetOpen(true)
+  }
+
+  const openEdit = (server: RegisteredServer) => {
+    setEditingServer(server)
+    reset(toFormValues(server))
+    setIsSheetOpen(true)
+  }
+
+  const handleSheetOpenChange = (open: boolean) => {
+    setIsSheetOpen(open)
+    if (!open) setEditingServer(null)
+  }
+
   const onSubmit = handleSubmit(async (values) => {
-    const request = serverService()
-      .register(values)
-      .then((result) => {
-        if (!result.success) throw new Error(result.message)
-        return result
-      })
+    const target = editingServer
+    const isEditing = target !== null
+
+    const request = (
+      target
+        ? serverService().update(target.id, values)
+        : serverService().register(values)
+    ).then((result) => {
+      if (!result.success) throw new Error(result.message)
+      return result
+    })
 
     try {
       await toast.promise(request, {
-        loading: { title: 'Registering server…' },
+        loading: {
+          title: isEditing ? 'Updating server…' : 'Registering server…',
+        },
         success: {
-          title: 'Server registered',
-          description: `${values.server} was added.`,
+          title: isEditing ? 'Server updated' : 'Server registered',
+          description: isEditing
+            ? `${values.server} was updated.`
+            : `${values.server} was added.`,
         },
         error: (error) => ({
-          title: 'Registration failed',
+          title: isEditing ? 'Update failed' : 'Registration failed',
           description: error instanceof Error ? error.message : String(error),
         }),
       })
 
       await reload()
-      reset()
+      reset(DEFAULT_FORM_VALUES)
       setIsSheetOpen(false)
+      setEditingServer(null)
     } catch {
       // toast.promise already surfaced the error; keep the sheet open.
     }
@@ -146,21 +187,25 @@ export function Server() {
           </TabsList>
         </Tabs>
 
-        <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-          <Button size='sm' onClick={() => setIsSheetOpen(true)}>
+        <Sheet open={isSheetOpen} onOpenChange={handleSheetOpenChange}>
+          <Button size='sm' onClick={openRegister}>
             <Plus strokeWidth={2} />
             Register server
           </Button>
           <SheetContent size='md'>
             <SheetHeader>
-              <SheetTitle>Register server</SheetTitle>
+              <SheetTitle>
+                {editingServer ? 'Edit server' : 'Register server'}
+              </SheetTitle>
               <SheetDescription>
-                Add a new server to the fleet.
+                {editingServer
+                  ? 'Update the selected server in the fleet.'
+                  : 'Add a new server to the fleet.'}
               </SheetDescription>
             </SheetHeader>
 
             <div className='flex-1 overflow-y-auto px-6'>
-              <form id='register-server-form' onSubmit={onSubmit}>
+              <form id='server-form' onSubmit={onSubmit}>
                 <FieldSet>
                   <FieldGroup className='grid grid-cols-2 gap-3'>
                     <Field data-invalid={!!errors.server}>
@@ -254,18 +299,20 @@ export function Server() {
                 variant='outline'
                 className='w-full'
                 disabled={isSubmitting}
-                onClick={() => reset()}
+                onClick={() =>
+                  reset(editingServer ? toFormValues(editingServer) : DEFAULT_FORM_VALUES)
+                }
               >
-                Clear
+                {editingServer ? 'Reset' : 'Clear'}
               </Button>
               <Button
                 type='submit'
-                form='register-server-form'
+                form='server-form'
                 className='w-full'
                 disabled={isSubmitting}
               >
                 {isSubmitting && <Spinner className='size-4' />}
-                Register
+                {editingServer ? 'Save changes' : 'Register'}
               </Button>
             </SheetFooter>
           </SheetContent>
@@ -300,7 +347,7 @@ export function Server() {
       {status === 'success' &&
         servers.length > 0 &&
         (filteredServers.length > 0 ? (
-          <ServerTable servers={filteredServers} />
+          <ServerTable servers={filteredServers} onEdit={openEdit} />
         ) : (
           <p className='text-sm text-muted-foreground py-6'>
             No {filter} servers.
