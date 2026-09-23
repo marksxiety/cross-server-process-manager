@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "start": "node dist/index.js",
     "db:create": "tsx src/scripts/createDatabase.ts",
-    "db:setup": "npm run db:create && npm run migrate:up",
+    "db:seed": "tsx src/scripts/seed.ts",
+    "db:setup": "npm run db:create && npm run migrate:up && npm run db:seed",
     "migrate:create": "node-pg-migrate --envPath ../.env -f .node-pg-migraterc.cjs create",
     "migrate:up": "node-pg-migrate --envPath ../.env -f .node-pg-migraterc.cjs up",
     "migrate:down": "node-pg-migrate --envPath ../.env -f .node-pg-migraterc.cjs down"
