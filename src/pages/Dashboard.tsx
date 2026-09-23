@@ -54,6 +54,7 @@ import {
   toneSurfaceClasses,
 } from '@/lib/status-tone'
 import { DASHBOARD_AUTO_REFRESH_MS } from '@/lib/swr'
+import { formatArgs, formatBytes, formatMetricValue, formatUptime } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { useDashboardStore } from '@/stores/dashboard.store'
 import type { ProcessDescribe, ProcessSummary } from '@/types/process'
@@ -69,77 +70,6 @@ function orDash(value: string | number | null | undefined): string {
   if (typeof value === 'string' && value.trim() === '') return '—'
   if (typeof value === 'number' && !Number.isFinite(value)) return '—'
   return String(value)
-}
-
-function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes)) return '—'
-  const mib = bytes / 1024 / 1024
-  return `${mib.toFixed(1)} MiB`
-}
-
-const SECOND = 1
-const MINUTE = 60 * SECOND
-const HOUR = 60 * MINUTE
-const DAY = 24 * HOUR
-const MONTH = 30 * DAY
-const YEAR = 365 * DAY
-
-/**
- * Formats an elapsed uptime (ms since the process last started, as returned
- * by the agent) by scaling the unit to whatever is most meaningful — seconds
- * up through years — with one secondary unit for precision (e.g. "2y 3mo",
- * "5d 4h").
- */
-function formatUptime(uptimeMs: number): string {
-  if (!Number.isFinite(uptimeMs) || uptimeMs <= 0) return '—'
-
-  const seconds = Math.floor(uptimeMs / 1000)
-
-  if (seconds >= YEAR) {
-    const years = Math.floor(seconds / YEAR)
-    const months = Math.floor((seconds % YEAR) / MONTH)
-    return months > 0 ? `${years}y ${months}mo` : `${years}y`
-  }
-  if (seconds >= MONTH) {
-    const months = Math.floor(seconds / MONTH)
-    const days = Math.floor((seconds % MONTH) / DAY)
-    return days > 0 ? `${months}mo ${days}d` : `${months}mo`
-  }
-  if (seconds >= DAY) {
-    const days = Math.floor(seconds / DAY)
-    const hours = Math.floor((seconds % DAY) / HOUR)
-    return hours > 0 ? `${days}d ${hours}h` : `${days}d`
-  }
-  if (seconds >= HOUR) {
-    const hours = Math.floor(seconds / HOUR)
-    const minutes = Math.floor((seconds % HOUR) / MINUTE)
-    return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`
-  }
-  if (seconds >= MINUTE) {
-    const minutes = Math.floor(seconds / MINUTE)
-    const secs = seconds % MINUTE
-    return secs > 0 ? `${minutes}m ${secs}s` : `${minutes}m`
-  }
-  return `${seconds}s`
-}
-
-function formatDate(iso: string): string {
-  if (!iso) return '—'
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
-
-function toNumber(value: string | number | undefined): number | null {
-  if (value === undefined) return null
-  const num = typeof value === 'number' ? value : Number.parseFloat(value)
-  return Number.isFinite(num) ? num : null
 }
 
 function truncatePath(path: string | null | undefined, segments = 2): string {
@@ -165,13 +95,6 @@ function statLabelClasses(tone: Tone): string {
   if (tone === 'danger') return 'text-destructive'
   if (tone === 'warning') return 'text-amber-600 dark:text-amber-400'
   return 'text-muted-foreground'
-}
-
-function heapUsageTone(value: number | null): Tone {
-  if (value === null) return 'default'
-  if (value >= 90) return 'danger'
-  if (value >= 70) return 'warning'
-  return 'default'
 }
 
 // ---------------------------------------------------------------------------
@@ -252,14 +175,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 function ProcessSheetBody({ data }: { data: ProcessDescribe }) {
   const { summary, describe, metrics } = data
-
-  const heapUsage = toNumber(metrics['Heap Usage']?.value)
-  const heapSize = toNumber(metrics['Heap Size']?.value)
-  const usedHeapSize = toNumber(metrics['Used Heap Size']?.value)
-  const loopP50 = toNumber(metrics['Event Loop Latency']?.value)
-  const loopP95 = toNumber(metrics['Event Loop Latency p95']?.value)
-  const activeHandles = toNumber(metrics['Active handles']?.value)
-  const activeRequests = toNumber(metrics['Active requests']?.value)
+  const metricEntries = Object.entries(metrics)
 
   return (
     <div className='space-y-5'>
@@ -274,15 +190,10 @@ function ProcessSheetBody({ data }: { data: ProcessDescribe }) {
         </div>
         <div className='grid grid-cols-3 gap-3'>
           <StatTile label='Uptime' value={formatUptime(summary.uptime)} />
-          <StatTile
-            label='Restarts'
-            value={orDash(summary.restarts)}
-            tone={summary.restarts > 0 ? 'warning' : 'default'}
-          />
+          <StatTile label='Restarts' value={orDash(summary.restarts)} />
           <StatTile
             label='Unstable restarts'
             value={orDash(summary.unstable_restarts)}
-            tone={summary.unstable_restarts > 0 ? 'danger' : 'default'}
           />
         </div>
       </section>
@@ -292,39 +203,26 @@ function ProcessSheetBody({ data }: { data: ProcessDescribe }) {
       {/* Resource usage */}
       <section>
         <SectionLabel>Resource usage</SectionLabel>
-        <div className='grid grid-cols-3 gap-3'>
+        <div className='grid grid-cols-2 gap-3'>
           <StatTile label='CPU' value={Number.isFinite(summary.cpu) ? `${summary.cpu}%` : '—'} />
           <StatTile label='Memory' value={formatBytes(summary.memory)} />
-          <StatTile
-            label='Heap size'
-            value={heapSize !== null ? `${heapSize} MiB` : '—'}
-          />
-          <StatTile
-            label='Used heap size'
-            value={usedHeapSize !== null ? `${usedHeapSize} MiB` : '—'}
-          />
-          <StatTile
-            label='Heap usage'
-            value={heapUsage !== null ? `${heapUsage}%` : '—'}
-            tone={heapUsageTone(heapUsage)}
-          />
-          <StatTile
-            label='Loop latency p50'
-            value={loopP50 !== null ? `${loopP50} ms` : '—'}
-          />
-          <StatTile
-            label='Loop latency p95'
-            value={loopP95 !== null ? `${loopP95} ms` : '—'}
-          />
-          <StatTile
-            label='Active handles'
-            value={activeHandles !== null ? String(activeHandles) : '—'}
-          />
-          <StatTile
-            label='Active requests'
-            value={activeRequests !== null ? String(activeRequests) : '—'}
-          />
         </div>
+      </section>
+
+      <Separator />
+
+      {/* Custom metrics — raw pmx probes, mirroring pm2 describe/monit */}
+      <section>
+        <SectionLabel>Custom metrics</SectionLabel>
+        {metricEntries.length > 0 ? (
+          <div className='grid grid-cols-2 gap-x-6'>
+            {metricEntries.map(([key, metric]) => (
+              <KeyValueRow key={key} label={key} value={formatMetricValue(metric)} />
+            ))}
+          </div>
+        ) : (
+          <p className='text-sm text-muted-foreground'>No custom metrics</p>
+        )}
       </section>
 
       <Separator />
@@ -353,12 +251,24 @@ function ProcessSheetBody({ data }: { data: ProcessDescribe }) {
         <CollapsibleContent className='space-y-1 pt-1'>
           <PathRow label='cwd' value={truncatePath(summary.cwd)} />
           <PathRow label='script path' value={truncatePath(describe.script_path)} />
-          <PathRow label='script args' value={describe.script_args} />
-          <PathRow label='interpreter args' value={describe.interpreter_args} />
+          <PathRow label='script args' value={formatArgs(describe.script_args)} />
+          <PathRow label='interpreter args' value={formatArgs(describe.interpreter_args)} />
           <PathRow label='out log' value={truncatePath(describe.out_log_path)} />
           <PathRow label='error log' value={truncatePath(describe.error_log_path)} />
           <PathRow label='pid file' value={truncatePath(describe.pid_path)} />
-          <PathRow label='created' value={formatDate(describe.created_at)} />
+          {describe.entire_log_path && (
+            <PathRow label='entire log path' value={truncatePath(describe.entire_log_path)} />
+          )}
+          {describe.cron_restart && (
+            <PathRow label='cron restart' value={describe.cron_restart} />
+          )}
+          {describe.max_memory_restart !== undefined && (
+            <PathRow
+              label='max memory restart'
+              value={String(describe.max_memory_restart)}
+            />
+          )}
+          <PathRow label='created' value={orDash(describe.created_at)} />
         </CollapsibleContent>
       </Collapsible>
     </div>
