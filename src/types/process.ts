@@ -6,6 +6,7 @@ export interface ProcessSummary {
     name: string;
     namespace: string;
     status: ProcessStatus;
+    /** Elapsed time in ms since the process last started; 0 when not online. */
     uptime: number;
     restarts: number;
     unstable_restarts: number;
