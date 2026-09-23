@@ -1,5 +1,5 @@
 import { createConnection } from "@/api/connection";
-import type { RegisteredServer, RegisterServer } from "@/types/server";
+import type { RegisteredServer, ServerInput } from "@/types/server";
 import type { ApiResponse } from "@/types/api";
 
 export function serverService() {
@@ -21,6 +21,8 @@ export function serverService() {
                 return { success: false, message: (cause as Error).message, info: [], status: 0 };
             }
         },
-        register: (payload: RegisterServer) => api.post<RegisteredServer>("/register", payload),
+        register: (payload: ServerInput) => api.post<RegisteredServer>("/register", payload),
+        update: (id: number, payload: ServerInput) =>
+            api.put<RegisteredServer>(`/servers/${id}`, payload),
     };
 }
