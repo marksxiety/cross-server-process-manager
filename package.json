@@ -14,6 +14,8 @@
     "build:ui": "tsc -b && vite build",
     "build:server": "npm run build --workspace=server",
     "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "preview": "vite preview",
     "run:built": "concurrently -n ui,api -c cyan,magenta \"vite preview\" \"npm run start --workspace=server\""
   },
@@ -56,6 +58,7 @@
     "globals": "^17.7.0",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.65.0",
-    "vite": "^8.2.0"
+    "vite": "^8.2.0",
+    "vitest": "^5.0.1"
   }
 }
