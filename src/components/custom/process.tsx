@@ -1,5 +1,6 @@
 import { Badge } from '@/components/ui/badge'
 import { StatusDot } from '@/components/custom/status-dot'
+import { formatBytes } from '@/lib/format'
 import {
   processTone,
   toneBadgeVariant,
@@ -8,10 +9,6 @@ import {
 } from '@/lib/status-tone'
 import { cn } from '@/lib/utils'
 import type { ProcessSummary } from '@/types/process'
-
-function formatMemory(bytes: number) {
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
-}
 
 type ProcessProps = {
   process: ProcessSummary
@@ -50,7 +47,7 @@ export function Process({ process, onSelect }: ProcessProps) {
       </span>
       <Badge variant={toneBadgeVariant[tone]}>{process.status}</Badge>
       <span className='ml-auto shrink-0 text-xs tabular-nums text-muted-foreground'>
-        {process.cpu}% · {formatMemory(process.memory)}
+        {process.cpu}% · {formatBytes(process.memory)}
       </span>
     </div>
   )
