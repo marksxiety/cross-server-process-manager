@@ -85,16 +85,15 @@ const MONTH = 30 * DAY
 const YEAR = 365 * DAY
 
 /**
- * Formats a process start timestamp (ms since epoch) as elapsed uptime,
- * scaling the unit to whatever is most meaningful — seconds up through
- * years — with one secondary unit for precision (e.g. "2y 3mo", "5d 4h").
+ * Formats an elapsed uptime (ms since the process last started, as returned
+ * by the agent) by scaling the unit to whatever is most meaningful — seconds
+ * up through years — with one secondary unit for precision (e.g. "2y 3mo",
+ * "5d 4h").
  */
-function formatUptime(startedAtMs: number): string {
-  if (!Number.isFinite(startedAtMs) || startedAtMs <= 0) return '—'
-  const elapsedMs = Date.now() - startedAtMs
-  if (elapsedMs < 0) return '—'
+function formatUptime(uptimeMs: number): string {
+  if (!Number.isFinite(uptimeMs) || uptimeMs <= 0) return '—'
 
-  const seconds = Math.floor(elapsedMs / 1000)
+  const seconds = Math.floor(uptimeMs / 1000)
 
   if (seconds >= YEAR) {
     const years = Math.floor(seconds / YEAR)
