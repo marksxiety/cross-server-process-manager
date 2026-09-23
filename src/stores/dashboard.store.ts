@@ -42,6 +42,7 @@ export const useDashboardStore = create<DashboardState>()(
 
                 const candidate = value as Partial<RegisteredServer>;
                 return (
+                    typeof candidate.id === "number" &&
                     typeof candidate.server === "string" &&
                     (candidate.protocol === "http" || candidate.protocol === "https") &&
                     typeof candidate.host === "string" &&
