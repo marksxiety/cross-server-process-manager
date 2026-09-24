@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, ServerOff } from 'lucide-react'
+import { Plus, ServerOff, Trash2 } from 'lucide-react'
 import {
   Field,
   FieldGroup,
@@ -35,6 +35,17 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogMedia,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Spinner } from '@/components/ui/spinner'
 import { toast } from '@/components/ui/toast'
 import { PageHeader } from '@/components/custom/page-header'
@@ -73,6 +84,8 @@ function toFormValues(server: RegisteredServer): RegisterServerValues {
 export function Server() {
   const [isSheetOpen, setIsSheetOpen] = useState(false)
   const [editingServer, setEditingServer] = useState<RegisteredServer | null>(null)
+  const [deletingServer, setDeletingServer] = useState<RegisteredServer | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [filter, setFilter] = useState<StatusFilter>('all')
   const servers = useServerStore((state) => state.servers)
   const status = useServerStore((state) => state.status)
@@ -150,6 +163,43 @@ export function Server() {
       // toast.promise already surfaced the error; keep the sheet open.
     }
   })
+
+  const confirmDelete = async () => {
+    const target = deletingServer
+    if (!target || isDeleting) return
+
+    setIsDeleting(true)
+
+    const request = serverService()
+      .remove(target.id)
+      .then((result) => {
+        if (!result.success) throw new Error(result.message)
+        return result
+      })
+
+    try {
+      await toast.promise(request, {
+        loading: {
+          title: 'Deleting server…',
+        },
+        success: {
+          title: 'Server deleted',
+          description: `${target.server} was removed.`,
+        },
+        error: (error) => ({
+          title: 'Delete failed',
+          description: error instanceof Error ? error.message : String(error),
+        }),
+      })
+
+      await reload()
+    } catch {
+      // toast.promise already surfaced the error.
+    } finally {
+      setIsDeleting(false)
+      setDeletingServer(null)
+    }
+  }
 
   const counts = useMemo(
     () => ({
@@ -317,6 +367,36 @@ export function Server() {
             </SheetFooter>
           </SheetContent>
         </Sheet>
+
+        <AlertDialog
+          open={deletingServer !== null}
+          onOpenChange={(open) => {
+            if (!open && !isDeleting) setDeletingServer(null)
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogMedia className='text-destructive'>
+                <Trash2 strokeWidth={2} />
+              </AlertDialogMedia>
+              <AlertDialogTitle>Delete Server?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete this server? Any processes currently running on it will not be automatically stopped.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                variant='destructive'
+                disabled={isDeleting}
+                onClick={confirmDelete}
+              >
+                {isDeleting && <Spinner className='size-4' />}
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </PageHeader>
 
       {status === 'loading' && (
@@ -347,7 +427,11 @@ export function Server() {
       {status === 'success' &&
         servers.length > 0 &&
         (filteredServers.length > 0 ? (
-          <ServerTable servers={filteredServers} onEdit={openEdit} />
+          <ServerTable
+            servers={filteredServers}
+            onEdit={openEdit}
+            onDelete={setDeletingServer}
+          />
         ) : (
           <p className='text-sm text-muted-foreground py-6'>
             No {filter} servers.
