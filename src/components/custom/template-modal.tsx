@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/select'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { buildTemplatePayload } from '@/lib/template-payload'
+import { cn } from '@/lib/utils'
 import type { ProcessTemplate, TemplateDataType, TemplateKey } from '@/types/template'
 
 type TemplateModalProps = {
@@ -30,6 +31,9 @@ type TemplateModalProps = {
 }
 
 const DATA_TYPES: TemplateDataType[] = ['string', 'boolean', 'number', 'array', 'object']
+
+const KEY_GRID =
+  'grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7rem_4.5rem_1.5rem] items-center gap-2'
 
 function newKey(): TemplateKey {
   return {
@@ -83,17 +87,26 @@ export function TemplateModal({ template, open, onOpenChange, onUse }: TemplateM
           <div className='space-y-2'>
             <div className='flex items-center justify-between'>
               <p className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>
-                Keys
+                Fields
               </p>
               <Button type='button' variant='outline' size='sm' onClick={addKey}>
-                + Add key
+                + Add field
               </Button>
+            </div>
+
+            {/* Header lives outside the ScrollArea so only the rows scroll. */}
+            <div className={cn(KEY_GRID, 'pr-3 text-xs font-medium text-muted-foreground')}>
+              <span>Key</span>
+              <span>Value</span>
+              <span>Data Type</span>
+              <span className='text-center'>Required</span>
+              <span />
             </div>
 
             <ScrollArea className='max-h-105 [&_[data-slot=scroll-area-viewport]]:max-h-105'>
               <div className='space-y-2 pr-3'>
                 {keys.map((key, index) => (
-                  <div key={index} className='flex items-center gap-2'>
+                  <div key={index} className={KEY_GRID}>
                     <Input
                       className='font-mono text-xs'
                       placeholder='key'
@@ -112,7 +125,7 @@ export function TemplateModal({ template, open, onOpenChange, onUse }: TemplateM
                         updateKey(index, { data_type: value as TemplateDataType })
                       }
                     >
-                      <SelectTrigger className='w-28 shrink-0'>
+                      <SelectTrigger className='w-full'>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -123,15 +136,14 @@ export function TemplateModal({ template, open, onOpenChange, onUse }: TemplateM
                         ))}
                       </SelectContent>
                     </Select>
-                    <label className='flex shrink-0 items-center gap-1 text-xs text-muted-foreground'>
+                    <div className='flex justify-center'>
                       <Checkbox
                         checked={key.is_required}
                         onCheckedChange={(checked) =>
                           updateKey(index, { is_required: checked === true })
                         }
                       />
-                      req
-                    </label>
+                    </div>
                     <Button
                       type='button'
                       variant='ghost'
@@ -152,9 +164,11 @@ export function TemplateModal({ template, open, onOpenChange, onUse }: TemplateM
             <p className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>
               Payload preview
             </p>
-            <pre className='max-h-105 overflow-auto rounded-md border bg-muted p-3 font-mono text-[11px] leading-relaxed'>
-              {payloadJson}
-            </pre>
+            <ScrollArea className='max-h-105 rounded-md border bg-muted [&_[data-slot=scroll-area-viewport]]:max-h-105'>
+              <pre className='whitespace-pre-wrap break-words p-3 font-mono text-[11px] leading-relaxed'>
+                {payloadJson}
+              </pre>
+            </ScrollArea>
             <Button
               type='button'
               variant='outline'
