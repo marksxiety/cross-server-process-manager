@@ -39,6 +39,7 @@ const TEMPLATE_ROW = {
     template_name: 'Node',
     category: 'Node / JavaScript',
     description: 'Run a .js/.mjs/.cjs entry file directly under node.exe.',
+    preview: 'node --env-file=.env index.js --port 3000',
     is_active: true,
 };
 
@@ -119,6 +120,16 @@ describe('templateController.index', () => {
         const info = responseBody(res).info as Array<{ keys: unknown[] }>;
         expect(info).toHaveLength(1);
         expect(info[0]?.keys).toEqual([]);
+    });
+
+    it('passes a null preview through unchanged', async () => {
+        query.mockResolvedValueOnce({ rows: [{ ...TEMPLATE_ROW, preview: null, ...SCRIPT_KEY }] });
+        const res = createResponse();
+
+        await index(createRequest({}), res);
+
+        const info = responseBody(res).info as Array<{ preview: string | null }>;
+        expect(info[0]?.preview).toBeNull();
     });
 
     it('keeps separate templates distinct and preserves query order', async () => {
