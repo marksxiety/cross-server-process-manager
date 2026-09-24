@@ -30,6 +30,13 @@ import {
 } from '@/components/ui/empty'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Sheet,
   SheetContent,
   SheetFooter,
@@ -51,6 +58,13 @@ import { DASHBOARD_AUTO_REFRESH_MS } from '@/lib/swr'
 import { formatArgs, formatBytes, formatMetricValue, formatUptime } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { useDashboardStore } from '@/stores/dashboard.store'
+import {
+  LOGS_DEFAULT_TAIL,
+  LOGS_TAIL_OPTIONS,
+  logKey,
+  useProcessLogsStore,
+  type LogsEntry,
+} from '@/stores/process-logs.store'
 import type { ProcessDescribe, ProcessSummary } from '@/types/process'
 import type { RegisteredServer } from '@/types/server'
 
@@ -169,15 +183,27 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 function ProcessSheetBody({
   data,
+  server,
   pathsOpen,
   onPathsOpenChange,
+  logsOpen,
+  onLogsOpenChange,
+  logs,
 }: {
   data: ProcessDescribe
+  server: RegisteredServer
   pathsOpen: boolean
   onPathsOpenChange: (open: boolean) => void
+  logsOpen: boolean
+  onLogsOpenChange: (open: boolean) => void
+  logs: LogsEntry | undefined
 }) {
   const { summary, describe, metrics } = data
   const metricEntries = Object.entries(metrics)
+  const pmId = summary.pm_id
+  const tail = logs?.tail ?? LOGS_DEFAULT_TAIL
+  const setTail = useProcessLogsStore((state) => state.setTail)
+  const refreshLogs = useProcessLogsStore((state) => state.refresh)
 
   return (
     <div className='space-y-5'>
@@ -281,6 +307,99 @@ function ProcessSheetBody({
           </AccordionContent>
         </AccordionItem>
       </Accordion>
+
+      {/* Logs — merged out/error timeline, collapsed by default */}
+      <Accordion
+        value={logsOpen ? ['logs'] : []}
+        onValueChange={(value) => onLogsOpenChange(value.includes('logs'))}
+        className='rounded-none border-0'
+      >
+        <AccordionItem value='logs' className='border-0 data-open:bg-transparent'>
+          <AccordionTrigger className='p-0 hover:no-underline'>
+            <SectionLabel>Logs</SectionLabel>
+          </AccordionTrigger>
+          <AccordionContent className='-mx-2 pt-1 pb-0'>
+            <div className='mb-2 flex items-center justify-between gap-2'>
+              <div className='flex items-center gap-2'>
+                <span className='text-xs text-muted-foreground'>Rows</span>
+                <Select
+                  value={String(tail)}
+                  onValueChange={(value) => void setTail(server, pmId, Number(value))}
+                >
+                  <SelectTrigger size='sm' className='w-20'>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {LOGS_TAIL_OPTIONS.map((option) => (
+                      <SelectItem key={option} value={String(option)}>
+                        {option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                type='button'
+                variant='ghost'
+                size='icon-sm'
+                aria-label='Refresh logs'
+                title='Refresh logs'
+                disabled={logs?.refreshing}
+                onClick={() => void refreshLogs(server, pmId)}
+              >
+                <RefreshCw
+                  strokeWidth={2}
+                  className={cn(logs?.refreshing && 'animate-spin')}
+                />
+              </Button>
+            </div>
+
+            {!logs || logs.status === 'loading' ? (
+              <div className='flex items-center gap-2 py-4 text-xs text-muted-foreground'>
+                <Spinner className='size-4' />
+                Loading logs…
+              </div>
+            ) : logs.status === 'error' && logs.lines.length === 0 ? (
+              <p className='py-2 text-xs text-destructive'>{logs.error}</p>
+            ) : logs.lines.length === 0 ? (
+              <p className='py-2 text-xs text-muted-foreground'>No logs</p>
+            ) : (
+              <ScrollArea className='max-h-72 rounded-md border bg-muted/30 [&_[data-slot=scroll-area-viewport]]:max-h-72'>
+                <div className='p-2'>
+                  {logs.lines.map((line) => (
+                    <div key={line.id} className='flex gap-2 py-0.5 font-mono text-xs'>
+                      <span
+                        className='shrink-0 tabular-nums text-muted-foreground'
+                        title={line.timestamp ?? undefined}
+                      >
+                        {line.timestamp ? line.timestamp.slice(11) : '—'}
+                      </span>
+                      <span
+                        className={cn(
+                          'shrink-0 font-medium uppercase',
+                          line.stream === 'error'
+                            ? 'text-destructive'
+                            : 'text-muted-foreground',
+                        )}
+                      >
+                        {line.stream === 'error' ? 'err' : 'out'}
+                      </span>
+                      <span
+                        className={cn(
+                          'min-w-0 whitespace-pre-wrap break-all',
+                          line.stream === 'error' && 'text-destructive',
+                        )}
+                      >
+                        {line.message}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
     </div>
   )
 }
@@ -305,11 +424,19 @@ export function Dashboard() {
     process: ProcessSummary
   } | null>(null)
   const [pathsOpen, setPathsOpen] = useState(false)
+  const [logsOpen, setLogsOpen] = useState(false)
 
   const describe = useProcessDescribe(
     selected?.server ?? null,
     selected?.process.pm_id ?? null,
   )
+
+  const logs = useProcessLogsStore((state) =>
+    selected
+      ? state.entries[logKey(selected.server, selected.process.pm_id)]
+      : undefined,
+  )
+  const loadLogs = useProcessLogsStore((state) => state.load)
 
   const selectedTone = selected
     ? processTone(selected.process.status)
@@ -336,6 +463,13 @@ export function Dashboard() {
   useEffect(() => {
     void load()
   }, [load])
+
+  // Fetch logs when the Logs accordion opens (the store serves the in-memory
+  // timeline first and only refetches when it is stale).
+  useEffect(() => {
+    if (!logsOpen || !selected) return
+    void loadLogs(selected.server, selected.process.pm_id)
+  }, [logsOpen, selected, loadLogs])
 
   useEffect(() => {
     const intervalId = setInterval(
@@ -466,6 +600,7 @@ export function Dashboard() {
                               onSelect={() => {
                                 setSelected({ server, process })
                                 setPathsOpen(false)
+                                setLogsOpen(false)
                               }}
                             />
                           ))}
@@ -486,6 +621,7 @@ export function Dashboard() {
           if (!open) {
             setSelected(null)
             setPathsOpen(false)
+            setLogsOpen(false)
           }
         }}
       >
@@ -565,11 +701,15 @@ export function Dashboard() {
               {describe.status === 'error' && (
                 <p className='text-destructive'>{describe.error}</p>
               )}
-              {describe.status === 'success' && describe.data && (
+              {describe.status === 'success' && describe.data && selected && (
                 <ProcessSheetBody
                   data={describe.data}
+                  server={selected.server}
                   pathsOpen={pathsOpen}
                   onPathsOpenChange={setPathsOpen}
+                  logsOpen={logsOpen}
+                  onLogsOpenChange={setLogsOpen}
+                  logs={logs}
                 />
               )}
             </div>
