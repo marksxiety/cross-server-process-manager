@@ -1,5 +1,22 @@
 export type ProcessStatus = "online" | "stopped" | "stopping" | "launching" | "errored";
 
+export type LogStreamType = "both" | "output" | "error";
+
+export type LogStream = "out" | "error";
+
+export interface ProcessLogs {
+    out?: string[];
+    error?: string[];
+}
+
+export interface ProcessLogLine {
+    id: number;
+    stream: LogStream;
+    /** ISO-ish prefix exactly as PM2 writes it, e.g. 2026-09-19T10:29:08. Null for continuation lines. */
+    timestamp: string | null;
+    message: string;
+}
+
 export interface ProcessSummary {
     pid: number;
     pm_id: number;
