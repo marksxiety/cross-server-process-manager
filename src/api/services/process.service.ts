@@ -2,7 +2,7 @@ import { createConnection } from "@/api/connection";
 import { normalizeProcessDescribe } from "@/lib/process-describe";
 import type { ApiResponse } from "@/types/api";
 import type { RegisteredServer } from "@/types/server";
-import type { ProcessDescribe, ProcessSummary } from "@/types/process";
+import type { LogStreamType, ProcessDescribe, ProcessLogs, ProcessSummary } from "@/types/process";
 import type { SystemOverview } from "@/types/system";
 
 export function processService(server: RegisteredServer) {
@@ -26,6 +26,13 @@ export function processService(server: RegisteredServer) {
                 };
             }
             return { ...response, info };
+        },
+        logs: (pmId: number, params: { tail?: number; type?: LogStreamType } = {}) => {
+            const search = new URLSearchParams();
+            if (params.tail !== undefined) search.set("tail", String(params.tail));
+            if (params.type !== undefined) search.set("type", params.type);
+            const query = search.toString();
+            return api.get<ProcessLogs>(`/pm2/logs/${pmId}${query ? `?${query}` : ""}`);
         },
         start: (pmId: number) => api.post<ProcessSummary[]>(`/pm2/start/${pmId}`),
         stop: (pmId: number) => api.post<ProcessSummary[]>(`/pm2/stop/${pmId}`),
