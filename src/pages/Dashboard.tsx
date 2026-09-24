@@ -8,7 +8,6 @@ import {
 } from '@/components/ui/accordion'
 import {
   Check,
-  ChevronDown,
   Circle,
   Play,
   RefreshCw,
@@ -21,11 +20,6 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible'
 import {
   Empty,
   EmptyContent,
@@ -173,7 +167,15 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 // Process detail sheet body
 // ---------------------------------------------------------------------------
 
-function ProcessSheetBody({ data }: { data: ProcessDescribe }) {
+function ProcessSheetBody({
+  data,
+  pathsOpen,
+  onPathsOpenChange,
+}: {
+  data: ProcessDescribe
+  pathsOpen: boolean
+  onPathsOpenChange: (open: boolean) => void
+}) {
   const { summary, describe, metrics } = data
   const metricEntries = Object.entries(metrics)
 
@@ -243,34 +245,42 @@ function ProcessSheetBody({ data }: { data: ProcessDescribe }) {
       <Separator />
 
       {/* Paths and logs — collapsed by default, low priority during triage */}
-      <Collapsible>
-        <CollapsibleTrigger className='group flex w-full items-center justify-between'>
-          <SectionLabel>Paths and logs</SectionLabel>
-          <ChevronDown className='size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180' />
-        </CollapsibleTrigger>
-        <CollapsibleContent className='space-y-1 pt-1'>
-          <PathRow label='cwd' value={truncatePath(summary.cwd)} />
-          <PathRow label='script path' value={truncatePath(describe.script_path)} />
-          <PathRow label='script args' value={formatArgs(describe.script_args)} />
-          <PathRow label='interpreter args' value={formatArgs(describe.interpreter_args)} />
-          <PathRow label='out log' value={truncatePath(describe.out_log_path)} />
-          <PathRow label='error log' value={truncatePath(describe.error_log_path)} />
-          <PathRow label='pid file' value={truncatePath(describe.pid_path)} />
-          {describe.entire_log_path && (
-            <PathRow label='entire log path' value={truncatePath(describe.entire_log_path)} />
-          )}
-          {describe.cron_restart && (
-            <PathRow label='cron restart' value={describe.cron_restart} />
-          )}
-          {describe.max_memory_restart !== undefined && (
-            <PathRow
-              label='max memory restart'
-              value={String(describe.max_memory_restart)}
-            />
-          )}
-          <PathRow label='created' value={orDash(describe.created_at)} />
-        </CollapsibleContent>
-      </Collapsible>
+      <Accordion
+        value={pathsOpen ? ['paths-and-logs'] : []}
+        onValueChange={(value) => onPathsOpenChange(value.includes('paths-and-logs'))}
+        className='rounded-none border-0'
+      >
+        <AccordionItem
+          value='paths-and-logs'
+          className='border-0 data-open:bg-transparent'
+        >
+          <AccordionTrigger className='p-0 hover:no-underline'>
+            <SectionLabel>Paths and Commands</SectionLabel>
+          </AccordionTrigger>
+          <AccordionContent className='-mx-2 space-y-1 pt-1 pb-0'>
+            <PathRow label='cwd' value={truncatePath(summary.cwd)} />
+            <PathRow label='script path' value={truncatePath(describe.script_path)} />
+            <PathRow label='script args' value={formatArgs(describe.script_args)} />
+            <PathRow label='interpreter args' value={formatArgs(describe.interpreter_args)} />
+            <PathRow label='out log' value={truncatePath(describe.out_log_path)} />
+            <PathRow label='error log' value={truncatePath(describe.error_log_path)} />
+            <PathRow label='pid file' value={truncatePath(describe.pid_path)} />
+            {describe.entire_log_path && (
+              <PathRow label='entire log path' value={truncatePath(describe.entire_log_path)} />
+            )}
+            {describe.cron_restart && (
+              <PathRow label='cron restart' value={describe.cron_restart} />
+            )}
+            {describe.max_memory_restart !== undefined && (
+              <PathRow
+                label='max memory restart'
+                value={String(describe.max_memory_restart)}
+              />
+            )}
+            <PathRow label='created' value={orDash(describe.created_at)} />
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
     </div>
   )
 }
@@ -294,6 +304,7 @@ export function Dashboard() {
     server: RegisteredServer
     process: ProcessSummary
   } | null>(null)
+  const [pathsOpen, setPathsOpen] = useState(false)
 
   const describe = useProcessDescribe(
     selected?.server ?? null,
@@ -452,7 +463,10 @@ export function Dashboard() {
                             <Process
                               key={process.pm_id}
                               process={process}
-                              onSelect={() => setSelected({ server, process })}
+                              onSelect={() => {
+                                setSelected({ server, process })
+                                setPathsOpen(false)
+                              }}
                             />
                           ))}
                         </AccordionContent>
@@ -469,7 +483,10 @@ export function Dashboard() {
       <Sheet
         open={selected !== null}
         onOpenChange={(open) => {
-          if (!open) setSelected(null)
+          if (!open) {
+            setSelected(null)
+            setPathsOpen(false)
+          }
         }}
       >
         <SheetContent size='lg'>
@@ -549,7 +566,11 @@ export function Dashboard() {
                 <p className='text-destructive'>{describe.error}</p>
               )}
               {describe.status === 'success' && describe.data && (
-                <ProcessSheetBody data={describe.data} />
+                <ProcessSheetBody
+                  data={describe.data}
+                  pathsOpen={pathsOpen}
+                  onPathsOpenChange={setPathsOpen}
+                />
               )}
             </div>
           </ScrollArea>
