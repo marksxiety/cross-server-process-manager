@@ -14,3 +14,18 @@ export const registerServerSchema = z.object({
 
 export type RegisterServerInput = z.input<typeof registerServerSchema>
 export type RegisterServerValues = z.output<typeof registerServerSchema>
+
+export const registeredServerSchema = z.object({
+  id: z.number(),
+  server: z.string(),
+  protocol: z.enum(['http', 'https']),
+  host: z.string(),
+  port: z.number(),
+  is_active: z.boolean(),
+})
+
+// Persisted slice — these keys drive `partialize` and the rehydration merge.
+export const serverPersistSchema = z.object({
+  servers: z.array(registeredServerSchema),
+  serversFetchedAt: z.number().nullable(),
+})
