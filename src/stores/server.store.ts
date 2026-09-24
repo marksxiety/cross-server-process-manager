@@ -2,6 +2,8 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { serverService } from "@/api/services/server.service";
 import { isCacheFresh } from "@/lib/swr";
+import { persistedStore } from "@/lib/persisted";
+import { serverPersistSchema } from "@/schemas/server.schema";
 import type { LoadStatus } from "@/types/dashboard";
 import type { RegisteredServer } from "@/types/server";
 
@@ -13,22 +15,6 @@ interface ServerState {
     isRefreshing: boolean;
     load: () => Promise<void>;
     reload: () => Promise<void>;
-}
-
-// Type guard that rejects malformed entries coming from localStorage. Used by
-// the persist merge so corrupt caches fall through to a real fetch.
-function isRegisteredServer(value: unknown): value is RegisteredServer {
-    if (typeof value !== "object" || value === null) return false;
-
-    const candidate = value as Partial<RegisteredServer>;
-    return (
-        typeof candidate.id === "number" &&
-        typeof candidate.server === "string" &&
-        (candidate.protocol === "http" || candidate.protocol === "https") &&
-        typeof candidate.host === "string" &&
-        typeof candidate.port === "number" &&
-        typeof candidate.is_active === "boolean"
-    );
 }
 
 export const useServerStore = create<ServerState>()(
@@ -109,32 +95,9 @@ export const useServerStore = create<ServerState>()(
                 },
             };
         },
-        {
+        persistedStore<ServerState, typeof serverPersistSchema>({
             name: "server-registry-cache",
-            // Only the registry and its fetch timestamp are cached.
-            partialize: (state) => ({
-                servers: state.servers,
-                serversFetchedAt: state.serversFetchedAt,
-            }),
-            // Sanitizes the persisted slice after hydration so corrupt data can never
-            // put a non-array or malformed rows into servers.
-            merge: (persistedState, currentState) => {
-                const persisted = persistedState as Partial<ServerState> | null;
-                return {
-                    ...currentState,
-                    servers: Array.isArray(persisted?.servers)
-                        ? persisted.servers.filter(isRegisteredServer)
-                        : [],
-                    serversFetchedAt:
-                        typeof persisted?.serversFetchedAt === "number" ? persisted.serversFetchedAt : null,
-                };
-            },
-            // Reports hydration failures (corrupt JSON, storage unavailable).
-            onRehydrateStorage: () => (_state, error) => {
-                if (error) {
-                    console.warn("server-store: could not restore cached servers", error);
-                }
-            },
-        }
+            schema: serverPersistSchema,
+        })
     )
 );
