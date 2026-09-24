@@ -1,9 +1,11 @@
 import { NavLink, useLocation } from 'react-router'
 import { Bot, ChevronRight, Cog, FileText, LayoutDashboard, Server } from 'lucide-react'
 import xpmIcon from '@/assets/xpm-icon.svg'
+import { version } from '../../../package.json'
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupLabel,
   SidebarHeader,
@@ -26,7 +28,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { Separator } from "@/components/ui/separator"
+import { Badge } from '@/components/ui/badge'
 
 const navItems = [
   { title: 'Dashboard', url: '/', icon: LayoutDashboard },
@@ -46,18 +48,18 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible='icon'>
       <SidebarHeader>
-        <SidebarMenu className='p-1'>
+        <SidebarMenu>
           <SidebarMenuItem>
             <Tooltip>
               <TooltipTrigger
                 render={
-                  <SidebarMenuButton size='lg' className='cursor-default p-0.5'>
+                  <SidebarMenuButton size='lg' className='cursor-default'>
                     <img
                       src={xpmIcon}
                       alt='XPM logo'
                       className='size-8 shrink-0 rounded-lg border border-sidebar-border'
                     />
-                    <div className='grid flex-1 text-left leading-tight'>
+                    <div className='grid flex-1 text-left leading-tight group-data-[collapsible=icon]:hidden'>
                       <span className='truncate text-sm font-semibold tracking-tight'>
                         XPM
                       </span>
@@ -78,7 +80,6 @@ export function AppSidebar() {
             </Tooltip>
           </SidebarMenuItem>
         </SidebarMenu>
-        <Separator className='mx-2' />
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
@@ -148,6 +149,15 @@ export function AppSidebar() {
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
+
+      <SidebarFooter className='items-center'>
+        <Badge
+          variant='secondary'
+          className='w-fit font-mono font-normal normal-case tracking-wider text-muted-foreground/70 group-data-[collapsible=icon]:hidden'
+        >
+          v{version}
+        </Badge>
+      </SidebarFooter>
 
       <SidebarRail />
     </Sidebar>
