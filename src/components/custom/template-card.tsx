@@ -1,4 +1,5 @@
-import { Lock, Wand2 } from 'lucide-react'
+import type { KeyboardEvent } from 'react'
+import { Wand2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -10,25 +11,38 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { TemplatePreview } from '@/components/custom/template-preview'
 import { cn } from '@/lib/utils'
 import type { ProcessTemplate } from '@/types/template'
 
 type TemplateCardProps = {
   template: ProcessTemplate
+  onOpen: (template: ProcessTemplate) => void
   onUse: (template: ProcessTemplate) => void
 }
 
-const MAX_PREVIEW = 8
-
-export function TemplateCard({ template, onUse }: TemplateCardProps) {
-  const visible = template.keys.filter((key) => !key.is_hidden)
+export function TemplateCard({ template, onOpen, onUse }: TemplateCardProps) {
   const locked = template.keys.filter((key) => key.is_locked).length
   const hidden = template.keys.filter((key) => key.is_hidden).length
-  const preview = visible.slice(0, MAX_PREVIEW)
-  const overflow = visible.length - preview.length
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      onOpen(template)
+    }
+  }
 
   return (
-    <Card className={cn(!template.is_active && 'opacity-60')}>
+    <Card
+      role='button'
+      tabIndex={0}
+      onClick={() => onOpen(template)}
+      onKeyDown={handleKeyDown}
+      className={cn(
+        'cursor-pointer transition-colors hover:bg-accent/40',
+        !template.is_active && 'opacity-60',
+      )}
+    >
       <CardHeader>
         <CardTitle>{template.template_name}</CardTitle>
         <CardDescription className='line-clamp-2'>
@@ -45,24 +59,18 @@ export function TemplateCard({ template, onUse }: TemplateCardProps) {
         <p className='text-xs text-muted-foreground'>
           {template.keys.length} fields · {locked} locked · {hidden} hidden
         </p>
-        <div className='flex flex-wrap gap-1'>
-          {preview.map((key) => (
-            <span
-              key={key.property_key}
-              className='inline-flex items-center gap-1 rounded border bg-muted/40 px-1.5 py-0.5 font-mono text-[0.625rem] text-muted-foreground'
-            >
-              {key.is_locked && <Lock className='size-2.5' strokeWidth={2.5} />}
-              {key.property_key}
-            </span>
-          ))}
-          {overflow > 0 && (
-            <span className='px-1 text-[0.625rem] text-muted-foreground'>+{overflow}</span>
-          )}
-        </div>
+        <TemplatePreview template={template} />
       </CardContent>
 
       <CardFooter className='mt-auto'>
-        <Button size='sm' className='w-full' onClick={() => onUse(template)}>
+        <Button
+          size='sm'
+          className='w-full'
+          onClick={(event) => {
+            event.stopPropagation()
+            onUse(template)
+          }}
+        >
           <Wand2 strokeWidth={2} />
           Use template
         </Button>
