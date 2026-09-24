@@ -14,6 +14,7 @@ export const processTemplateSchema = z.object({
     template_name: z.string(),
     category: z.string().nullable(),
     description: z.string().nullable(),
+    preview: z.string().nullable(),
     is_active: z.boolean(),
     keys: z.array(templateKeySchema),
 });
