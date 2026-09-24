@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/empty'
 import { PageHeader } from '@/components/custom/page-header'
 import { TemplateCard } from '@/components/custom/template-card'
+import { TemplateModal } from '@/components/custom/template-modal'
 import { useTemplateStore } from '@/stores/template.store'
 import type { ProcessTemplate } from '@/types/template'
 
@@ -20,6 +21,7 @@ type StatusFilter = 'all' | 'active' | 'inactive'
 
 export function Template() {
   const [filter, setFilter] = useState<StatusFilter>('all')
+  const [selected, setSelected] = useState<ProcessTemplate | null>(null)
   const templates = useTemplateStore((state) => state.templates)
   const status = useTemplateStore((state) => state.status)
   const error = useTemplateStore((state) => state.error)
@@ -126,7 +128,12 @@ export function Template() {
                 <h2 className='mb-3 text-xs font-medium text-muted-foreground'>{category}</h2>
                 <div className='grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3'>
                   {items.map((template) => (
-                    <TemplateCard key={template.id} template={template} onUse={handleUse} />
+                    <TemplateCard
+                      key={template.id}
+                      template={template}
+                      onOpen={setSelected}
+                      onUse={handleUse}
+                    />
                   ))}
                 </div>
               </section>
@@ -135,6 +142,18 @@ export function Template() {
         ) : (
           <p className='py-6 text-sm text-muted-foreground'>No {filter} templates.</p>
         ))}
+
+      {selected && (
+        <TemplateModal
+          key={selected.id}
+          template={selected}
+          open
+          onOpenChange={(open) => {
+            if (!open) setSelected(null)
+          }}
+          onUse={handleUse}
+        />
+      )}
     </div>
   )
 }
