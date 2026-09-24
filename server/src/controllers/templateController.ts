@@ -18,6 +18,7 @@ export interface TemplateRecord {
     template_name: string;
     category: string | null;
     description: string | null;
+    preview: string | null;
     is_active: boolean;
     keys: TemplateKeyRecord[];
 }
@@ -27,6 +28,7 @@ interface Templates {
     template_name: string;
     category: string | null;
     description: string | null;
+    preview: string | null;
     is_active: boolean;
     property_key: string | null;
     property_value: string | null;
@@ -47,6 +49,7 @@ export const index = async (req: Request, res: Response): Promise<void> => {
                     t.template_name,
                     t.category,
                     t.description,
+                    t.preview,
                     t.is_active,
                     k.property_key,
                     k.property_value,
@@ -71,6 +74,7 @@ export const index = async (req: Request, res: Response): Promise<void> => {
                     template_name: row.template_name,
                     category: row.category,
                     description: row.description,
+                    preview: row.preview,
                     is_active: row.is_active,
                     keys: []
                 });
