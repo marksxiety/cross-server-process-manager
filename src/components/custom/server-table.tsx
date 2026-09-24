@@ -14,9 +14,10 @@ import type { RegisteredServer } from '@/types/server'
 type ServerTableProps = {
   servers: RegisteredServer[]
   onEdit: (server: RegisteredServer) => void
+  onDelete: (server: RegisteredServer) => void
 }
 
-export function ServerTable({ servers, onEdit }: ServerTableProps) {
+export function ServerTable({ servers, onEdit, onDelete }: ServerTableProps) {
   return (
     <Table>
       <TableHeader>
@@ -67,6 +68,7 @@ export function ServerTable({ servers, onEdit }: ServerTableProps) {
                   size='icon-sm'
                   aria-label={`Delete ${server.server}`}
                   title={`Delete ${server.server}`}
+                  onClick={() => onDelete(server)}
                 >
                   <Trash2 strokeWidth={2} />
                 </Button>
