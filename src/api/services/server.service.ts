@@ -24,5 +24,6 @@ export function serverService() {
         register: (payload: ServerInput) => api.post<RegisteredServer>("/register", payload),
         update: (id: number, payload: ServerInput) =>
             api.put<RegisteredServer>(`/servers/${id}`, payload),
+        remove: (id: number) => api.del<RegisteredServer>(`/servers/${id}`),
     };
 }
