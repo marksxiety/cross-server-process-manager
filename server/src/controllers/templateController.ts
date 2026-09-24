@@ -59,8 +59,13 @@ export const index = async (req: Request, res: Response): Promise<void> => {
                     k.is_locked
              FROM templates t
              LEFT JOIN template_keys k ON k.template_id = t.id
+             LEFT JOIN (
+                 SELECT category, COUNT(id) AS cat_count
+                 FROM templates
+                 GROUP BY category
+             ) c ON t.category = c.category
              WHERE ($1::boolean OR t.is_active = TRUE)
-             ORDER BY t.category, t.template_name, k.id`,
+             ORDER BY c.cat_count DESC, t.category ASC, t.template_name ASC, k.id`,
             [withInactive]
         )
 
