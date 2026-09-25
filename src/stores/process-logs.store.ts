@@ -1,7 +1,9 @@
 import { create } from "zustand";
 import { processService } from "@/api/services/process.service";
+import { toApiError, toUnreachableError } from "@/lib/error-code";
 import { mergeProcessLogs } from "@/lib/process-logs";
 import { isCacheFresh } from "@/lib/swr";
+import type { ApiError } from "@/types/api";
 import type { LoadStatus } from "@/types/dashboard";
 import type { ProcessLogLine } from "@/types/process";
 import type { RegisteredServer } from "@/types/server";
@@ -16,7 +18,7 @@ export function logKey(server: RegisteredServer, pmId: number): string {
 export interface LogsEntry {
     status: LoadStatus;
     lines: ProcessLogLine[];
-    error: string | null;
+    requestError: ApiError | null;
     tail: number;
     fetchedAt: number | null;
     refreshing: boolean;
@@ -54,7 +56,7 @@ export const useProcessLogsStore = create<ProcessLogsState>()((set, get) => {
                     [key]: {
                         status: mode === "initial" ? "loading" : previous?.status ?? "success",
                         lines: previous?.lines ?? [],
-                        error: previous?.error ?? null,
+                        requestError: previous?.requestError ?? null,
                         tail,
                         fetchedAt: previous?.fetchedAt ?? null,
                         refreshing: mode === "silent",
@@ -74,7 +76,7 @@ export const useProcessLogsStore = create<ProcessLogsState>()((set, get) => {
                 next = {
                     status: "error",
                     lines: previous?.lines ?? [],
-                    error: result.message,
+                    requestError: toApiError(result),
                     tail,
                     fetchedAt: Date.now(),
                     refreshing: false,
@@ -83,7 +85,7 @@ export const useProcessLogsStore = create<ProcessLogsState>()((set, get) => {
                 next = {
                     status: "success",
                     lines: mergeProcessLogs(result.info),
-                    error: null,
+                    requestError: null,
                     tail,
                     fetchedAt: Date.now(),
                     refreshing: false,
@@ -95,7 +97,7 @@ export const useProcessLogsStore = create<ProcessLogsState>()((set, get) => {
             next = {
                 status: "error",
                 lines: previous?.lines ?? [],
-                error: (cause as Error).message,
+                requestError: toUnreachableError(cause),
                 tail,
                 fetchedAt: Date.now(),
                 refreshing: false,
