@@ -1,9 +1,11 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { templateService } from "@/api/services/template.service";
+import { toApiError } from "@/lib/error-code";
 import { isCacheFresh } from "@/lib/swr";
 import { persistedStore } from "@/lib/persisted";
 import { templatePersistSchema } from "@/schemas/template.schema";
+import type { ApiError } from "@/types/api";
 import type { LoadStatus } from "@/types/dashboard";
 import type { ProcessTemplate } from "@/types/template";
 
@@ -11,7 +13,7 @@ interface TemplateState {
     templates: ProcessTemplate[];
     templatesFetchedAt: number | null;
     status: LoadStatus;
-    error: string | null;
+    requestError: ApiError | null;
     isRefreshing: boolean;
     load: () => Promise<void>;
     reload: () => Promise<void>;
@@ -30,18 +32,18 @@ export const useTemplateStore = create<TemplateState>()(
                 const templates = result.info;
 
                 if (!result.success || !templates) {
-                    set({ status: "error", error: result.message });
+                    set({ status: "error", requestError: toApiError(result) });
                     return;
                 }
 
-                set({ status: "success", error: null, templates, templatesFetchedAt: Date.now() });
+                set({ status: "success", requestError: null, templates, templatesFetchedAt: Date.now() });
             }
 
             return {
                 templates: [],
                 templatesFetchedAt: null,
                 status: "idle",
-                error: null,
+                requestError: null,
                 isRefreshing: false,
 
                 // Entry action called by Template.tsx on mount. Renders the cached
@@ -53,7 +55,7 @@ export const useTemplateStore = create<TemplateState>()(
 
                     if (templates.length === 0) {
                         isFetchInFlight = true;
-                        set({ status: "loading", error: null });
+                        set({ status: "loading", requestError: null });
                         try {
                             await fetchTemplates();
                         } finally {
@@ -62,7 +64,7 @@ export const useTemplateStore = create<TemplateState>()(
                         return;
                     }
 
-                    set({ status: "success", error: null });
+                    set({ status: "success", requestError: null });
                     if (isCacheFresh(templatesFetchedAt)) return;
 
                     isFetchInFlight = true;
@@ -83,7 +85,7 @@ export const useTemplateStore = create<TemplateState>()(
                     isFetchInFlight = true;
                     set((state) => ({
                         status: state.templates.length === 0 ? "loading" : "success",
-                        error: null,
+                        requestError: null,
                         isRefreshing: true,
                     }));
                     try {
