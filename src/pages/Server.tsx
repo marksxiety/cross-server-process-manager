@@ -48,6 +48,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Spinner } from '@/components/ui/spinner'
 import { toast } from '@/components/ui/toast'
+import { ErrorAlert } from '@/components/custom/error-alert'
 import { PageHeader } from '@/components/custom/page-header'
 import { ServerTable } from '@/components/custom/server-table'
 import { useServerStore } from '@/stores/server.store'
@@ -89,7 +90,7 @@ export function Server() {
   const [filter, setFilter] = useState<StatusFilter>('all')
   const servers = useServerStore((state) => state.servers)
   const status = useServerStore((state) => state.status)
-  const error = useServerStore((state) => state.error)
+  const requestError = useServerStore((state) => state.requestError)
   const load = useServerStore((state) => state.load)
   const reload = useServerStore((state) => state.reload)
 
@@ -406,8 +407,8 @@ export function Server() {
         </div>
       )}
 
-      {status === 'error' && (
-        <p className='text-sm text-destructive py-6'>{error}</p>
+      {status === 'error' && requestError && (
+        <ErrorAlert error={requestError} className='my-6' />
       )}
 
       {status === 'success' && servers.length === 0 && (
