@@ -45,6 +45,7 @@ import {
 } from '@/components/ui/sheet'
 import { Separator } from '@/components/ui/separator'
 import { Spinner } from '@/components/ui/spinner'
+import { ErrorAlert } from '@/components/custom/error-alert'
 import { Process } from '@/components/custom/process'
 import { ServerHeader } from '@/components/custom/server-header'
 import { useProcessDescribe } from '@/hooks/use-process-describe'
@@ -360,11 +361,16 @@ function ProcessSheetBody({
                 Loading logs…
               </div>
             ) : logs.status === 'error' && logs.lines.length === 0 ? (
-              <p className='py-2 text-xs text-destructive'>{logs.error}</p>
+              logs.requestError ? (
+                <ErrorAlert
+                  error={logs.requestError}
+                  onRetry={() => void refreshLogs(server, pmId)}
+                />
+              ) : null
             ) : logs.lines.length === 0 ? (
               <p className='py-2 text-xs text-muted-foreground'>No logs</p>
             ) : (
-              <ScrollArea className='max-h-72 rounded-md border bg-muted/30 [&_[data-slot=scroll-area-viewport]]:max-h-72'>
+              <ScrollArea className='max-h-72 rounded-md border bg-muted/30 **:data-[slot=scroll-area-viewport]:max-h-72'>
                 <div className='p-2'>
                   {logs.lines.map((line) => (
                     <div key={line.id} className='flex gap-2 py-0.5 font-mono text-xs'>
@@ -411,7 +417,7 @@ function ProcessSheetBody({
 export function Dashboard() {
   const servers = useDashboardStore((state) => state.servers)
   const serversStatus = useDashboardStore((state) => state.serversStatus)
-  const serversError = useDashboardStore((state) => state.serversError)
+  const registryRequestError = useDashboardStore((state) => state.requestError)
   const processesByServer = useDashboardStore((state) => state.processesByServer)
   const isRefreshing = useDashboardStore((state) => state.isRefreshing)
   const load = useDashboardStore((state) => state.load)
@@ -510,8 +516,8 @@ export function Dashboard() {
             Loading servers…
           </div>
         )}
-        {serversError && (
-          <p className='mt-4 text-sm text-destructive'>{serversError}</p>
+        {registryRequestError && (
+          <ErrorAlert error={registryRequestError} className='mt-4' />
         )}
 
         {serversStatus === 'success' && servers.length === 0 && (
@@ -571,20 +577,8 @@ export function Dashboard() {
                             orientation='vertical'
                             className='absolute left-4 top-0 bottom-2'
                           />
-                          {entry.error && (
-                            <div
-                              className={cn(
-                                'space-y-1 rounded-md px-2 py-1.5',
-                                toneSurfaceClasses.danger,
-                              )}
-                            >
-                              <p className='whitespace-pre-wrap wrap-break-words text-destructive'>
-                                {entry.error.message}
-                              </p>
-                              <p className='font-mono text-muted-foreground'>
-                                {entry.error.code} · HTTP {entry.error.status}
-                              </p>
-                            </div>
+                          {entry.requestError && (
+                            <ErrorAlert error={entry.requestError} />
                           )}
                         </AccordionContent>
                       ) : canExpand ? (
@@ -698,8 +692,11 @@ export function Dashboard() {
                   Loading details…
                 </div>
               )}
-              {describe.status === 'error' && (
-                <p className='text-destructive'>{describe.error}</p>
+              {describe.status === 'error' && describe.requestError && (
+                <ErrorAlert
+                  error={describe.requestError}
+                  onRetry={describe.retry}
+                />
               )}
               {describe.status === 'success' && describe.data && selected && (
                 <ProcessSheetBody
