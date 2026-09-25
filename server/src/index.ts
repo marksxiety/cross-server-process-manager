@@ -29,6 +29,25 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     fail(res, 500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
 });
 
-app.listen(port, () => {
-    console.log(`XPM server listening on http://localhost:${port}`);
+const server = app.listen(port, () => {
+    // Windows can emit the bind error after the listen callback, so confirm the
+    // server is still listening before announcing success.
+    setImmediate(() => {
+        if (!server.listening) return;
+        console.log(`XPM server listening on http://localhost:${port}`);
+    });
+});
+
+// Surfaces listen failures (e.g. a stale process holding the port) on stderr
+// instead of an unhandled error event.
+server.on('error', (error: NodeJS.ErrnoException) => {
+    if (error.code === 'EADDRINUSE') {
+        console.error(
+            `XPM server failed to start: port ${port} is already in use. ` +
+                'Stop the process holding it and retry.'
+        );
+    } else {
+        console.error('XPM server failed to start:', error);
+    }
+    process.exit(1);
 });
