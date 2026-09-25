@@ -6,3 +6,9 @@ export interface ApiResponse<T = unknown> {
     info: T | null;
     status: number;
 }
+
+export interface ApiError {
+    code: string;
+    message: string;
+    status: number;
+}
