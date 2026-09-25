@@ -1,9 +1,11 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { serverService } from "@/api/services/server.service";
+import { toApiError } from "@/lib/error-code";
 import { isCacheFresh } from "@/lib/swr";
 import { persistedStore } from "@/lib/persisted";
 import { serverPersistSchema } from "@/schemas/server.schema";
+import type { ApiError } from "@/types/api";
 import type { LoadStatus } from "@/types/dashboard";
 import type { RegisteredServer } from "@/types/server";
 
@@ -11,7 +13,7 @@ interface ServerState {
     servers: RegisteredServer[];
     serversFetchedAt: number | null;
     status: LoadStatus;
-    error: string | null;
+    requestError: ApiError | null;
     isRefreshing: boolean;
     load: () => Promise<void>;
     reload: () => Promise<void>;
@@ -30,18 +32,18 @@ export const useServerStore = create<ServerState>()(
                 const servers = result.info;
 
                 if (!result.success || !servers) {
-                    set({ status: "error", error: result.message });
+                    set({ status: "error", requestError: toApiError(result) });
                     return;
                 }
 
-                set({ status: "success", error: null, servers, serversFetchedAt: Date.now() });
+                set({ status: "success", requestError: null, servers, serversFetchedAt: Date.now() });
             }
 
             return {
                 servers: [],
                 serversFetchedAt: null,
                 status: "idle",
-                error: null,
+                requestError: null,
                 isRefreshing: false,
 
                 // Entry action called by Server.tsx on mount. Renders the cached
@@ -53,7 +55,7 @@ export const useServerStore = create<ServerState>()(
 
                     if (servers.length === 0) {
                         isFetchInFlight = true;
-                        set({ status: "loading", error: null });
+                        set({ status: "loading", requestError: null });
                         try {
                             await fetchRegistry();
                         } finally {
@@ -62,7 +64,7 @@ export const useServerStore = create<ServerState>()(
                         return;
                     }
 
-                    set({ status: "success", error: null });
+                    set({ status: "success", requestError: null });
                     if (isCacheFresh(serversFetchedAt)) return;
 
                     isFetchInFlight = true;
@@ -83,7 +85,7 @@ export const useServerStore = create<ServerState>()(
                     isFetchInFlight = true;
                     set((state) => ({
                         status: state.servers.length === 0 ? "loading" : "success",
-                        error: null,
+                        requestError: null,
                         isRefreshing: true,
                     }));
                     try {
