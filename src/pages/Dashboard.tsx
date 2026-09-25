@@ -56,7 +56,7 @@ import {
   toneSurfaceClasses,
 } from '@/lib/status-tone'
 import { DASHBOARD_AUTO_REFRESH_MS } from '@/lib/swr'
-import { formatArgs, formatBytes, formatMetricValue, formatUptime } from '@/lib/format'
+import { formatArgs, formatBytes, formatLogTimestamp, formatMetricValue, formatUptime } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { useDashboardStore } from '@/stores/dashboard.store'
 import {
@@ -378,7 +378,7 @@ function ProcessSheetBody({
                         className='shrink-0 tabular-nums text-muted-foreground'
                         title={line.timestamp ?? undefined}
                       >
-                        {line.timestamp ? line.timestamp.slice(11) : '—'}
+                        {formatLogTimestamp(line.timestamp)}
                       </span>
                       <span
                         className={cn(
