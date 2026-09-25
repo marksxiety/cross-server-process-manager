@@ -65,7 +65,7 @@ export function ServerHeader({ server, entry }: ServerHeaderProps) {
               toneTextClasses.danger,
             )}
           >
-            {errorCodeLabel(entry.error?.code)}
+            {errorCodeLabel(entry.requestError?.code)}
           </div>
         ) : (
           <div className='flex items-center gap-2 text-xs text-muted-foreground'>
