@@ -47,6 +47,22 @@ export function formatUptime(uptimeMs: number): string {
 }
 
 /**
+ * Formats a PM2 log timestamp prefix (ISO-ish local time, no timezone) for
+ * display: `2026-09-19T10:29:08.123` -> `2026-09-19 10:29:08`. String-based on
+ * purpose — the prefix is already local time, so no Date parsing is needed.
+ * Continuation lines (null) fall back to an em dash; unrecognized shapes pass
+ * through unchanged so nothing is hidden.
+ */
+export function formatLogTimestamp(timestamp: string | null | undefined): string {
+  if (!timestamp) return EMPTY_VALUE
+
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2}:\d{2})/.exec(timestamp)
+  if (!match) return timestamp
+
+  return `${match[1]}-${match[2]}-${match[3]} ${match[4]}`
+}
+
+/**
  * Mirrors PM2's `UxHelpers.bytesToSize` (used by `pm2 list`/`pm2 describe`):
  * binary units with lowercase suffixes, e.g. "40.7mb".
  */
