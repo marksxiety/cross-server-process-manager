@@ -12,6 +12,7 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty'
 import { PageHeader } from '@/components/custom/page-header'
+import { ErrorAlert } from '@/components/custom/error-alert'
 import { TemplateCard } from '@/components/custom/template-card'
 import { TemplateModal } from '@/components/custom/template-modal'
 import { useTemplateStore } from '@/stores/template.store'
@@ -24,7 +25,7 @@ export function Template() {
   const [selected, setSelected] = useState<ProcessTemplate | null>(null)
   const templates = useTemplateStore((state) => state.templates)
   const status = useTemplateStore((state) => state.status)
-  const error = useTemplateStore((state) => state.error)
+  const requestError = useTemplateStore((state) => state.requestError)
   const load = useTemplateStore((state) => state.load)
   const navigate = useNavigate()
 
@@ -101,8 +102,8 @@ export function Template() {
         </div>
       )}
 
-      {status === 'error' && (
-        <p className='py-6 text-sm text-destructive'>{error}</p>
+      {status === 'error' && requestError && (
+        <ErrorAlert error={requestError} className='my-6' />
       )}
 
       {status === 'success' && templates.length === 0 && (
