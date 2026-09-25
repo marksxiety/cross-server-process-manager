@@ -1,17 +1,12 @@
+import type { ApiError } from "@/types/api";
 import type { ProcessSummary } from "@/types/process";
 import type { SystemOverview } from "@/types/system";
 
 export type LoadStatus = "idle" | "loading" | "success" | "error";
 
-export interface ServerError {
-    code: string;
-    message: string;
-    status: number;
-}
-
 export interface ServerProcesses {
     status: LoadStatus;
     processes: ProcessSummary[];
     overview: SystemOverview | null;
-    error: ServerError | null;
+    requestError: ApiError | null;
 }
