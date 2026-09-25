@@ -1,14 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { processService } from '@/api/services/process.service'
+import { toApiError, toUnreachableError } from '@/lib/error-code'
+import type { ApiError } from '@/types/api'
 import type { LoadStatus } from '@/types/dashboard'
 import type { ProcessDescribe } from '@/types/process'
 import type { RegisteredServer } from '@/types/server'
 
 interface DescribeResult {
   key: string
+  attempt: number
   status: Exclude<LoadStatus, 'idle' | 'loading'>
   data: ProcessDescribe | null
-  error: string | null
+  requestError: ApiError | null
 }
 
 export function useProcessDescribe(
@@ -20,10 +23,11 @@ export function useProcessDescribe(
       ? `${server.protocol}://${server.host}:${server.port}/${pmId}`
       : null
 
+  const [attempt, setAttempt] = useState(0)
   const [result, setResult] = useState<DescribeResult | null>(null)
 
   useEffect(() => {
-    if (key === null || !server || pmId === null) return
+    if (key === null || server === null || pmId === null) return
 
     let cancelled = false
 
@@ -35,21 +39,29 @@ export function useProcessDescribe(
         if (!response.success || !response.info) {
           setResult({
             key,
+            attempt,
             status: 'error',
             data: null,
-            error: response.message,
+            requestError: toApiError(response),
           })
           return
         }
 
-        setResult({ key, status: 'success', data: response.info, error: null })
+        setResult({
+          key,
+          attempt,
+          status: 'success',
+          data: response.info,
+          requestError: null,
+        })
       } catch (cause) {
         if (cancelled) return
         setResult({
           key,
+          attempt,
           status: 'error',
           data: null,
-          error: (cause as Error).message,
+          requestError: toUnreachableError(cause),
         })
       }
     })()
@@ -57,13 +69,24 @@ export function useProcessDescribe(
     return () => {
       cancelled = true
     }
-  }, [key, server, pmId])
+  }, [key, server, pmId, attempt])
 
-  const isCurrent = result !== null && result.key === key
+  const retry = useCallback(() => {
+    setAttempt((value) => value + 1)
+  }, [])
+
+  const isCurrent =
+    result !== null && result.key === key && result.attempt === attempt
 
   return {
     status: key === null ? 'idle' : isCurrent ? result.status : 'loading',
     data: isCurrent ? result.data : null,
-    error: isCurrent ? result.error : null,
-  } satisfies { status: LoadStatus; data: ProcessDescribe | null; error: string | null }
+    requestError: isCurrent ? result.requestError : null,
+    retry,
+  } satisfies {
+    status: LoadStatus
+    data: ProcessDescribe | null
+    requestError: ApiError | null
+    retry: () => void
+  }
 }
