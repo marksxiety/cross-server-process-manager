@@ -2,14 +2,11 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { serverService } from "@/api/services/server.service";
 import { processService } from "@/api/services/process.service";
-import {
-    UNKNOWN_ERROR_CODE,
-    UNREACHABLE_ERROR_CODE,
-} from "@/lib/error-code";
+import { toApiError, toUnreachableError } from "@/lib/error-code";
 import { withRetry } from "@/lib/retry";
 import { isCacheFresh } from "@/lib/swr";
 import { toSystemOverview } from "@/lib/system-overview";
-import type { ApiResponse } from "@/types/api";
+import type { ApiError, ApiResponse } from "@/types/api";
 import type { LoadStatus, ServerProcesses } from "@/types/dashboard";
 import type { ProcessSummary } from "@/types/process";
 import type { RegisteredServer } from "@/types/server";
@@ -19,7 +16,7 @@ interface DashboardState {
     servers: RegisteredServer[];
     serversFetchedAt: number | null;
     serversStatus: LoadStatus;
-    serversError: string | null;
+    requestError: ApiError | null;
     processesByServer: Record<string, ServerProcesses>;
     isRefreshing: boolean;
     load: () => Promise<void>;
@@ -54,7 +51,7 @@ export const useDashboardStore = create<DashboardState>()(
             // Placeholder entry shown while a server's overview request is in flight.
             // Used by createLoadingEntries and reconcileEntries.
             function loadingEntry(): ServerProcesses {
-                return { status: "loading", processes: [], overview: null, error: null };
+                return { status: "loading", processes: [], overview: null, requestError: null };
             }
 
             // Builds a loading entry per cached server so the UI can render cached servers
@@ -76,12 +73,11 @@ export const useDashboardStore = create<DashboardState>()(
             // Used by syncProcesses for each server.
             function toServerProcesses(result: PromiseSettledResult<OverviewResult>): ServerProcesses {
                 if (result.status === "rejected") {
-                    const cause = result.reason as Error;
                     return {
                         status: "error",
                         processes: [],
                         overview: null,
-                        error: { code: UNREACHABLE_ERROR_CODE, message: cause.message, status: 0 },
+                        requestError: toUnreachableError(result.reason),
                     };
                 }
 
@@ -90,11 +86,7 @@ export const useDashboardStore = create<DashboardState>()(
                         status: "error",
                         processes: [],
                         overview: null,
-                        error: {
-                            code: result.value.code ?? UNKNOWN_ERROR_CODE,
-                            message: result.value.message,
-                            status: result.value.status,
-                        },
+                        requestError: toApiError(result.value),
                     };
                 }
 
@@ -102,7 +94,7 @@ export const useDashboardStore = create<DashboardState>()(
                     status: "success",
                     processes: Array.isArray(result.value.info.processes) ? result.value.info.processes : [],
                     overview: toSystemOverview(result.value.info.overview),
-                    error: null,
+                    requestError: null,
                 };
             }
 
@@ -132,16 +124,16 @@ export const useDashboardStore = create<DashboardState>()(
 
             // Fetches the registered servers and stores them with serversFetchedAt, which
             // drives the SWR freshness check. Used by runLoad and reload.
-            async function fetchAndStoreRegistry(): Promise<string | null> {
+            async function fetchAndStoreRegistry(): Promise<ApiError | null> {
                 const result = await serverService().list();
                 const servers = result.info;
 
-                if (!result.success || !servers) return result.message;
+                if (!result.success || !servers) return toApiError(result);
 
                 set((state) => ({
                     servers,
                     serversFetchedAt: Date.now(),
-                    serversError: null,
+                    requestError: null,
                     processesByServer: reconcileEntries(state.processesByServer, servers),
                 }));
                 return null;
@@ -155,11 +147,11 @@ export const useDashboardStore = create<DashboardState>()(
                     serversFetchedAt !== null && servers.length > 0 && servers.every(isRegisteredServer);
 
                 if (!hasValidCache) {
-                    set({ serversStatus: "loading", serversError: null, servers: [], processesByServer: {} });
+                    set({ serversStatus: "loading", requestError: null, servers: [], processesByServer: {} });
                     const error = await fetchAndStoreRegistry();
 
                     if (error !== null) {
-                        set({ serversStatus: "error", serversError: error });
+                        set({ serversStatus: "error", requestError: error });
                         return;
                     }
 
@@ -170,14 +162,14 @@ export const useDashboardStore = create<DashboardState>()(
 
                 set({
                     serversStatus: "success",
-                    serversError: null,
+                    requestError: null,
                     processesByServer: createLoadingEntries(servers),
                 });
 
                 if (!isCacheFresh(serversFetchedAt)) {
                     set({ isRefreshing: true });
                     const error = await fetchAndStoreRegistry();
-                    set({ isRefreshing: false, serversError: error });
+                    set({ isRefreshing: false, requestError: error });
                 }
 
                 await syncProcesses(get().servers);
@@ -187,7 +179,7 @@ export const useDashboardStore = create<DashboardState>()(
                 servers: [],
                 serversFetchedAt: null,
                 serversStatus: "idle",
-                serversError: null,
+                requestError: null,
                 processesByServer: {},
                 isRefreshing: false,
 
@@ -228,12 +220,12 @@ export const useDashboardStore = create<DashboardState>()(
                         if (error !== null) {
                             set((state) => ({
                                 serversStatus: state.servers.length === 0 ? "error" : state.serversStatus,
-                                serversError: error,
+                                requestError: error,
                             }));
                             return;
                         }
 
-                        set({ serversStatus: "success", serversError: null });
+                        set({ serversStatus: "success", requestError: null });
                         await syncProcesses(get().servers);
                     } finally {
                         set({ isRefreshing: false });
