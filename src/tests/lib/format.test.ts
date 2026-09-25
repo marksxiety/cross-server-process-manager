@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 import {
   formatArgs,
   formatBytes,
+  formatLogTimestamp,
   formatMetricValue,
   formatUptime,
 } from '../../lib/format'
@@ -52,6 +53,26 @@ describe('formatUptime', () => {
   test('floors partial units', () => {
     expect(formatUptime(59 * SECOND + 999)).toBe('59s')
     expect(formatUptime(2 * HOUR - 1)).toBe('1h 59m')
+  })
+})
+
+describe('formatLogTimestamp', () => {
+  test('returns an em dash for null, undefined and empty timestamps', () => {
+    expect(formatLogTimestamp(null)).toBe('—')
+    expect(formatLogTimestamp(undefined)).toBe('—')
+    expect(formatLogTimestamp('')).toBe('—')
+  })
+
+  test('formats the PM2 timestamp prefix as date and time', () => {
+    expect(formatLogTimestamp('2026-09-19T10:29:08')).toBe('2026-09-19 10:29:08')
+  })
+
+  test('drops the milliseconds PM2 may append', () => {
+    expect(formatLogTimestamp('2026-09-19T10:29:08.123')).toBe('2026-09-19 10:29:08')
+  })
+
+  test('passes unrecognized formats through unchanged', () => {
+    expect(formatLogTimestamp('not-a-timestamp')).toBe('not-a-timestamp')
   })
 })
 
