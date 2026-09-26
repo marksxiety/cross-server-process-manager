@@ -1,8 +1,16 @@
 import type { Request, Response } from 'express';
+import type { PoolClient } from 'pg';
+import { z } from 'zod';
 import db from '../config/db';
+import { templateKeysInputSchema } from '../schemas/templateSchema';
 import { fail, ok } from '../utils/response';
 
 export type TemplateDataType = 'string' | 'boolean' | 'number' | 'array' | 'object';
+
+const INVALID_ID_MESSAGE = 'Template id must be a positive integer';
+const NOT_FOUND_MESSAGE = 'Template not found';
+const VALIDATION_FAILED_CODE = 'VALIDATION_FAILED';
+const CHECK_VIOLATION_CODE = '23514';
 
 export interface TemplateKeyRecord {
     property_key: string;
@@ -38,6 +46,46 @@ interface Templates {
     is_locked: boolean | null;
 }
 
+function parseIdParam(value: string | string[] | undefined): number | null {
+    if (typeof value !== 'string') return null;
+    const id = Number(value);
+    return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+// Collapses the flat LEFT JOIN rows (one per key) into templates with a nested
+// `keys` array, preserving query order for both templates and keys.
+function groupTemplateRows(rows: Templates[]): TemplateRecord[] {
+    const templates = new Map<number, TemplateRecord>();
+
+    for (const row of rows) {
+        const templateId = row.id;
+        if (!templates.has(templateId)) {
+            templates.set(templateId, {
+                id: templateId,
+                template_name: row.template_name,
+                category: row.category,
+                description: row.description,
+                preview: row.preview,
+                is_active: row.is_active,
+                keys: []
+            });
+        }
+
+        const template = templates.get(templateId);
+        if (template && row.property_key !== null) {
+            template.keys.push({
+                property_key: row.property_key,
+                property_value: row.property_value,
+                data_type: row.data_type ?? 'string',
+                is_required: row.is_required ?? false,
+                is_hidden: row.is_hidden ?? false,
+                is_locked: row.is_locked ?? false
+            });
+        }
+    }
+
+    return [...templates.values()];
+}
 
 export const index = async (req: Request, res: Response): Promise<void> => {
     const withInactive = req.query.with_inactive === 'true';
@@ -69,40 +117,139 @@ export const index = async (req: Request, res: Response): Promise<void> => {
             [withInactive]
         )
 
-        const templates = new Map<number, TemplateRecord>();
-
-        for (const row of rows) {
-            const templateId = row.id;
-            if (!templates.has(templateId)) {
-                templates.set(templateId, {
-                    id: templateId,
-                    template_name: row.template_name,
-                    category: row.category,
-                    description: row.description,
-                    preview: row.preview,
-                    is_active: row.is_active,
-                    keys: []
-                });
-            }
-
-            const template = templates.get(templateId);
-            if (template) {
-                if (row.property_key !== null) {
-                    template.keys.push({
-                        property_key: row.property_key,
-                        property_value: row.property_value,
-                        data_type: row.data_type ?? 'string',
-                        is_required: row.is_required ?? false,
-                        is_hidden: row.is_hidden ?? false,
-                        is_locked: row.is_locked ?? false
-                    });
-                }
-            }
-        }
-
-        ok(res, 'Templates retrieved successfully', [...templates.values()]);
+        ok(res, 'Templates retrieved successfully', groupTemplateRows(rows));
     } catch (error) {
         console.error(error);
         fail(res, 500, 'Failed to retrieve templates', 'INTERNAL_SERVER_ERROR');
+    }
+}
+
+export const update = async (req: Request, res: Response): Promise<void> => {
+    const id = parseIdParam(req.params.id);
+    if (id === null) {
+        fail(res, 400, INVALID_ID_MESSAGE, 'INVALID_ID');
+        return;
+    }
+
+    const parsed = templateKeysInputSchema.safeParse(req.body);
+    if (!parsed.success) {
+        fail(
+            res,
+            400,
+            'Invalid template payload',
+            VALIDATION_FAILED_CODE,
+            z.flattenError(parsed.error).fieldErrors
+        );
+        return;
+    }
+
+    const { keys } = parsed.data;
+
+    let client: PoolClient;
+    try {
+        client = await db.connect();
+    } catch (error) {
+        console.error(error);
+        fail(res, 500, 'Failed to update template', 'INTERNAL_SERVER_ERROR');
+        return;
+    }
+
+    try {
+        await client.query('BEGIN');
+
+        const { rowCount } = await client.query(
+            'SELECT 1 FROM templates WHERE id = $1 FOR UPDATE',
+            [id]
+        );
+        if (rowCount === 0) {
+            await client.query('ROLLBACK');
+            fail(res, 404, NOT_FOUND_MESSAGE, 'NOT_FOUND');
+            return;
+        }
+
+        // Upsert by the (template_id, property_key) natural key, then prune any
+        // stored keys that were dropped in the editor — all in one transaction.
+        for (const key of keys) {
+            await client.query(
+                `INSERT INTO template_keys
+                   (template_id, property_key, property_value, data_type, is_required, is_hidden, is_locked)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7)
+                 ON CONFLICT (template_id, property_key) DO UPDATE
+                 SET property_value = EXCLUDED.property_value,
+                     data_type = EXCLUDED.data_type,
+                     is_required = EXCLUDED.is_required,
+                     is_hidden = EXCLUDED.is_hidden,
+                     is_locked = EXCLUDED.is_locked,
+                     updated_at = current_timestamp`,
+                [
+                    id,
+                    key.property_key,
+                    key.property_value,
+                    key.data_type,
+                    key.is_required,
+                    key.is_hidden,
+                    key.is_locked
+                ]
+            );
+        }
+
+        await client.query(
+            `DELETE FROM template_keys
+             WHERE template_id = $1 AND NOT (property_key = ANY($2::text[]))`,
+            [id, keys.map((key) => key.property_key)]
+        );
+
+        await client.query(
+            'UPDATE templates SET updated_at = current_timestamp WHERE id = $1',
+            [id]
+        );
+
+        const { rows } = await client.query<Templates>(
+            `SELECT t.id,
+                    t.template_name,
+                    t.category,
+                    t.description,
+                    t.preview,
+                    t.is_active,
+                    k.property_key,
+                    k.property_value,
+                    k.data_type,
+                    k.is_required,
+                    k.is_hidden,
+                    k.is_locked
+             FROM templates t
+             LEFT JOIN template_keys k ON k.template_id = t.id
+             WHERE t.id = $1
+             ORDER BY k.id`,
+            [id]
+        );
+
+        await client.query('COMMIT');
+
+        const templates = groupTemplateRows(rows);
+        ok(res, 'Template updated successfully', templates[0] ?? null);
+    } catch (error) {
+        await client.query('ROLLBACK').catch(() => undefined);
+        console.error(error);
+        const dbError = error as {
+            detail?: string;
+            code?: string;
+            constraint?: string;
+            message?: string;
+        };
+
+        if (dbError.code === CHECK_VIOLATION_CODE) {
+            fail(res, 400, dbError.detail ?? 'Invalid template key payload', VALIDATION_FAILED_CODE);
+            return;
+        }
+
+        fail(
+            res,
+            500,
+            dbError.detail ?? dbError.message ?? 'Failed to update template',
+            dbError.code ?? 'INTERNAL_SERVER_ERROR'
+        );
+    } finally {
+        client.release();
     }
 }
