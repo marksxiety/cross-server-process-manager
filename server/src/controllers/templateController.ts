@@ -31,6 +31,8 @@ export interface TemplateRecord {
     keys: TemplateKeyRecord[];
 }
 
+export type TemplateSummary = Omit<TemplateRecord, 'keys'>;
+
 interface Templates {
     id: number;
     template_name: string;
@@ -253,3 +255,39 @@ export const update = async (req: Request, res: Response): Promise<void> => {
         client.release();
     }
 }
+
+export const remove = async (req: Request, res: Response): Promise<void> => {
+    const id = parseIdParam(req.params.id);
+    if (id === null) {
+        fail(res, 400, INVALID_ID_MESSAGE, 'INVALID_ID');
+        return;
+    }
+
+    try {
+        // template_keys.template_id references templates(id) ON DELETE CASCADE,
+        // so the key rows are removed atomically with the template.
+        const { rows } = await db.query<TemplateSummary>(
+            `DELETE FROM templates
+             WHERE id = $1
+             RETURNING id, template_name, category, description, preview, is_active`,
+            [id]
+        );
+
+        const removed = rows[0];
+        if (!removed) {
+            fail(res, 404, NOT_FOUND_MESSAGE, 'NOT_FOUND');
+            return;
+        }
+
+        ok(res, 'Template removed successfully', removed);
+    } catch (error) {
+        console.error(error);
+        const dbError = error as { detail?: string; code?: string; message?: string };
+        fail(
+            res,
+            500,
+            dbError.detail ?? dbError.message ?? 'Failed to remove template',
+            dbError.code ?? 'INTERNAL_SERVER_ERROR'
+        );
+    }
+};
