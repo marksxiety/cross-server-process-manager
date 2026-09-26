@@ -5,9 +5,9 @@ import { toApiError } from "@/lib/error-code";
 import { isCacheFresh } from "@/lib/swr";
 import { persistedStore } from "@/lib/persisted";
 import { templatePersistSchema } from "@/schemas/template.schema";
-import type { ApiError } from "@/types/api";
+import type { ApiError, ApiResponse } from "@/types/api";
 import type { LoadStatus } from "@/types/dashboard";
-import type { ProcessTemplate } from "@/types/template";
+import type { ProcessTemplate, TemplateKey } from "@/types/template";
 
 interface TemplateState {
     templates: ProcessTemplate[];
@@ -17,6 +17,7 @@ interface TemplateState {
     isRefreshing: boolean;
     load: () => Promise<void>;
     reload: () => Promise<void>;
+    save: (templateId: number, keys: TemplateKey[]) => Promise<ApiResponse<ProcessTemplate>>;
 }
 
 export const useTemplateStore = create<TemplateState>()(
@@ -94,6 +95,24 @@ export const useTemplateStore = create<TemplateState>()(
                         isFetchInFlight = false;
                         set({ isRefreshing: false });
                     }
+                },
+
+                // Persists an edited template's keys and swaps the server's
+                // canonical copy into the cached list. Returns the envelope so
+                // the caller can surface success/failure feedback.
+                save: async (templateId, keys) => {
+                    const result = await templateService().update(templateId, keys);
+
+                    const saved = result.info;
+                    if (result.success && saved) {
+                        set((state) => ({
+                            templates: state.templates.map((template) =>
+                                template.id === saved.id ? saved : template
+                            ),
+                        }));
+                    }
+
+                    return result;
                 },
             };
         },
