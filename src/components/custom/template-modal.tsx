@@ -19,8 +19,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Spinner } from '@/components/ui/spinner'
+import { toast } from '@/components/ui/toast'
+import { errorCodeLabel, toApiError } from '@/lib/error-code'
 import { buildTemplatePayload } from '@/lib/template-payload'
 import { cn } from '@/lib/utils'
+import type { ApiResponse } from '@/types/api'
 import type { ProcessTemplate, TemplateDataType, TemplateKey } from '@/types/template'
 
 type TemplateModalProps = {
@@ -28,6 +32,7 @@ type TemplateModalProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
   onUse: (template: ProcessTemplate) => void
+  onSave: (keys: TemplateKey[]) => Promise<ApiResponse<ProcessTemplate>>
 }
 
 const DATA_TYPES: TemplateDataType[] = ['string', 'boolean', 'number', 'array', 'object']
@@ -46,9 +51,10 @@ function newKey(): TemplateKey {
   }
 }
 
-export function TemplateModal({ template, open, onOpenChange, onUse }: TemplateModalProps) {
+export function TemplateModal({ template, open, onOpenChange, onUse, onSave }: TemplateModalProps) {
   const [keys, setKeys] = useState<TemplateKey[]>(template.keys)
   const [copied, setCopied] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   const payload = useMemo(() => buildTemplatePayload(keys), [keys])
   const payloadJson = useMemo(() => JSON.stringify(payload, null, 2), [payload])
@@ -69,6 +75,26 @@ export function TemplateModal({ template, open, onOpenChange, onUse }: TemplateM
     await navigator.clipboard.writeText(payloadJson)
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
+  }
+
+  const save = async () => {
+    if (saving) return
+    setSaving(true)
+    try {
+      const result = await onSave(keys)
+      if (result.success) {
+        toast.add({ type: 'success', title: 'Template saved', description: result.message })
+        return
+      }
+      const error = toApiError(result)
+      toast.add({
+        type: 'error',
+        title: errorCodeLabel(error.code),
+        description: error.message,
+      })
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -201,7 +227,10 @@ export function TemplateModal({ template, open, onOpenChange, onUse }: TemplateM
               <Trash2 strokeWidth={2} />
               Delete
             </Button>
-            <Button type='button'>Save</Button>
+            <Button type='button' disabled={saving} onClick={() => void save()}>
+              {saving && <Spinner className='size-3.5' />}
+              Save
+            </Button>
           </div>
         </DialogFooter>
       </DialogContent>
