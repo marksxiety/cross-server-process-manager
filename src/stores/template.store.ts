@@ -18,6 +18,7 @@ interface TemplateState {
     load: () => Promise<void>;
     reload: () => Promise<void>;
     save: (templateId: number, keys: TemplateKey[]) => Promise<ApiResponse<ProcessTemplate>>;
+    remove: (templateId: number) => Promise<ApiResponse<ProcessTemplate>>;
 }
 
 export const useTemplateStore = create<TemplateState>()(
@@ -108,6 +109,22 @@ export const useTemplateStore = create<TemplateState>()(
                         set((state) => ({
                             templates: state.templates.map((template) =>
                                 template.id === saved.id ? saved : template
+                            ),
+                        }));
+                    }
+
+                    return result;
+                },
+
+                // Deletes a template (the server cascades its keys) and drops it
+                // from the cached list. Returns the envelope for caller feedback.
+                remove: async (templateId) => {
+                    const result = await templateService().remove(templateId);
+
+                    if (result.success) {
+                        set((state) => ({
+                            templates: state.templates.filter(
+                                (template) => template.id !== templateId
                             ),
                         }));
                     }
