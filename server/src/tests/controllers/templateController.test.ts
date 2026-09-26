@@ -6,7 +6,7 @@ vi.mock('../../config/db', () => ({
 }));
 
 import db from '../../config/db';
-import { index, update } from '../../controllers/templateController';
+import { index, remove, update } from '../../controllers/templateController';
 
 const query = db.query as unknown as Mock;
 const connect = db.connect as unknown as Mock;
@@ -344,5 +344,56 @@ describe('templateController.update', () => {
         expect(responseBody(res).code).toBe('INTERNAL_SERVER_ERROR');
         expect(sqlCalls(client)).toContain('ROLLBACK');
         expect(client.release).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('templateController.remove', () => {
+    it('deletes the template and returns the removed row', async () => {
+        query.mockResolvedValueOnce({ rows: [TEMPLATE_ROW], rowCount: 1 });
+        const res = createResponse();
+
+        await remove(createRequest({ params: { id: '1' } }), res);
+
+        expect(res.status).not.toHaveBeenCalled();
+        expect(responseBody(res)).toEqual({
+            success: true,
+            message: 'Template removed successfully',
+            info: TEMPLATE_ROW,
+        });
+
+        const [sql, params] = query.mock.calls[0] as [string, unknown[]];
+        expect(sql).toContain('DELETE FROM templates');
+        expect(sql).toContain('RETURNING');
+        expect(params).toEqual([1]);
+    });
+
+    it('responds 404 when the template does not exist', async () => {
+        query.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+        const res = createResponse();
+
+        await remove(createRequest({ params: { id: '99' } }), res);
+
+        expect(res.status).toHaveBeenCalledWith(404);
+        expect(responseBody(res).code).toBe('NOT_FOUND');
+    });
+
+    it('rejects an invalid id before querying', async () => {
+        const res = createResponse();
+
+        await remove(createRequest({ params: { id: 'abc' } }), res);
+
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(responseBody(res).code).toBe('INVALID_ID');
+        expect(query).not.toHaveBeenCalled();
+    });
+
+    it('responds 500 when the query fails', async () => {
+        query.mockRejectedValueOnce(new Error('connection terminated'));
+        const res = createResponse();
+
+        await remove(createRequest({ params: { id: '1' } }), res);
+
+        expect(res.status).toHaveBeenCalledWith(500);
+        expect(responseBody(res).code).toBe('INTERNAL_SERVER_ERROR');
     });
 });
