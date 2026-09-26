@@ -4,7 +4,7 @@ import cors from 'cors';
 import './config/env';
 import { health } from './controllers/healthController';
 import { index as servers, register, update, remove } from './controllers/serverController';
-import { index as templates } from './controllers/templateController';
+import { index as templates, update as updateTemplate } from './controllers/templateController';
 import { fail } from './utils/response';
 
 const app = express();
@@ -19,6 +19,7 @@ app.post('/register', register);
 app.put('/servers/:id', update);
 app.delete('/servers/:id', remove);
 app.get('/templates', templates);
+app.put('/templates/:id', updateTemplate);
 
 app.use((req: Request, res: Response) => {
     fail(res, 404, `Route ${req.method} ${req.originalUrl} not found`, 'NOT_FOUND');
