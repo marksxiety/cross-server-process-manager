@@ -1,5 +1,16 @@
 import { useMemo, useState } from 'react'
 import { Check, Copy, Trash2, Wand2, X } from 'lucide-react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogMedia,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -33,6 +44,7 @@ type TemplateModalProps = {
   onOpenChange: (open: boolean) => void
   onUse: (template: ProcessTemplate) => void
   onSave: (keys: TemplateKey[]) => Promise<ApiResponse<ProcessTemplate>>
+  onDelete: (template: ProcessTemplate) => Promise<ApiResponse<ProcessTemplate>>
 }
 
 const DATA_TYPES: TemplateDataType[] = ['string', 'boolean', 'number', 'array', 'object']
@@ -51,10 +63,19 @@ function newKey(): TemplateKey {
   }
 }
 
-export function TemplateModal({ template, open, onOpenChange, onUse, onSave }: TemplateModalProps) {
+export function TemplateModal({
+  template,
+  open,
+  onOpenChange,
+  onUse,
+  onSave,
+  onDelete,
+}: TemplateModalProps) {
   const [keys, setKeys] = useState<TemplateKey[]>(template.keys)
   const [copied, setCopied] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const payload = useMemo(() => buildTemplatePayload(keys), [keys])
   const payloadJson = useMemo(() => JSON.stringify(payload, null, 2), [payload])
@@ -78,7 +99,7 @@ export function TemplateModal({ template, open, onOpenChange, onUse, onSave }: T
   }
 
   const save = async () => {
-    if (saving) return
+    if (saving || deleting) return
     setSaving(true)
     try {
       const result = await onSave(keys)
@@ -94,6 +115,32 @@ export function TemplateModal({ template, open, onOpenChange, onUse, onSave }: T
       })
     } finally {
       setSaving(false)
+    }
+  }
+
+  const confirmDelete = async () => {
+    if (deleting || saving) return
+    setDeleting(true)
+    try {
+      const result = await onDelete(template)
+      if (result.success) {
+        toast.add({
+          type: 'success',
+          title: 'Template deleted',
+          description: `${template.template_name} was removed.`,
+        })
+        setConfirmOpen(false)
+        onOpenChange(false)
+        return
+      }
+      const error = toApiError(result)
+      toast.add({
+        type: 'error',
+        title: errorCodeLabel(error.code),
+        description: error.message,
+      })
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -223,7 +270,12 @@ export function TemplateModal({ template, open, onOpenChange, onUse, onSave }: T
             Use template
           </Button>
           <div className='flex gap-2'>
-            <Button type='button' variant='destructive'>
+            <Button
+              type='button'
+              variant='destructive'
+              disabled={deleting}
+              onClick={() => setConfirmOpen(true)}
+            >
               <Trash2 strokeWidth={2} />
               Delete
             </Button>
@@ -233,6 +285,37 @@ export function TemplateModal({ template, open, onOpenChange, onUse, onSave }: T
             </Button>
           </div>
         </DialogFooter>
+
+        <AlertDialog
+          open={confirmOpen}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen && !deleting) setConfirmOpen(false)
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogMedia className='text-destructive'>
+                <Trash2 strokeWidth={2} />
+              </AlertDialogMedia>
+              <AlertDialogTitle>Delete Template?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete “{template.template_name}”? This permanently
+                removes the template and its fields, and cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                variant='destructive'
+                disabled={deleting}
+                onClick={() => void confirmDelete()}
+              >
+                {deleting && <Spinner className='size-3.5' />}
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DialogContent>
     </Dialog>
   )
