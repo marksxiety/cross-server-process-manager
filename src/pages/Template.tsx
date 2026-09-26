@@ -30,6 +30,7 @@ export function Template() {
   const requestError = useTemplateStore((state) => state.requestError)
   const load = useTemplateStore((state) => state.load)
   const save = useTemplateStore((state) => state.save)
+  const remove = useTemplateStore((state) => state.remove)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -71,6 +72,9 @@ export function Template() {
     }
     return save(selected.id, toSavableKeys(keys))
   }
+
+  const handleDelete = (template: ProcessTemplate): Promise<ApiResponse<ProcessTemplate>> =>
+    remove(template.id)
 
   return (
     <div className='mx-auto w-full max-w-[75%]'>
@@ -164,6 +168,7 @@ export function Template() {
           }}
           onUse={handleUse}
           onSave={handleSave}
+          onDelete={handleDelete}
         />
       )}
     </div>
