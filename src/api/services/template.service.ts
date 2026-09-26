@@ -27,5 +27,12 @@ export function templateService() {
                 return { success: false, message: (cause as Error).message, info: null, status: 0 };
             }
         },
+        remove: async (id: number): Promise<ApiResponse<ProcessTemplate>> => {
+            try {
+                return await api.del<ProcessTemplate>(`/templates/${id}`);
+            } catch (cause) {
+                return { success: false, message: (cause as Error).message, info: null, status: 0 };
+            }
+        },
     };
 }
