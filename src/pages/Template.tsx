@@ -16,7 +16,9 @@ import { ErrorAlert } from '@/components/custom/error-alert'
 import { TemplateCard } from '@/components/custom/template-card'
 import { TemplateModal } from '@/components/custom/template-modal'
 import { useTemplateStore } from '@/stores/template.store'
-import type { ProcessTemplate } from '@/types/template'
+import { toSavableKeys } from '@/lib/template-keys'
+import type { ApiResponse } from '@/types/api'
+import type { ProcessTemplate, TemplateKey } from '@/types/template'
 
 type StatusFilter = 'all' | 'active' | 'inactive'
 
@@ -27,6 +29,7 @@ export function Template() {
   const status = useTemplateStore((state) => state.status)
   const requestError = useTemplateStore((state) => state.requestError)
   const load = useTemplateStore((state) => state.load)
+  const save = useTemplateStore((state) => state.save)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -60,6 +63,13 @@ export function Template() {
 
   const handleUse = (template: ProcessTemplate) => {
     void navigate(`/process?template=${template.id}`)
+  }
+
+  const handleSave = async (keys: TemplateKey[]): Promise<ApiResponse<ProcessTemplate>> => {
+    if (!selected) {
+      return { success: false, message: 'No template selected', info: null, status: 0 }
+    }
+    return save(selected.id, toSavableKeys(keys))
   }
 
   return (
@@ -153,6 +163,7 @@ export function Template() {
             if (!open) setSelected(null)
           }}
           onUse={handleUse}
+          onSave={handleSave}
         />
       )}
     </div>
