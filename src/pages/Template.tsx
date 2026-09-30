@@ -15,6 +15,13 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -37,7 +44,6 @@ import {
 import { PageHeader } from '@/components/custom/page-header'
 import { ErrorAlert } from '@/components/custom/error-alert'
 import { TemplateCard } from '@/components/custom/template-card'
-import { Modal } from '@/components/custom/modal'
 import { useTemplateStore } from '@/stores/template.store'
 import { errorCodeLabel, toApiError } from '@/lib/error-code'
 import { toSavableKeys } from '@/lib/template-keys'
@@ -279,23 +285,129 @@ export function Template() {
         ))}
 
       {selected && (
-        <Modal
+        <Dialog
           open
           onOpenChange={(open) => {
             if (!open) setSelected(null)
           }}
-          className='sm:max-w-5xl'
-          title={selected.template_name}
-          description={
-            selected.category ? (
-              <Badge variant='outline' className='w-fit font-normal text-muted-foreground'>
-                {selected.category}
-              </Badge>
-            ) : undefined
-          }
-          footerClassName='sm:justify-between'
-          footer={
-            <>
+        >
+          <DialogContent className='sm:max-w-5xl'>
+            <DialogHeader className='pr-6'>
+              <DialogTitle>{selected.template_name}</DialogTitle>
+              {selected.category && (
+                <Badge variant='outline' className='w-fit font-normal text-muted-foreground'>
+                  {selected.category}
+                </Badge>
+              )}
+            </DialogHeader>
+
+            <div className='grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]'>
+              <div className='space-y-2'>
+                <div className='flex items-center justify-between'>
+                  <p className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>
+                    Fields
+                  </p>
+                  <Button type='button' variant='outline' size='sm' onClick={addKey}>
+                    + Add field
+                  </Button>
+                </div>
+
+                {/* Header lives outside the ScrollArea so only the rows scroll. */}
+                <div className={cn(KEY_GRID, 'pr-3 text-xs font-medium text-muted-foreground')}>
+                  <span>Key</span>
+                  <span>Value</span>
+                  <span>Data Type</span>
+                  <span className='text-center'>Required</span>
+                  <span />
+                </div>
+
+                <ScrollArea className='max-h-105 [&_[data-slot=scroll-area-viewport]]:max-h-105'>
+                  <div className='space-y-2 pr-3'>
+                    {keys.map((key, index) => (
+                      <div key={index} className={KEY_GRID}>
+                        <Input
+                          className='font-mono text-xs'
+                          placeholder='key'
+                          value={key.property_key}
+                          onChange={(event) =>
+                            updateKey(index, { property_key: event.target.value })
+                          }
+                        />
+                        <Input
+                          className='font-mono text-xs'
+                          placeholder='value'
+                          value={key.property_value ?? ''}
+                          onChange={(event) =>
+                            updateKey(index, { property_value: event.target.value })
+                          }
+                        />
+                        <Select
+                          value={key.data_type}
+                          onValueChange={(value) =>
+                            updateKey(index, { data_type: value as TemplateDataType })
+                          }
+                        >
+                          <SelectTrigger className='w-full'>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {DATA_TYPES.map((type) => (
+                              <SelectItem key={type} value={type}>
+                                {type}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <div className='flex justify-center'>
+                          <Checkbox
+                            checked={key.is_required}
+                            onCheckedChange={(checked) =>
+                              updateKey(index, { is_required: checked === true })
+                            }
+                          />
+                        </div>
+                        <Button
+                          type='button'
+                          variant='ghost'
+                          size='icon-sm'
+                          aria-label={`Remove ${key.property_key || 'key'}`}
+                          title='Remove key'
+                          onClick={() => removeKey(index)}
+                        >
+                          <X strokeWidth={2} />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+
+              <div className='space-y-2'>
+                <p className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>
+                  Payload preview
+                </p>
+                <ScrollArea className='max-h-105 rounded-md border bg-muted [&_[data-slot=scroll-area-viewport]]:max-h-105'>
+                  <pre className='whitespace-pre-wrap break-words p-3 font-mono text-[11px] leading-relaxed'>
+                    {payloadJson}
+                  </pre>
+                </ScrollArea>
+                <Button
+                  type='button'
+                  variant='outline'
+                  className='w-full'
+                  onClick={() => void copyPayload()}
+                >
+                  {copied ? (
+                    <Check className='mr-1 h-3.5 w-3.5' />
+                  ) : (
+                    <Copy className='mr-1 h-3.5 w-3.5' />
+                  )}
+                  {copied ? 'Copied' : 'Copy JSON'}
+                </Button>
+              </div>
+            </div>
+
+            <DialogFooter className='sm:justify-between'>
               <Button
                 type='button'
                 onClick={() => {
@@ -321,146 +433,40 @@ export function Template() {
                   Save
                 </Button>
               </div>
-            </>
-          }
-        >
-          <div className='grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]'>
-            <div className='space-y-2'>
-              <div className='flex items-center justify-between'>
-                <p className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>
-                  Fields
-                </p>
-                <Button type='button' variant='outline' size='sm' onClick={addKey}>
-                  + Add field
-                </Button>
-              </div>
+            </DialogFooter>
 
-              {/* Header lives outside the ScrollArea so only the rows scroll. */}
-              <div className={cn(KEY_GRID, 'pr-3 text-xs font-medium text-muted-foreground')}>
-                <span>Key</span>
-                <span>Value</span>
-                <span>Data Type</span>
-                <span className='text-center'>Required</span>
-                <span />
-              </div>
-
-              <ScrollArea className='max-h-105 [&_[data-slot=scroll-area-viewport]]:max-h-105'>
-                <div className='space-y-2 pr-3'>
-                  {keys.map((key, index) => (
-                    <div key={index} className={KEY_GRID}>
-                      <Input
-                        className='font-mono text-xs'
-                        placeholder='key'
-                        value={key.property_key}
-                        onChange={(event) =>
-                          updateKey(index, { property_key: event.target.value })
-                        }
-                      />
-                      <Input
-                        className='font-mono text-xs'
-                        placeholder='value'
-                        value={key.property_value ?? ''}
-                        onChange={(event) =>
-                          updateKey(index, { property_value: event.target.value })
-                        }
-                      />
-                      <Select
-                        value={key.data_type}
-                        onValueChange={(value) =>
-                          updateKey(index, { data_type: value as TemplateDataType })
-                        }
-                      >
-                        <SelectTrigger className='w-full'>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {DATA_TYPES.map((type) => (
-                            <SelectItem key={type} value={type}>
-                              {type}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <div className='flex justify-center'>
-                        <Checkbox
-                          checked={key.is_required}
-                          onCheckedChange={(checked) =>
-                            updateKey(index, { is_required: checked === true })
-                          }
-                        />
-                      </div>
-                      <Button
-                        type='button'
-                        variant='ghost'
-                        size='icon-sm'
-                        aria-label={`Remove ${key.property_key || 'key'}`}
-                        title='Remove key'
-                        onClick={() => removeKey(index)}
-                      >
-                        <X strokeWidth={2} />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            </div>
-
-            <div className='space-y-2'>
-              <p className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>
-                Payload preview
-              </p>
-              <ScrollArea className='max-h-105 rounded-md border bg-muted [&_[data-slot=scroll-area-viewport]]:max-h-105'>
-                <pre className='whitespace-pre-wrap break-words p-3 font-mono text-[11px] leading-relaxed'>
-                  {payloadJson}
-                </pre>
-              </ScrollArea>
-              <Button
-                type='button'
-                variant='outline'
-                className='w-full'
-                onClick={() => void copyPayload()}
-              >
-                {copied ? (
-                  <Check className='mr-1 h-3.5 w-3.5' />
-                ) : (
-                  <Copy className='mr-1 h-3.5 w-3.5' />
-                )}
-                {copied ? 'Copied' : 'Copy JSON'}
-              </Button>
-            </div>
-          </div>
-
-          <AlertDialog
-            open={confirmOpen}
-            onOpenChange={(nextOpen) => {
-              if (!nextOpen && !deleting) setConfirmOpen(false)
-            }}
-          >
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogMedia className='text-destructive'>
-                  <Trash2 strokeWidth={2} />
-                </AlertDialogMedia>
-                <AlertDialogTitle>Delete Template?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Are you sure you want to delete “{selected.template_name}”? This permanently
-                  removes the template and its fields, and cannot be undone.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  variant='destructive'
-                  disabled={deleting}
-                  onClick={() => void confirmDelete()}
-                >
-                  {deleting && <Spinner className='size-3.5' />}
-                  Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </Modal>
+            <AlertDialog
+              open={confirmOpen}
+              onOpenChange={(nextOpen) => {
+                if (!nextOpen && !deleting) setConfirmOpen(false)
+              }}
+            >
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogMedia className='text-destructive'>
+                    <Trash2 strokeWidth={2} />
+                  </AlertDialogMedia>
+                  <AlertDialogTitle>Delete Template?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete “{selected.template_name}”? This permanently
+                    removes the template and its fields, and cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    variant='destructive'
+                    disabled={deleting}
+                    onClick={() => void confirmDelete()}
+                  >
+                    {deleting && <Spinner className='size-3.5' />}
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   )
