@@ -12,6 +12,7 @@ export default defineConfig({
     tailwindcss(),
     babel({ presets: [reactCompilerPreset()] })
   ],
+  envDir: path.resolve(import.meta.dirname, ".."),
   server: {
     host: true,
   },
