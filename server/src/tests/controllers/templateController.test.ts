@@ -6,7 +6,7 @@ vi.mock('../../config/db', () => ({
 }));
 
 import db from '../../config/db';
-import { index, remove, update } from '../../controllers/templateController';
+import { create, index, remove, update } from '../../controllers/templateController';
 
 const query = db.query as unknown as Mock;
 const connect = db.connect as unknown as Mock;
@@ -205,6 +205,9 @@ function createClient(options: { rowCount?: number; rows?: unknown[] } = {}): Cl
     client.query.mockImplementation((sql: unknown) => {
         const text = typeof sql === 'string' ? sql : '';
         if (text.includes('FOR UPDATE')) return Promise.resolve({ rows: [], rowCount });
+        if (text.includes('INSERT INTO templates')) {
+            return Promise.resolve({ rows: [{ id: 1 }], rowCount: 1 });
+        }
         if (text.includes('FROM templates t')) {
             return Promise.resolve({ rows, rowCount: rows.length });
         }
@@ -216,6 +219,168 @@ function createClient(options: { rowCount?: number; rows?: unknown[] } = {}): Cl
 function sqlCalls(client: ClientStub): string[] {
     return client.query.mock.calls.map((call) => call[0] as string);
 }
+
+describe('templateController.create', () => {
+    const CREATE_BODY = {
+        template_name: 'Deno',
+        category: 'Deno',
+        description: 'Run a Deno script.',
+        preview: 'deno run --allow-net main.ts',
+        keys: [INPUT_KEY],
+    };
+
+    it('inserts the template and its keys, commits, and returns the new template', async () => {
+        const client = createClient();
+        connect.mockResolvedValueOnce(client);
+        const res = createResponse();
+
+        await create(createRequest({ body: CREATE_BODY }), res);
+
+        expect(res.status).not.toHaveBeenCalled();
+        expect(responseBody(res)).toEqual({
+            success: true,
+            message: 'Template registered successfully',
+            info: {
+                id: 1,
+                template_name: 'Deno',
+                category: 'Deno',
+                description: 'Run a Deno script.',
+                preview: 'deno run --allow-net main.ts',
+                is_active: true,
+                keys: [INPUT_KEY],
+            },
+        });
+
+        const calls = sqlCalls(client);
+        expect(calls[0]).toBe('BEGIN');
+        expect(calls.at(-1)).toBe('COMMIT');
+
+        const insertTemplate = client.query.mock.calls.find((call) =>
+            String(call[0]).includes('INSERT INTO templates')
+        );
+        expect(insertTemplate?.[1]).toEqual([
+            'Deno',
+            'Deno',
+            'Run a Deno script.',
+            'deno run --allow-net main.ts',
+            true,
+        ]);
+
+        const insertKey = client.query.mock.calls.find((call) =>
+            String(call[0]).includes('INSERT INTO template_keys')
+        );
+        expect(insertKey?.[1]).toEqual([1, 'script', 'index.js', 'string', true, false, false]);
+        expect(client.release).toHaveBeenCalledTimes(1);
+    });
+
+    it('defaults is_active to true and trims blank metadata to null', async () => {
+        const client = createClient();
+        connect.mockResolvedValueOnce(client);
+        const res = createResponse();
+
+        await create(
+            createRequest({ body: { template_name: '  Deno  ', category: '   ', keys: [] } }),
+            res
+        );
+
+        expect(responseBody(res)).toEqual({
+            success: true,
+            message: 'Template registered successfully',
+            info: {
+                id: 1,
+                template_name: 'Deno',
+                category: null,
+                description: null,
+                preview: null,
+                is_active: true,
+                keys: [],
+            },
+        });
+
+        const insertTemplate = client.query.mock.calls.find((call) =>
+            String(call[0]).includes('INSERT INTO templates')
+        );
+        expect(insertTemplate?.[1]).toEqual(['Deno', null, null, null, true]);
+    });
+
+    it('rejects a blank template name before touching the database', async () => {
+        const res = createResponse();
+
+        await create(createRequest({ body: { template_name: '   ', keys: [] } }), res);
+
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(responseBody(res).code).toBe('VALIDATION_FAILED');
+        expect(connect).not.toHaveBeenCalled();
+    });
+
+    it('rejects duplicate property_key values before touching the database', async () => {
+        const res = createResponse();
+
+        await create(
+            createRequest({
+                body: { template_name: 'Deno', keys: [INPUT_KEY, INPUT_KEY] },
+            }),
+            res
+        );
+
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(responseBody(res).code).toBe('VALIDATION_FAILED');
+        expect(connect).not.toHaveBeenCalled();
+    });
+
+    it('rolls back and responds 409 when the template name already exists', async () => {
+        const client = createClient();
+        client.query.mockImplementation((sql: unknown) => {
+            const text = typeof sql === 'string' ? sql : '';
+            if (text.includes('INSERT INTO templates')) {
+                return Promise.reject(
+                    Object.assign(new Error('duplicate key value'), {
+                        code: '23505',
+                        constraint: 'templates_template_name_key',
+                    })
+                );
+            }
+            return Promise.resolve({ rows: [], rowCount: 0 });
+        });
+        connect.mockResolvedValueOnce(client);
+        const res = createResponse();
+
+        await create(createRequest({ body: CREATE_BODY }), res);
+
+        expect(res.status).toHaveBeenCalledWith(409);
+        expect(responseBody(res)).toEqual({
+            success: false,
+            message: 'Template "Deno" is already registered',
+            code: 'DUPLICATE_TEMPLATE',
+            info: null,
+        });
+        expect(sqlCalls(client)).toContain('ROLLBACK');
+        expect(client.release).toHaveBeenCalledTimes(1);
+    });
+
+    it('rolls back and responds 500 when a key write fails', async () => {
+        const client = createClient();
+        client.query.mockImplementation((sql: unknown) => {
+            const text = typeof sql === 'string' ? sql : '';
+            if (text.includes('INSERT INTO template_keys')) {
+                return Promise.reject(new Error('deadlock detected'));
+            }
+            if (text.includes('INSERT INTO templates')) {
+                return Promise.resolve({ rows: [{ id: 1 }], rowCount: 1 });
+            }
+            return Promise.resolve({ rows: [], rowCount: 0 });
+        });
+        connect.mockResolvedValueOnce(client);
+        const res = createResponse();
+
+        await create(createRequest({ body: CREATE_BODY }), res);
+
+        expect(res.status).toHaveBeenCalledWith(500);
+        expect(responseBody(res).code).toBe('INTERNAL_SERVER_ERROR');
+        expect(sqlCalls(client)).toContain('ROLLBACK');
+        expect(client.release).toHaveBeenCalledTimes(1);
+    });
+});
 
 describe('templateController.update', () => {
     it("upserts the submitted keys and commits, returning the nested template", async () => {
