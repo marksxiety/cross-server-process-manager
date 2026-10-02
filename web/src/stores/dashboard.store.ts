@@ -21,6 +21,7 @@ interface DashboardState {
     isRefreshing: boolean;
     load: () => Promise<void>;
     refresh: () => Promise<void>;
+    refreshServer: (server: RegisteredServer) => Promise<void>;
     reload: () => Promise<void>;
 }
 
@@ -206,6 +207,20 @@ export const useDashboardStore = create<DashboardState>()(
                     } finally {
                         set({ isRefreshing: false });
                     }
+                },
+
+                // Re-syncs a single server's processes. Called after a process is
+                // registered on that server so the dashboard reflects it immediately.
+                refreshServer: async (server) => {
+                    const entry = await settle(
+                        withRetry(() => processService(server).overview())
+                    );
+                    set((state) => ({
+                        processesByServer: {
+                            ...state.processesByServer,
+                            [server.server]: toServerProcesses(entry),
+                        },
+                    }));
                 },
 
                 // Re-fetches the registry and then processes. Called by Dashboard.tsx's
