@@ -2,7 +2,7 @@ import { createConnection } from "@/api/connection";
 import { normalizeProcessDescribe } from "@/lib/process-describe";
 import type { ApiResponse } from "@/types/api";
 import type { RegisteredServer } from "@/types/server";
-import type { LogStreamType, ProcessDescribe, ProcessLogs, ProcessSummary } from "@/types/process";
+import type { LogStreamType, ProcessDescribe, ProcessLogs, ProcessSummary, StartIssue, StartProcessPayload } from "@/types/process";
 import type { SystemOverview } from "@/types/system";
 
 export function processService(server: RegisteredServer) {
@@ -34,7 +34,8 @@ export function processService(server: RegisteredServer) {
             const query = search.toString();
             return api.get<ProcessLogs>(`/pm2/logs/${pmId}${query ? `?${query}` : ""}`);
         },
-        start: (pmId: number) => api.post<ProcessSummary[]>(`/pm2/start/${pmId}`),
+        start: (payload: StartProcessPayload) =>
+            api.post<ProcessSummary[] | StartIssue[]>("/pm2/start", payload),
         stop: (pmId: number) => api.post<ProcessSummary[]>(`/pm2/stop/${pmId}`),
         restart: (pmId: number) => api.post<ProcessSummary[]>(`/pm2/restart/${pmId}`),
         reload: (pmId: number) => api.post<ProcessSummary[]>(`/pm2/reload/${pmId}`),
