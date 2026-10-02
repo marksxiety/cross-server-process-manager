@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/select'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Spinner } from '@/components/ui/spinner'
+import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from '@/components/ui/toast'
 import {
@@ -44,20 +45,42 @@ import {
 import { PageHeader } from '@/components/custom/page-header'
 import { ErrorAlert } from '@/components/custom/error-alert'
 import { TemplateCard } from '@/components/custom/template-card'
+import { TemplatePreview } from '@/components/custom/template-preview'
 import { useTemplateStore } from '@/stores/template.store'
 import { errorCodeLabel, toApiError } from '@/lib/error-code'
 import { toSavableKeys } from '@/lib/template-keys'
 import { buildTemplatePayload } from '@/lib/template-payload'
 import { cn } from '@/lib/utils'
 import type { ApiResponse } from '@/types/api'
-import type { ProcessTemplate, TemplateDataType, TemplateKey } from '@/types/template'
+import type {
+  ProcessTemplate,
+  TemplateDataType,
+  TemplateInput,
+  TemplateKey,
+} from '@/types/template'
 
 type StatusFilter = 'all' | 'active' | 'inactive'
 
+type TemplateDraft = {
+  template_name: string
+  category: string
+  description: string
+  preview: string
+  is_active: boolean
+}
+
 const DATA_TYPES: TemplateDataType[] = ['string', 'boolean', 'number', 'array', 'object']
 
+const EMPTY_DRAFT: TemplateDraft = {
+  template_name: '',
+  category: '',
+  description: '',
+  preview: '',
+  is_active: true,
+}
+
 const KEY_GRID =
-  'grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7rem_4.5rem_1.5rem] items-center gap-2'
+  'grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7rem_4.5rem_4.5rem_4.5rem_1.5rem] items-center gap-2'
 
 function newKey(): TemplateKey {
   return {
@@ -78,10 +101,15 @@ export function Template() {
   const [saving, setSaving] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [createOpen, setCreateOpen] = useState(false)
+  const [draft, setDraft] = useState<TemplateDraft>(EMPTY_DRAFT)
+  const [creating, setCreating] = useState(false)
+  const [nameError, setNameError] = useState(false)
   const templates = useTemplateStore((state) => state.templates)
   const status = useTemplateStore((state) => state.status)
   const requestError = useTemplateStore((state) => state.requestError)
   const load = useTemplateStore((state) => state.load)
+  const register = useTemplateStore((state) => state.register)
   const save = useTemplateStore((state) => state.save)
   const remove = useTemplateStore((state) => state.remove)
   const navigate = useNavigate()
@@ -126,6 +154,17 @@ export function Template() {
   const openTemplate = (template: ProcessTemplate) => {
     setKeys(template.keys)
     setSelected(template)
+  }
+
+  const openCreate = () => {
+    setDraft(EMPTY_DRAFT)
+    setNameError(false)
+    setKeys([])
+    setCreateOpen(true)
+  }
+
+  const updateDraft = (patch: Partial<TemplateDraft>) => {
+    setDraft((prev) => ({ ...prev, ...patch }))
   }
 
   const handleSave = async (nextKeys: TemplateKey[]): Promise<ApiResponse<ProcessTemplate>> => {
@@ -173,6 +212,43 @@ export function Template() {
       })
     } finally {
       setSaving(false)
+    }
+  }
+
+  const registerTemplate = async () => {
+    if (creating || saving) return
+
+    const templateName = draft.template_name.trim()
+    if (templateName === '') {
+      setNameError(true)
+      return
+    }
+
+    setCreating(true)
+    try {
+      const payload: TemplateInput = {
+        template_name: templateName,
+        category: draft.category.trim() || null,
+        description: draft.description.trim() || null,
+        preview: draft.preview.trim() || null,
+        is_active: draft.is_active,
+        keys: toSavableKeys(keys),
+      }
+      const result = await register(payload)
+      if (result.success) {
+        toast.add({ type: 'success', title: 'Template registered', description: result.message })
+        setCreateOpen(false)
+        setKeys([])
+        return
+      }
+      const error = toApiError(result)
+      toast.add({
+        type: 'error',
+        title: errorCodeLabel(error.code),
+        description: error.message,
+      })
+    } finally {
+      setCreating(false)
     }
   }
 
@@ -228,7 +304,7 @@ export function Template() {
           >
             <RefreshCw strokeWidth={2} />
           </Button>
-          <Button size='sm'>
+          <Button size='sm' onClick={openCreate}>
             <Plus strokeWidth={2} />
             New Template
           </Button>
@@ -299,6 +375,7 @@ export function Template() {
                   {selected.category}
                 </Badge>
               )}
+              <TemplatePreview template={selected} className='mt-1 w-fit max-w-full' />
             </DialogHeader>
 
             <div className='grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]'>
@@ -318,10 +395,12 @@ export function Template() {
                   <span>Value</span>
                   <span>Data Type</span>
                   <span className='text-center'>Required</span>
+                  <span className='text-center'>Hidden</span>
+                  <span className='text-center'>Locked</span>
                   <span />
                 </div>
 
-                <ScrollArea className='max-h-105 [&_[data-slot=scroll-area-viewport]]:max-h-105'>
+                <ScrollArea className='max-h-105 **:data-[slot=scroll-area-viewport]:max-h-105'>
                   <div className='space-y-2 pr-3'>
                     {keys.map((key, index) => (
                       <div key={index} className={KEY_GRID}>
@@ -366,6 +445,22 @@ export function Template() {
                             }
                           />
                         </div>
+                        <div className='flex justify-center'>
+                          <Checkbox
+                            checked={key.is_hidden}
+                            onCheckedChange={(checked) =>
+                              updateKey(index, { is_hidden: checked === true })
+                            }
+                          />
+                        </div>
+                        <div className='flex justify-center'>
+                          <Checkbox
+                            checked={key.is_locked}
+                            onCheckedChange={(checked) =>
+                              updateKey(index, { is_locked: checked === true })
+                            }
+                          />
+                        </div>
                         <Button
                           type='button'
                           variant='ghost'
@@ -386,8 +481,8 @@ export function Template() {
                 <p className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>
                   Payload preview
                 </p>
-                <ScrollArea className='max-h-105 rounded-md border bg-muted [&_[data-slot=scroll-area-viewport]]:max-h-105'>
-                  <pre className='whitespace-pre-wrap break-words p-3 font-mono text-[11px] leading-relaxed'>
+                <ScrollArea className='max-h-105 rounded-md border bg-muted **:data-[slot=scroll-area-viewport]:max-h-105'>
+                  <pre className='whitespace-pre-wrap wrap-break-words p-3 font-mono text-[11px] leading-relaxed'>
                     {payloadJson}
                   </pre>
                 </ScrollArea>
@@ -465,6 +560,247 @@ export function Template() {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {createOpen && (
+        <Dialog
+          open
+          onOpenChange={(open) => {
+            if (!open && !creating) setCreateOpen(false)
+          }}
+        >
+          <DialogContent className='sm:max-w-5xl'>
+            <DialogHeader className='pr-6'>
+              <DialogTitle>New Template</DialogTitle>
+            </DialogHeader>
+
+            <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
+              <div className='space-y-1.5'>
+                <label
+                  htmlFor='template_name'
+                  className='text-xs font-medium text-muted-foreground'
+                >
+                  Template name
+                </label>
+                <Input
+                  id='template_name'
+                  placeholder='e.g. Deno'
+                  maxLength={100}
+                  aria-invalid={nameError}
+                  value={draft.template_name}
+                  onChange={(event) => {
+                    setNameError(false)
+                    updateDraft({ template_name: event.target.value })
+                  }}
+                />
+                {nameError && (
+                  <p className='text-xs text-destructive'>Template name is required.</p>
+                )}
+              </div>
+
+              <div className='space-y-1.5'>
+                <label
+                  htmlFor='template_category'
+                  className='text-xs font-medium text-muted-foreground'
+                >
+                  Category
+                </label>
+                <Input
+                  id='template_category'
+                  placeholder='e.g. Deno / TypeScript'
+                  maxLength={255}
+                  value={draft.category}
+                  onChange={(event) => updateDraft({ category: event.target.value })}
+                />
+              </div>
+
+              <div className='space-y-1.5'>
+                <label
+                  htmlFor='template_description'
+                  className='text-xs font-medium text-muted-foreground'
+                >
+                  Description
+                </label>
+                <Input
+                  id='template_description'
+                  placeholder='What does this template run?'
+                  maxLength={255}
+                  value={draft.description}
+                  onChange={(event) => updateDraft({ description: event.target.value })}
+                />
+              </div>
+
+              <div className='space-y-1.5'>
+                <label
+                  htmlFor='template_preview'
+                  className='text-xs font-medium text-muted-foreground'
+                >
+                  Preview command
+                </label>
+                <Input
+                  id='template_preview'
+                  className='font-mono'
+                  placeholder='deno run --allow-net main.ts'
+                  maxLength={255}
+                  value={draft.preview}
+                  onChange={(event) => updateDraft({ preview: event.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className='flex items-center justify-between rounded-md border px-3 py-2'>
+              <div>
+                <p className='text-sm font-medium'>Active</p>
+                <p className='text-xs text-muted-foreground'>
+                  Available when registering processes.
+                </p>
+              </div>
+              <Switch
+                checked={draft.is_active}
+                onCheckedChange={(checked) => updateDraft({ is_active: checked })}
+              />
+            </div>
+
+            <div className='grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]'>
+              <div className='space-y-2'>
+                <div className='flex items-center justify-between'>
+                  <p className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>
+                    Fields
+                  </p>
+                  <Button type='button' variant='outline' size='sm' onClick={addKey}>
+                    + Add field
+                  </Button>
+                </div>
+
+                {/* Header lives outside the ScrollArea so only the rows scroll. */}
+                <div className={cn(KEY_GRID, 'pr-3 text-xs font-medium text-muted-foreground')}>
+                  <span>Key</span>
+                  <span>Value</span>
+                  <span>Data Type</span>
+                  <span className='text-center'>Required</span>
+                  <span className='text-center'>Hidden</span>
+                  <span className='text-center'>Locked</span>
+                  <span />
+                </div>
+
+                <ScrollArea className='max-h-105 **:data-[slot=scroll-area-viewport]:max-h-105'>
+                  <div className='space-y-2 pr-3'>
+                    {keys.map((key, index) => (
+                      <div key={index} className={KEY_GRID}>
+                        <Input
+                          className='font-mono text-xs'
+                          placeholder='key'
+                          value={key.property_key}
+                          onChange={(event) =>
+                            updateKey(index, { property_key: event.target.value })
+                          }
+                        />
+                        <Input
+                          className='font-mono text-xs'
+                          placeholder='value'
+                          value={key.property_value ?? ''}
+                          onChange={(event) =>
+                            updateKey(index, { property_value: event.target.value })
+                          }
+                        />
+                        <Select
+                          value={key.data_type}
+                          onValueChange={(value) =>
+                            updateKey(index, { data_type: value as TemplateDataType })
+                          }
+                        >
+                          <SelectTrigger className='w-full'>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {DATA_TYPES.map((type) => (
+                              <SelectItem key={type} value={type}>
+                                {type}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <div className='flex justify-center'>
+                          <Checkbox
+                            checked={key.is_required}
+                            onCheckedChange={(checked) =>
+                              updateKey(index, { is_required: checked === true })
+                            }
+                          />
+                        </div>
+                        <div className='flex justify-center'>
+                          <Checkbox
+                            checked={key.is_hidden}
+                            onCheckedChange={(checked) =>
+                              updateKey(index, { is_hidden: checked === true })
+                            }
+                          />
+                        </div>
+                        <div className='flex justify-center'>
+                          <Checkbox
+                            checked={key.is_locked}
+                            onCheckedChange={(checked) =>
+                              updateKey(index, { is_locked: checked === true })
+                            }
+                          />
+                        </div>
+                        <Button
+                          type='button'
+                          variant='ghost'
+                          size='icon-sm'
+                          aria-label={`Remove ${key.property_key || 'key'}`}
+                          title='Remove key'
+                          onClick={() => removeKey(index)}
+                        >
+                          <X strokeWidth={2} />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+
+              <div className='space-y-2'>
+                <p className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>
+                  Payload preview
+                </p>
+                <ScrollArea className='max-h-105 rounded-md border bg-muted **:data-[slot=scroll-area-viewport]:max-h-105'>
+                  <pre className='whitespace-pre-wrap wrap-break-words p-3 font-mono text-[11px] leading-relaxed'>
+                    {payloadJson}
+                  </pre>
+                </ScrollArea>
+                <Button
+                  type='button'
+                  variant='outline'
+                  className='w-full'
+                  onClick={() => void copyPayload()}
+                >
+                  {copied ? (
+                    <Check className='mr-1 h-3.5 w-3.5' />
+                  ) : (
+                    <Copy className='mr-1 h-3.5 w-3.5' />
+                  )}
+                  {copied ? 'Copied' : 'Copy JSON'}
+                </Button>
+              </div>
+            </div>
+
+            <DialogFooter className='sm:justify-end'>
+              <Button
+                type='button'
+                variant='outline'
+                disabled={creating}
+                onClick={() => setCreateOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button type='button' disabled={creating} onClick={() => void registerTemplate()}>
+                {creating && <Spinner className='size-3.5' />}
+                Register template
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       )}
