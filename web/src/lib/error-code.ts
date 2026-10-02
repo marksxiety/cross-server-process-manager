@@ -16,6 +16,7 @@ const ERROR_CODE_LABELS: Record<string, string> = {
     INVALID_ID: "Invalid id",
     DUPLICATE_SERVER: "Server already registered",
     DUPLICATE_HOST: "Host already registered",
+    DUPLICATE_TEMPLATE: "Template already registered",
     DATABASE_UNAVAILABLE: "Database unavailable",
     PARSE: "Malformed request body",
     INVALID_COOKIE_SIGNATURE: "Invalid cookie signature",
