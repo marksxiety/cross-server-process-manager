@@ -4,7 +4,7 @@ import cors from 'cors';
 import './config/env';
 import { health } from './controllers/healthController';
 import { index as servers, register, update, remove } from './controllers/serverController';
-import { index as templates, update as updateTemplate, remove as removeTemplate } from './controllers/templateController';
+import { index as templates, create as createTemplate, update as updateTemplate, remove as removeTemplate } from './controllers/templateController';
 import { fail } from './utils/response';
 
 const app = express();
@@ -19,6 +19,7 @@ app.post('/register', register);
 app.put('/servers/:id', update);
 app.delete('/servers/:id', remove);
 app.get('/templates', templates);
+app.post('/templates', createTemplate);
 app.put('/templates/:id', updateTemplate);
 app.delete('/templates/:id', removeTemplate);
 
