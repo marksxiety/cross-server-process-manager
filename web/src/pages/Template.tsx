@@ -50,7 +50,7 @@ import { useTemplateStore } from '@/stores/template.store'
 import { errorCodeLabel, toApiError } from '@/lib/error-code'
 import { toSavableKeys } from '@/lib/template-keys'
 import { buildTemplatePayload } from '@/lib/template-payload'
-import { cn } from '@/lib/utils'
+import { cn, copyText } from '@/lib/utils'
 import type { ApiResponse } from '@/types/api'
 import type {
   ProcessTemplate,
@@ -190,7 +190,14 @@ export function Template() {
   }
 
   const copyPayload = async () => {
-    await navigator.clipboard.writeText(payloadJson)
+    if (!(await copyText(payloadJson))) {
+      toast.add({
+        type: 'error',
+        title: 'Copy failed',
+        description: 'Clipboard is unavailable in this browser context.',
+      })
+      return
+    }
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
   }
