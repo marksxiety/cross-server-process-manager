@@ -2,6 +2,32 @@ export type ProcessStatus = "online" | "stopped" | "stopping" | "launching" | "e
 
 export type LogStreamType = "both" | "output" | "error";
 
+export interface StartIssue {
+    field: string;
+    message: string;
+}
+
+export interface StartProcessPayload {
+    name: string;
+    script: string;
+    interpreter: string;
+    targetOs?: "win32" | "linux";
+    namespace?: string;
+    cwd?: string;
+    args?: string | string[];
+    interpreter_args?: string | string[];
+    exec_mode?: "fork" | "cluster";
+    instances?: number | "max";
+    autorestart?: boolean;
+    max_restarts?: number;
+    windowsHide?: boolean;
+    env?: Record<string, string>;
+    watch?: boolean | string[];
+    ignore_watch?: string[];
+    watch_delay?: number;
+    cron_restart?: string;
+}
+
 export type LogStream = "out" | "error";
 
 export interface ProcessLogs {
