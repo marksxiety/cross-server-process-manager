@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import type { PoolClient } from 'pg';
 import { z } from 'zod';
 import db from '../config/db';
-import { templateKeysInputSchema } from '../schemas/templateSchema';
+import { templateInputSchema, templateKeysInputSchema } from '../schemas/templateSchema';
 import { fail, ok } from '../utils/response';
 
 export type TemplateDataType = 'string' | 'boolean' | 'number' | 'array' | 'object';
@@ -11,6 +11,12 @@ const INVALID_ID_MESSAGE = 'Template id must be a positive integer';
 const NOT_FOUND_MESSAGE = 'Template not found';
 const VALIDATION_FAILED_CODE = 'VALIDATION_FAILED';
 const CHECK_VIOLATION_CODE = '23514';
+const DUPLICATE_KEY_CODE = '23505';
+const DUPLICATE_TEMPLATE_CODE = 'DUPLICATE_TEMPLATE';
+
+function duplicateTemplateMessage(name: string): string {
+    return `Template "${name}" is already registered`;
+}
 
 export interface TemplateKeyRecord {
     property_key: string;
@@ -89,6 +95,36 @@ function groupTemplateRows(rows: Templates[]): TemplateRecord[] {
     return [...templates.values()];
 }
 
+// Upserts a key by the (template_id, property_key) natural key. Shared by the
+// register and update flows so both persist keys identically.
+async function upsertTemplateKey(
+    client: PoolClient,
+    templateId: number,
+    key: TemplateKeyRecord
+): Promise<void> {
+    await client.query(
+        `INSERT INTO template_keys
+           (template_id, property_key, property_value, data_type, is_required, is_hidden, is_locked)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         ON CONFLICT (template_id, property_key) DO UPDATE
+         SET property_value = EXCLUDED.property_value,
+             data_type = EXCLUDED.data_type,
+             is_required = EXCLUDED.is_required,
+             is_hidden = EXCLUDED.is_hidden,
+             is_locked = EXCLUDED.is_locked,
+             updated_at = current_timestamp`,
+        [
+            templateId,
+            key.property_key,
+            key.property_value,
+            key.data_type,
+            key.is_required,
+            key.is_hidden,
+            key.is_locked
+        ]
+    );
+}
+
 export const index = async (req: Request, res: Response): Promise<void> => {
     const withInactive = req.query.with_inactive === 'true';
 
@@ -123,6 +159,99 @@ export const index = async (req: Request, res: Response): Promise<void> => {
     } catch (error) {
         console.error(error);
         fail(res, 500, 'Failed to retrieve templates', 'INTERNAL_SERVER_ERROR');
+    }
+}
+
+export const create = async (req: Request, res: Response): Promise<void> => {
+    const parsed = templateInputSchema.safeParse(req.body);
+    if (!parsed.success) {
+        fail(
+            res,
+            400,
+            'Invalid template payload',
+            VALIDATION_FAILED_CODE,
+            z.flattenError(parsed.error).fieldErrors
+        );
+        return;
+    }
+
+    const { template_name, category, description, preview, is_active, keys } = parsed.data;
+    const template = {
+        template_name,
+        category: category || null,
+        description: description || null,
+        preview: preview || null,
+        is_active: is_active ?? true
+    };
+
+    let client: PoolClient;
+    try {
+        client = await db.connect();
+    } catch (error) {
+        console.error(error);
+        fail(res, 500, 'Failed to register template', 'INTERNAL_SERVER_ERROR');
+        return;
+    }
+
+    try {
+        await client.query('BEGIN');
+
+        const { rows } = await client.query<{ id: number }>(
+            `INSERT INTO templates (template_name, category, description, preview, is_active)
+             VALUES ($1, $2, $3, $4, $5)
+             RETURNING id`,
+            [
+                template.template_name,
+                template.category,
+                template.description,
+                template.preview,
+                template.is_active
+            ]
+        );
+
+        const id = rows[0]?.id;
+        if (id === undefined) {
+            await client.query('ROLLBACK');
+            fail(res, 500, 'Failed to register template', 'INTERNAL_SERVER_ERROR');
+            return;
+        }
+
+        for (const key of keys) {
+            await upsertTemplateKey(client, id, key);
+        }
+
+        await client.query('COMMIT');
+
+        ok(res, 'Template registered successfully', { id, ...template, keys });
+    } catch (error) {
+        await client.query('ROLLBACK').catch(() => undefined);
+        console.error(error);
+        const dbError = error as {
+            detail?: string;
+            code?: string;
+            constraint?: string;
+            message?: string;
+        };
+
+        // template_name is the only unique column, so any 23505 is a name clash.
+        if (dbError.code === DUPLICATE_KEY_CODE) {
+            fail(res, 409, duplicateTemplateMessage(template.template_name), DUPLICATE_TEMPLATE_CODE);
+            return;
+        }
+
+        if (dbError.code === CHECK_VIOLATION_CODE) {
+            fail(res, 400, dbError.detail ?? 'Invalid template key payload', VALIDATION_FAILED_CODE);
+            return;
+        }
+
+        fail(
+            res,
+            500,
+            dbError.detail ?? dbError.message ?? 'Failed to register template',
+            dbError.code ?? 'INTERNAL_SERVER_ERROR'
+        );
+    } finally {
+        client.release();
     }
 }
 
@@ -172,27 +301,7 @@ export const update = async (req: Request, res: Response): Promise<void> => {
         // Upsert by the (template_id, property_key) natural key, then prune any
         // stored keys that were dropped in the editor — all in one transaction.
         for (const key of keys) {
-            await client.query(
-                `INSERT INTO template_keys
-                   (template_id, property_key, property_value, data_type, is_required, is_hidden, is_locked)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7)
-                 ON CONFLICT (template_id, property_key) DO UPDATE
-                 SET property_value = EXCLUDED.property_value,
-                     data_type = EXCLUDED.data_type,
-                     is_required = EXCLUDED.is_required,
-                     is_hidden = EXCLUDED.is_hidden,
-                     is_locked = EXCLUDED.is_locked,
-                     updated_at = current_timestamp`,
-                [
-                    id,
-                    key.property_key,
-                    key.property_value,
-                    key.data_type,
-                    key.is_required,
-                    key.is_hidden,
-                    key.is_locked
-                ]
-            );
+            await upsertTemplateKey(client, id, key);
         }
 
         await client.query(
