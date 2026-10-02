@@ -62,6 +62,7 @@ describe('errorCodeLabel', () => {
     expect(errorCodeLabel('INVALID_ID')).toBe('Invalid id')
     expect(errorCodeLabel('DUPLICATE_SERVER')).toBe('Server already registered')
     expect(errorCodeLabel('DUPLICATE_HOST')).toBe('Host already registered')
+    expect(errorCodeLabel('DUPLICATE_TEMPLATE')).toBe('Template already registered')
     expect(errorCodeLabel('DATABASE_UNAVAILABLE')).toBe('Database unavailable')
   })
 
