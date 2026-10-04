@@ -6,7 +6,6 @@ export const templateKeySchema = z.object({
     data_type: z.enum(["string", "boolean", "number", "array", "object"]),
     is_required: z.boolean(),
     is_hidden: z.boolean(),
-    is_locked: z.boolean(),
 });
 
 export const processTemplateSchema = z.object({
