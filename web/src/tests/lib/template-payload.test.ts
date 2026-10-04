@@ -8,7 +8,6 @@ function key(partial: Partial<TemplateKey> & Pick<TemplateKey, 'property_key'>):
     data_type: 'string',
     is_required: false,
     is_hidden: false,
-    is_locked: false,
     ...partial,
   }
 }
