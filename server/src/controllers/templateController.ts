@@ -24,7 +24,6 @@ export interface TemplateKeyRecord {
     data_type: TemplateDataType;
     is_required: boolean;
     is_hidden: boolean;
-    is_locked: boolean;
 }
 
 export interface TemplateRecord {
@@ -51,7 +50,6 @@ interface Templates {
     data_type: TemplateDataType | null;
     is_required: boolean | null;
     is_hidden: boolean | null;
-    is_locked: boolean | null;
 }
 
 function parseIdParam(value: string | string[] | undefined): number | null {
@@ -86,8 +84,7 @@ function groupTemplateRows(rows: Templates[]): TemplateRecord[] {
                 property_value: row.property_value,
                 data_type: row.data_type ?? 'string',
                 is_required: row.is_required ?? false,
-                is_hidden: row.is_hidden ?? false,
-                is_locked: row.is_locked ?? false
+                is_hidden: row.is_hidden ?? false
             });
         }
     }
@@ -104,14 +101,13 @@ async function upsertTemplateKey(
 ): Promise<void> {
     await client.query(
         `INSERT INTO template_keys
-           (template_id, property_key, property_value, data_type, is_required, is_hidden, is_locked)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+           (template_id, property_key, property_value, data_type, is_required, is_hidden)
+         VALUES ($1, $2, $3, $4, $5, $6)
          ON CONFLICT (template_id, property_key) DO UPDATE
          SET property_value = EXCLUDED.property_value,
              data_type = EXCLUDED.data_type,
              is_required = EXCLUDED.is_required,
              is_hidden = EXCLUDED.is_hidden,
-             is_locked = EXCLUDED.is_locked,
              updated_at = current_timestamp`,
         [
             templateId,
@@ -119,8 +115,7 @@ async function upsertTemplateKey(
             key.property_value,
             key.data_type,
             key.is_required,
-            key.is_hidden,
-            key.is_locked
+            key.is_hidden
         ]
     );
 }
@@ -141,8 +136,7 @@ export const index = async (req: Request, res: Response): Promise<void> => {
                     k.property_value,
                     k.data_type,
                     k.is_required,
-                    k.is_hidden,
-                    k.is_locked
+                    k.is_hidden
              FROM templates t
              LEFT JOIN template_keys k ON k.template_id = t.id
              LEFT JOIN (
@@ -326,8 +320,7 @@ export const update = async (req: Request, res: Response): Promise<void> => {
                     k.property_value,
                     k.data_type,
                     k.is_required,
-                    k.is_hidden,
-                    k.is_locked
+                    k.is_hidden
              FROM templates t
              LEFT JOIN template_keys k ON k.template_id = t.id
              WHERE t.id = $1
