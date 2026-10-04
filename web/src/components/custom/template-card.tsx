@@ -22,7 +22,6 @@ type TemplateCardProps = {
 }
 
 export function TemplateCard({ template, onOpen, onUse }: TemplateCardProps) {
-  const locked = template.keys.filter((key) => key.is_locked).length
   const hidden = template.keys.filter((key) => key.is_hidden).length
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -57,7 +56,7 @@ export function TemplateCard({ template, onOpen, onUse }: TemplateCardProps) {
 
       <CardContent className='space-y-2'>
         <p className='text-xs text-muted-foreground'>
-          {template.keys.length} fields · {locked} locked · {hidden} hidden
+          {template.keys.length} fields · {hidden} hidden
         </p>
         <TemplatePreview template={template} />
       </CardContent>
