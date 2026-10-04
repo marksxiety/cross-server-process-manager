@@ -6,7 +6,6 @@ import {
   ArrowRight,
   Check,
   Copy,
-  Lock,
   Plus,
   ServerOff,
   Terminal,
@@ -107,7 +106,7 @@ const EDITOR_KEY_OPTIONS: ReadonlyArray<{ key: string; dataType: TemplateDataTyp
 const DATA_TYPES: TemplateDataType[] = ['string', 'boolean', 'number', 'array', 'object']
 
 const KEY_GRID =
-  'grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7rem_4.5rem_4.5rem_4.5rem_1.5rem] items-center gap-2'
+  'grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7rem_4.5rem_4.5rem_1.5rem] items-center gap-2'
 
 type FieldRow = { field: TemplateKey; index: number }
 
@@ -277,11 +276,9 @@ function TemplateOption({
 
 function FieldControl({
   field,
-  disabled,
   onChange,
 }: {
   field: TemplateKey
-  disabled: boolean
   onChange: (value: string) => void
 }) {
   const value = field.property_value ?? ''
@@ -290,7 +287,6 @@ function FieldControl({
     return (
       <Switch
         checked={value === 'true'}
-        disabled={disabled}
         onCheckedChange={(checked) => onChange(checked ? 'true' : 'false')}
       />
     )
@@ -300,7 +296,6 @@ function FieldControl({
     return (
       <textarea
         className='min-h-20 w-full rounded-md border border-input bg-input/20 p-2 font-mono text-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30'
-        disabled={disabled}
         placeholder={field.data_type === 'array' ? '["--port", "3000"]' : '{ "NODE_ENV": "production" }'}
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -312,7 +307,6 @@ function FieldControl({
     return (
       <Input
         className='font-mono text-xs'
-        disabled={disabled}
         type={field.property_key === 'instances' ? 'text' : 'number'}
         inputMode='numeric'
         placeholder={field.property_key === 'instances' ? '1 or max' : undefined}
@@ -325,7 +319,6 @@ function FieldControl({
   return (
     <Input
       className='font-mono text-xs'
-      disabled={disabled}
       value={value}
       onChange={(event) => onChange(event.target.value)}
     />
@@ -341,21 +334,18 @@ function ProcessField({
   error: string | undefined
   onChange: (value: string) => void
 }) {
-  const disabled = field.is_locked
-
   return (
     <Field data-invalid={!!error}>
       <div className='flex items-center justify-between gap-2'>
         <FieldLabel htmlFor={field.property_key} className='text-muted-foreground'>
           {field.property_key}
           {field.is_required && <span className='text-destructive'>*</span>}
-          {disabled && <Lock className='size-3' strokeWidth={2} />}
         </FieldLabel>
         <span className='text-[10px] tracking-wide text-muted-foreground uppercase'>
           {field.data_type}
         </span>
       </div>
-      <FieldControl field={field} disabled={disabled} onChange={onChange} />
+      <FieldControl field={field} onChange={onChange} />
       <FieldError errors={[error ? { message: error } : undefined]} />
     </Field>
   )
@@ -381,7 +371,6 @@ function KeyEditor({
         <span>Data type</span>
         <span className='text-center'>Required</span>
         <span className='text-center'>Hidden</span>
-        <span className='text-center'>Locked</span>
         <span />
       </div>
 
@@ -459,13 +448,6 @@ function KeyEditor({
                     onCheckedChange={(checked) => onUpdate(index, { is_hidden: checked === true })}
                   />
                 </div>
-                <div className='flex justify-center'>
-                  <Checkbox
-                    checked={field.is_locked}
-                    onCheckedChange={(checked) => onUpdate(index, { is_locked: checked === true })}
-                  />
-                </div>
-
                 <Button
                   type='button'
                   variant='ghost'
@@ -575,6 +557,15 @@ export function Process() {
     () => templates.filter((entry) => entry.is_active),
     [templates],
   )
+
+  // With only one active server there is nothing to choose, so select it
+  // automatically (e.g. after load, or when the list shrinks to one).
+  useEffect(() => {
+    if (activeServers.length !== 1) return
+    const only = activeServers[0]
+    if (server?.id === only.id) return
+    selectServer(only)
+  }, [activeServers, server, selectServer])
 
   // Preselects the template a "Use template" click linked to (?template=id).
   const templateParamApplied = useRef(false)
