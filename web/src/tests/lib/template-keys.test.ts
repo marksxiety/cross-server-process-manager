@@ -8,7 +8,6 @@ function key(partial: Partial<TemplateKey> & Pick<TemplateKey, 'property_key'>):
     data_type: 'string',
     is_required: false,
     is_hidden: false,
-    is_locked: false,
     ...partial,
   }
 }
@@ -36,9 +35,9 @@ describe('toSavableKeys', () => {
     expect(toSavableKeys(rows).map((k) => k.property_key)).toEqual(['script', 'exec_mode'])
   })
 
-  it('keeps the hidden and locked flags intact', () => {
-    const rows = [key({ property_key: 'secret', property_value: 'x', is_hidden: true, is_locked: true })]
+  it('keeps the hidden flag intact', () => {
+    const rows = [key({ property_key: 'secret', property_value: 'x', is_hidden: true })]
 
-    expect(toSavableKeys(rows)[0]).toMatchObject({ is_hidden: true, is_locked: true })
+    expect(toSavableKeys(rows)[0]).toMatchObject({ is_hidden: true })
   })
 })
