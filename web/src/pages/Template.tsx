@@ -80,7 +80,7 @@ const EMPTY_DRAFT: TemplateDraft = {
 }
 
 const KEY_GRID =
-  'grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7rem_4.5rem_4.5rem_4.5rem_1.5rem] items-center gap-2'
+  'grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7rem_4.5rem_4.5rem_1.5rem] items-center gap-2'
 
 function newKey(): TemplateKey {
   return {
@@ -89,7 +89,6 @@ function newKey(): TemplateKey {
     data_type: 'string',
     is_required: false,
     is_hidden: false,
-    is_locked: false,
   }
 }
 
@@ -403,7 +402,6 @@ export function Template() {
                   <span>Data Type</span>
                   <span className='text-center'>Required</span>
                   <span className='text-center'>Hidden</span>
-                  <span className='text-center'>Locked</span>
                   <span />
                 </div>
 
@@ -457,14 +455,6 @@ export function Template() {
                             checked={key.is_hidden}
                             onCheckedChange={(checked) =>
                               updateKey(index, { is_hidden: checked === true })
-                            }
-                          />
-                        </div>
-                        <div className='flex justify-center'>
-                          <Checkbox
-                            checked={key.is_locked}
-                            onCheckedChange={(checked) =>
-                              updateKey(index, { is_locked: checked === true })
                             }
                           />
                         </div>
@@ -688,7 +678,6 @@ export function Template() {
                   <span>Data Type</span>
                   <span className='text-center'>Required</span>
                   <span className='text-center'>Hidden</span>
-                  <span className='text-center'>Locked</span>
                   <span />
                 </div>
 
@@ -742,14 +731,6 @@ export function Template() {
                             checked={key.is_hidden}
                             onCheckedChange={(checked) =>
                               updateKey(index, { is_hidden: checked === true })
-                            }
-                          />
-                        </div>
-                        <div className='flex justify-center'>
-                          <Checkbox
-                            checked={key.is_locked}
-                            onCheckedChange={(checked) =>
-                              updateKey(index, { is_locked: checked === true })
                             }
                           />
                         </div>
