@@ -50,7 +50,6 @@ const SCRIPT_KEY = {
     data_type: 'string',
     is_required: true,
     is_hidden: false,
-    is_locked: false,
 };
 
 const ARGS_KEY = {
@@ -59,7 +58,6 @@ const ARGS_KEY = {
     data_type: 'array',
     is_required: false,
     is_hidden: false,
-    is_locked: false,
 };
 
 const HIDDEN_KEY = {
@@ -68,7 +66,6 @@ const HIDDEN_KEY = {
     data_type: 'string',
     is_required: false,
     is_hidden: true,
-    is_locked: false,
 };
 
 const KEYLESS_ROW = {
@@ -78,7 +75,6 @@ const KEYLESS_ROW = {
     data_type: null,
     is_required: null,
     is_hidden: null,
-    is_locked: null,
 };
 
 beforeEach(() => {
@@ -194,7 +190,6 @@ const INPUT_KEY = {
     data_type: 'string',
     is_required: true,
     is_hidden: false,
-    is_locked: false,
 };
 
 type ClientStub = { query: Mock; release: Mock };
@@ -269,7 +264,7 @@ describe('templateController.create', () => {
         const insertKey = client.query.mock.calls.find((call) =>
             String(call[0]).includes('INSERT INTO template_keys')
         );
-        expect(insertKey?.[1]).toEqual([1, 'script', 'index.js', 'string', true, false, false]);
+        expect(insertKey?.[1]).toEqual([1, 'script', 'index.js', 'string', true, false]);
         expect(client.release).toHaveBeenCalledTimes(1);
     });
 
@@ -411,7 +406,6 @@ describe('templateController.update', () => {
             'index.js',
             'string',
             true,
-            false,
             false,
         ]);
 
