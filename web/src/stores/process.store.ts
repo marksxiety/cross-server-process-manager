@@ -24,7 +24,6 @@ function blankField(): TemplateKey {
         data_type: "string",
         is_required: false,
         is_hidden: false,
-        is_locked: false,
     };
 }
 
@@ -35,12 +34,11 @@ function fixedField(propertyKey: string): TemplateKey {
         data_type: "string",
         is_required: REQUIRED_FIXED_FIELDS.includes(propertyKey),
         is_hidden: false,
-        is_locked: false,
     };
 }
 
 // Adds the fixed rows without disturbing rows a template already defines for
-// them, so template flags (required/locked) win for matching keys.
+// them, so template flags (required) win for matching keys.
 function ensureFixedFields(fields: TemplateKey[]): TemplateKey[] {
     const present = new Set(fields.map((field) => field.property_key));
     const missing = FIXED_FIELD_KEYS.filter((key) => !present.has(key)).map(fixedField);
