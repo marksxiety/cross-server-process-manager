@@ -8,7 +8,6 @@ type TemplateKey = {
   type: DataType;
   required: boolean;
   hidden: boolean;
-  locked: boolean;
 };
 
 type Template = {
@@ -26,15 +25,15 @@ const templates: Template[] = [
     description: 'Run a .js/.mjs/.cjs entry file directly under node.exe.',
     preview: 'node --env-file=.env index.js --port 3000',
     keys: [
-      { key: 'script', value: 'index.js', type: 'string', required: true, hidden: false, locked: false },
-      { key: 'args', value: JSON.stringify(["--port", "3000"]), type: 'array', required: false, hidden: false, locked: false },
-      { key: 'interpreter', value: 'C:\\Program Files\\nodejs\\node.exe', type: 'string', required: true, hidden: false, locked: false },
-      { key: 'interpreter_args', value: JSON.stringify(["--env-file=.env"]), type: 'array', required: false, hidden: false, locked: false },
-      { key: 'exec_mode', value: 'fork', type: 'string', required: false, hidden: false, locked: false },
-      { key: 'instances', value: '1', type: 'number', required: false, hidden: false, locked: false },
-      { key: 'autorestart', value: 'true', type: 'boolean', required: false, hidden: false, locked: false },
-      { key: 'windowsHide', value: 'true', type: 'boolean', required: false, hidden: false, locked: false },
-      { key: 'env', value: JSON.stringify({ NODE_ENV: "production", PORT: "3000" }), type: 'object', required: false, hidden: false, locked: false },
+      { key: 'script', value: 'index.js', type: 'string', required: true, hidden: false },
+      { key: 'args', value: JSON.stringify(["--port", "3000"]), type: 'array', required: false, hidden: false },
+      { key: 'interpreter', value: 'C:\\Program Files\\nodejs\\node.exe', type: 'string', required: true, hidden: false },
+      { key: 'interpreter_args', value: JSON.stringify(["--env-file=.env"]), type: 'array', required: false, hidden: false },
+      { key: 'exec_mode', value: 'fork', type: 'string', required: false, hidden: false },
+      { key: 'instances', value: '1', type: 'number', required: false, hidden: false },
+      { key: 'autorestart', value: 'true', type: 'boolean', required: false, hidden: false },
+      { key: 'windowsHide', value: 'true', type: 'boolean', required: false, hidden: false },
+      { key: 'env', value: JSON.stringify({ NODE_ENV: "production", PORT: "3000" }), type: 'object', required: false, hidden: false },
     ]
   },
   {
@@ -43,13 +42,13 @@ const templates: Template[] = [
     description: 'Run an npm script (npm run dev, npm start, ...) under PM2.',
     preview: 'npm run dev',
     keys: [
-      { key: 'script', value: 'C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js', type: 'string', required: true, hidden: false, locked: true },
-      { key: 'args', value: JSON.stringify(["run", "dev"]), type: 'array', required: true, hidden: false, locked: false },
-      { key: 'interpreter', value: 'C:\\Program Files\\nodejs\\node.exe', type: 'string', required: true, hidden: false, locked: true },
-      { key: 'exec_mode', value: null, type: 'string', required: false, hidden: true, locked: false },
-      { key: 'instances', value: null, type: 'number', required: false, hidden: true, locked: false },
-      { key: 'autorestart', value: 'true', type: 'boolean', required: false, hidden: false, locked: false },
-      { key: 'windowsHide', value: 'true', type: 'boolean', required: false, hidden: false, locked: false },
+      { key: 'script', value: 'C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js', type: 'string', required: true, hidden: false },
+      { key: 'args', value: JSON.stringify(["run", "dev"]), type: 'array', required: true, hidden: false },
+      { key: 'interpreter', value: 'C:\\Program Files\\nodejs\\node.exe', type: 'string', required: true, hidden: false },
+      { key: 'exec_mode', value: null, type: 'string', required: false, hidden: true },
+      { key: 'instances', value: null, type: 'number', required: false, hidden: true },
+      { key: 'autorestart', value: 'true', type: 'boolean', required: false, hidden: false },
+      { key: 'windowsHide', value: 'true', type: 'boolean', required: false, hidden: false },
     ]
   },
   {
@@ -58,14 +57,14 @@ const templates: Template[] = [
     description: 'Run a .py entry file with a system Python.',
     preview: 'python -u app.py --port 5000',
     keys: [
-      { key: 'script', value: 'app.py', type: 'string', required: true, hidden: false, locked: false },
-      { key: 'args', value: JSON.stringify(["--port", "5000"]), type: 'array', required: false, hidden: false, locked: false },
-      { key: 'interpreter', value: 'C:\\Python312\\python.exe', type: 'string', required: true, hidden: false, locked: false },
-      { key: 'interpreter_args', value: JSON.stringify(["-u"]), type: 'array', required: false, hidden: false, locked: false },
-      { key: 'exec_mode', value: null, type: 'string', required: false, hidden: true, locked: false },
-      { key: 'instances', value: null, type: 'number', required: false, hidden: true, locked: false },
-      { key: 'autorestart', value: 'true', type: 'boolean', required: false, hidden: false, locked: false },
-      { key: 'windowsHide', value: 'true', type: 'boolean', required: false, hidden: false, locked: false },
+      { key: 'script', value: 'app.py', type: 'string', required: true, hidden: false },
+      { key: 'args', value: JSON.stringify(["--port", "5000"]), type: 'array', required: false, hidden: false },
+      { key: 'interpreter', value: 'C:\\Python312\\python.exe', type: 'string', required: true, hidden: false },
+      { key: 'interpreter_args', value: JSON.stringify(["-u"]), type: 'array', required: false, hidden: false },
+      { key: 'exec_mode', value: null, type: 'string', required: false, hidden: true },
+      { key: 'instances', value: null, type: 'number', required: false, hidden: true },
+      { key: 'autorestart', value: 'true', type: 'boolean', required: false, hidden: false },
+      { key: 'windowsHide', value: 'true', type: 'boolean', required: false, hidden: false },
     ]
   },
   {
@@ -74,15 +73,15 @@ const templates: Template[] = [
     description: 'Run a .py entry file pointing at the venv’s own python.exe.',
     preview: 'python app.py --port 5000',
     keys: [
-      { key: 'script', value: 'app.py', type: 'string', required: true, hidden: false, locked: false },
-      { key: 'args', value: JSON.stringify(["--port", "5000"]), type: 'array', required: false, hidden: false, locked: false },
-      { key: 'interpreter', value: 'venv\\Scripts\\python.exe', type: 'string', required: true, hidden: false, locked: false },
-      { key: 'exec_mode', value: null, type: 'string', required: false, hidden: true, locked: false },
-      { key: 'instances', value: null, type: 'number', required: false, hidden: true, locked: false },
-      { key: 'autorestart', value: 'true', type: 'boolean', required: false, hidden: false, locked: false },
-      { key: 'max_restarts', value: '50', type: 'number', required: false, hidden: false, locked: false },
-      { key: 'windowsHide', value: 'true', type: 'boolean', required: false, hidden: false, locked: false },
-      { key: 'watch', value: 'false', type: 'boolean', required: false, hidden: false, locked: false },
+      { key: 'script', value: 'app.py', type: 'string', required: true, hidden: false },
+      { key: 'args', value: JSON.stringify(["--port", "5000"]), type: 'array', required: false, hidden: false },
+      { key: 'interpreter', value: 'venv\\Scripts\\python.exe', type: 'string', required: true, hidden: false },
+      { key: 'exec_mode', value: null, type: 'string', required: false, hidden: true },
+      { key: 'instances', value: null, type: 'number', required: false, hidden: true },
+      { key: 'autorestart', value: 'true', type: 'boolean', required: false, hidden: false },
+      { key: 'max_restarts', value: '50', type: 'number', required: false, hidden: false },
+      { key: 'windowsHide', value: 'true', type: 'boolean', required: false, hidden: false },
+      { key: 'watch', value: 'false', type: 'boolean', required: false, hidden: false },
     ]
   },
   {
@@ -91,14 +90,14 @@ const templates: Template[] = [
     description: 'Run PHP’s built-in web server (php -S).',
     preview: 'php -S 127.0.0.1:8080 -t public',
     keys: [
-      { key: 'script', value: 'C:\\php\\php.exe', type: 'string', required: true, hidden: false, locked: true },
-      { key: 'args', value: JSON.stringify(["-S", "127.0.0.1:8080", "-t", "public"]), type: 'array', required: true, hidden: false, locked: false },
-      { key: 'interpreter', value: 'none', type: 'string', required: true, hidden: false, locked: true },
-      { key: 'interpreter_args', value: null, type: 'array', required: false, hidden: true, locked: false },
-      { key: 'exec_mode', value: null, type: 'string', required: false, hidden: true, locked: false },
-      { key: 'instances', value: null, type: 'number', required: false, hidden: true, locked: false },
-      { key: 'autorestart', value: 'true', type: 'boolean', required: false, hidden: false, locked: false },
-      { key: 'windowsHide', value: 'true', type: 'boolean', required: false, hidden: false, locked: false },
+      { key: 'script', value: 'C:\\php\\php.exe', type: 'string', required: true, hidden: false },
+      { key: 'args', value: JSON.stringify(["-S", "127.0.0.1:8080", "-t", "public"]), type: 'array', required: true, hidden: false },
+      { key: 'interpreter', value: 'none', type: 'string', required: true, hidden: false },
+      { key: 'interpreter_args', value: null, type: 'array', required: false, hidden: true },
+      { key: 'exec_mode', value: null, type: 'string', required: false, hidden: true },
+      { key: 'instances', value: null, type: 'number', required: false, hidden: true },
+      { key: 'autorestart', value: 'true', type: 'boolean', required: false, hidden: false },
+      { key: 'windowsHide', value: 'true', type: 'boolean', required: false, hidden: false },
     ]
   },
   {
@@ -107,14 +106,14 @@ const templates: Template[] = [
     description: 'Run a compiled Go binary directly.',
     preview: 'my-go-app.exe --port 5000',
     keys: [
-      { key: 'script', value: 'my-go-app.exe', type: 'string', required: true, hidden: false, locked: false },
-      { key: 'args', value: JSON.stringify(["--port", "5000"]), type: 'array', required: false, hidden: false, locked: false },
-      { key: 'interpreter', value: 'none', type: 'string', required: true, hidden: false, locked: true },
-      { key: 'interpreter_args', value: null, type: 'array', required: false, hidden: true, locked: false },
-      { key: 'exec_mode', value: null, type: 'string', required: false, hidden: true, locked: false },
-      { key: 'instances', value: null, type: 'number', required: false, hidden: true, locked: false },
-      { key: 'autorestart', value: 'true', type: 'boolean', required: false, hidden: false, locked: false },
-      { key: 'windowsHide', value: 'true', type: 'boolean', required: false, hidden: false, locked: false },
+      { key: 'script', value: 'my-go-app.exe', type: 'string', required: true, hidden: false },
+      { key: 'args', value: JSON.stringify(["--port", "5000"]), type: 'array', required: false, hidden: false },
+      { key: 'interpreter', value: 'none', type: 'string', required: true, hidden: false },
+      { key: 'interpreter_args', value: null, type: 'array', required: false, hidden: true },
+      { key: 'exec_mode', value: null, type: 'string', required: false, hidden: true },
+      { key: 'instances', value: null, type: 'number', required: false, hidden: true },
+      { key: 'autorestart', value: 'true', type: 'boolean', required: false, hidden: false },
+      { key: 'windowsHide', value: 'true', type: 'boolean', required: false, hidden: false },
     ]
   }
 ];
@@ -145,16 +144,15 @@ export default async function seed(client: Client): Promise<void> {
     for (const k of tpl.keys) {
       await client.query(
         `INSERT INTO template_keys
-           (template_id, property_key, property_value, data_type, is_required, is_hidden, is_locked)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+           (template_id, property_key, property_value, data_type, is_required, is_hidden)
+         VALUES ($1, $2, $3, $4, $5, $6)
          ON CONFLICT (template_id, property_key) DO UPDATE
          SET property_value = EXCLUDED.property_value,
              data_type = EXCLUDED.data_type,
              is_required = EXCLUDED.is_required,
              is_hidden = EXCLUDED.is_hidden,
-             is_locked = EXCLUDED.is_locked,
              updated_at = current_timestamp`,
-        [templateId, k.key, k.value, k.type, k.required, k.hidden, k.locked]
+        [templateId, k.key, k.value, k.type, k.required, k.hidden]
       );
     }
 
