@@ -16,7 +16,6 @@ export const templateKeyInputSchema = z.object({
     }),
     is_required: z.boolean({ message: 'Required must be a boolean' }),
     is_hidden: z.boolean({ message: 'Hidden must be a boolean' }),
-    is_locked: z.boolean({ message: 'Locked must be a boolean' }),
 });
 
 // Natural key within a template: duplicate keys would silently collapse into one
