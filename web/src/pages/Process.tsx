@@ -6,11 +6,9 @@ import {
   ArrowRight,
   Check,
   Copy,
-  Plus,
   ServerOff,
   Terminal,
   TriangleAlert,
-  X,
 } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -21,7 +19,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import { Checkbox } from '@/components/ui/checkbox'
 import {
   Empty,
   EmptyContent,
@@ -30,8 +27,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@/components/ui/empty'
-import { Field, FieldError, FieldGroup, FieldLabel, FieldTitle } from '@/components/ui/field'
-import { Input } from '@/components/ui/input'
+import { Field, FieldGroup, FieldTitle } from '@/components/ui/field'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Select,
@@ -42,73 +38,20 @@ import {
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Spinner } from '@/components/ui/spinner'
-import { Switch } from '@/components/ui/switch'
 import { Toggle } from '@/components/ui/toggle'
 import { toast } from '@/components/ui/toast'
 import { ErrorAlert } from '@/components/custom/error-alert'
 import { PageHeader } from '@/components/custom/page-header'
+import { ProcessForm } from '@/components/custom/process-form'
 import { errorCodeLabel, toApiError } from '@/lib/error-code'
+import { ALLOWED_FIELD_KEYS, REQUIRED_FIELD_KEYS, validateFields } from '@/lib/process-fields'
 import { buildTemplatePayload } from '@/lib/template-payload'
 import { cn, copyText } from '@/lib/utils'
 import { useServerStore } from '@/stores/server.store'
-import { FIXED_FIELD_KEYS, isFixedField, useProcessStore } from '@/stores/process.store'
+import { useProcessStore } from '@/stores/process.store'
 import { useTemplateStore } from '@/stores/template.store'
 import type { StartIssue, StartProcessPayload } from '@/types/process'
-import type { TemplateDataType, TemplateKey } from '@/types/template'
-
-// ---------------------------------------------------------------------------
-// Payload rules
-//
-// The agent's POST /pm2/start schema accepts exactly these keys; anything else
-// is silently stripped by Elysia before it reaches PM2, so the manual editor
-// only offers them and the preview warns about unknown ones.
-// ---------------------------------------------------------------------------
-
-const ALLOWED_FIELD_KEYS = new Set<string>([
-  'name',
-  'namespace',
-  'targetOs',
-  'cwd',
-  'script',
-  'args',
-  'interpreter',
-  'interpreter_args',
-  'exec_mode',
-  'instances',
-  'autorestart',
-  'max_restarts',
-  'windowsHide',
-  'env',
-  'watch',
-  'ignore_watch',
-  'watch_delay',
-  'cron_restart',
-])
-
-const REQUIRED_FIELD_KEYS: readonly string[] = ['name', 'script', 'interpreter']
-
-const EDITOR_KEY_OPTIONS: ReadonlyArray<{ key: string; dataType: TemplateDataType }> = [
-  { key: 'script', dataType: 'string' },
-  { key: 'args', dataType: 'array' },
-  { key: 'interpreter_args', dataType: 'array' },
-  { key: 'exec_mode', dataType: 'string' },
-  { key: 'instances', dataType: 'number' },
-  { key: 'autorestart', dataType: 'boolean' },
-  { key: 'max_restarts', dataType: 'number' },
-  { key: 'windowsHide', dataType: 'boolean' },
-  { key: 'env', dataType: 'object' },
-  { key: 'watch', dataType: 'boolean' },
-  { key: 'ignore_watch', dataType: 'array' },
-  { key: 'watch_delay', dataType: 'number' },
-  { key: 'cron_restart', dataType: 'string' },
-]
-
-const DATA_TYPES: TemplateDataType[] = ['string', 'boolean', 'number', 'array', 'object']
-
-const KEY_GRID =
-  'grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7rem_4.5rem_4.5rem_1.5rem] items-center gap-2'
-
-type FieldRow = { field: TemplateKey; index: number }
+import type { TemplateKey } from '@/types/template'
 
 // Coerces values by data_type (via the shared template-payload helper) and adds
 // the API-level targetOs. The one special case is `instances: "max"`, which the
@@ -118,73 +61,6 @@ function buildProcessPayload(fields: TemplateKey[]): StartProcessPayload {
   const instances = fields.find((field) => field.property_key.trim() === 'instances')
   if (instances?.property_value?.trim() === 'max') payload.instances = 'max'
   return { ...payload, targetOs: 'win32' } as StartProcessPayload
-}
-
-// Client-side mirror of the agent's schema + configuration guide, limited to
-// what a form can catch before the request is sent.
-function validateFields(fields: TemplateKey[]): Record<string, string> {
-  const errors: Record<string, string> = {}
-  const seen = new Set<string>()
-
-  for (const field of fields) {
-    const key = field.property_key.trim()
-    if (key === '') continue
-
-    if (seen.has(key)) {
-      errors[key] = `Duplicate field "${key}"`
-      continue
-    }
-    seen.add(key)
-
-    const value = (field.property_value ?? '').trim()
-    const isRequired = field.is_required || REQUIRED_FIELD_KEYS.includes(key)
-    if (isRequired && value === '') {
-      errors[key] = 'This field is required'
-      continue
-    }
-    if (value === '') continue
-
-    if (field.data_type === 'number') {
-      if (key === 'instances' && value === 'max') continue
-      const numeric = Number(value)
-      if (!Number.isFinite(numeric)) {
-        errors[key] = 'Must be a number'
-      } else if (key === 'instances' && (!Number.isInteger(numeric) || numeric < 1)) {
-        errors[key] = 'Must be a positive integer or "max"'
-      }
-      continue
-    }
-
-    if (field.data_type === 'array' || field.data_type === 'object') {
-      let parsed: unknown
-      try {
-        parsed = JSON.parse(value)
-      } catch {
-        errors[key] = 'Must be valid JSON'
-        continue
-      }
-
-      if (field.data_type === 'array' && !Array.isArray(parsed)) {
-        errors[key] = 'Must be a JSON array'
-      }
-
-      if (field.data_type === 'object') {
-        if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-          errors[key] = 'Must be a JSON object'
-        } else if (key === 'env' && Object.values(parsed).some((entry) => typeof entry !== 'string')) {
-          errors[key] = 'Every env value must be a string'
-        }
-      }
-    }
-  }
-
-  for (const key of REQUIRED_FIELD_KEYS) {
-    if (!seen.has(key) && errors[key] === undefined) {
-      errors[key] = 'This field is required'
-    }
-  }
-
-  return errors
 }
 
 function mapIssues(issues: StartIssue[]): Record<string, string> {
@@ -274,204 +150,6 @@ function TemplateOption({
   )
 }
 
-function FieldControl({
-  field,
-  onChange,
-}: {
-  field: TemplateKey
-  onChange: (value: string) => void
-}) {
-  const value = field.property_value ?? ''
-
-  if (field.data_type === 'boolean') {
-    return (
-      <Switch
-        checked={value === 'true'}
-        onCheckedChange={(checked) => onChange(checked ? 'true' : 'false')}
-      />
-    )
-  }
-
-  if (field.data_type === 'array' || field.data_type === 'object') {
-    return (
-      <textarea
-        className='min-h-20 w-full rounded-md border border-input bg-input/20 p-2 font-mono text-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30'
-        placeholder={field.data_type === 'array' ? '["--port", "3000"]' : '{ "NODE_ENV": "production" }'}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    )
-  }
-
-  if (field.data_type === 'number') {
-    return (
-      <Input
-        className='font-mono text-xs'
-        type={field.property_key === 'instances' ? 'text' : 'number'}
-        inputMode='numeric'
-        placeholder={field.property_key === 'instances' ? '1 or max' : undefined}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    )
-  }
-
-  return (
-    <Input
-      className='font-mono text-xs'
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-    />
-  )
-}
-
-function ProcessField({
-  field,
-  error,
-  onChange,
-}: {
-  field: TemplateKey
-  error: string | undefined
-  onChange: (value: string) => void
-}) {
-  return (
-    <Field data-invalid={!!error}>
-      <div className='flex items-center justify-between gap-2'>
-        <FieldLabel htmlFor={field.property_key} className='text-muted-foreground'>
-          {field.property_key}
-          {field.is_required && <span className='text-destructive'>*</span>}
-        </FieldLabel>
-        <span className='text-[10px] tracking-wide text-muted-foreground uppercase'>
-          {field.data_type}
-        </span>
-      </div>
-      <FieldControl field={field} onChange={onChange} />
-      <FieldError errors={[error ? { message: error } : undefined]} />
-    </Field>
-  )
-}
-
-function KeyEditor({
-  rows,
-  onUpdate,
-  onAdd,
-  onRemove,
-}: {
-  rows: FieldRow[]
-  onUpdate: (index: number, patch: Partial<TemplateKey>) => void
-  onAdd: () => void
-  onRemove: (index: number) => void
-}) {
-  return (
-    <div className='space-y-2'>
-      {/* Header lives outside the ScrollArea so only the rows scroll. */}
-      <div className={cn(KEY_GRID, 'pr-3 text-xs font-medium text-muted-foreground')}>
-        <span>Key</span>
-        <span>Value</span>
-        <span>Data type</span>
-        <span className='text-center'>Required</span>
-        <span className='text-center'>Hidden</span>
-        <span />
-      </div>
-
-      <ScrollArea className='max-h-105 **:data-[slot=scroll-area-viewport]:max-h-105'>
-        <div className='space-y-2 pr-3'>
-          {rows.map(({ field, index }) => {
-            const usedKeys = new Set(
-              rows
-                .filter((row) => row.index !== index)
-                .map((row) => row.field.property_key),
-            )
-
-            return (
-              <div key={index} className={KEY_GRID}>
-                <Select
-                  value={field.property_key}
-                  onValueChange={(key) => {
-                    const option = EDITOR_KEY_OPTIONS.find((entry) => entry.key === key)
-                    onUpdate(index, {
-                      property_key: key ?? '',
-                      data_type: option?.dataType ?? 'string',
-                    })
-                  }}
-                >
-                  <SelectTrigger className='w-full'>
-                    <SelectValue placeholder='Select a key' />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {EDITOR_KEY_OPTIONS.map((option) => (
-                      <SelectItem
-                        key={option.key}
-                        value={option.key}
-                        disabled={usedKeys.has(option.key)}
-                      >
-                        {option.key}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Input
-                  className='font-mono text-xs'
-                  placeholder='value'
-                  value={field.property_value ?? ''}
-                  onChange={(event) => onUpdate(index, { property_value: event.target.value })}
-                />
-
-                <Select
-                  value={field.data_type}
-                  onValueChange={(value) =>
-                    onUpdate(index, { data_type: value as TemplateDataType })
-                  }
-                >
-                  <SelectTrigger className='w-full'>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DATA_TYPES.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <div className='flex justify-center'>
-                  <Checkbox
-                    checked={field.is_required}
-                    onCheckedChange={(checked) => onUpdate(index, { is_required: checked === true })}
-                  />
-                </div>
-                <div className='flex justify-center'>
-                  <Checkbox
-                    checked={field.is_hidden}
-                    onCheckedChange={(checked) => onUpdate(index, { is_hidden: checked === true })}
-                  />
-                </div>
-                <Button
-                  type='button'
-                  variant='ghost'
-                  size='icon-sm'
-                  aria-label={`Remove ${field.property_key || 'field'}`}
-                  title='Remove field'
-                  onClick={() => onRemove(index)}
-                >
-                  <X strokeWidth={2} />
-                </Button>
-              </div>
-            )
-          })}
-        </div>
-      </ScrollArea>
-
-      <Button type='button' variant='outline' size='sm' onClick={onAdd}>
-        <Plus strokeWidth={2} />
-        Add field
-      </Button>
-    </div>
-  )
-}
-
 function PayloadPreview({ payload }: { payload: StartProcessPayload }) {
   const [copied, setCopied] = useState(false)
   const json = useMemo(() => JSON.stringify(payload, null, 2), [payload])
@@ -527,9 +205,6 @@ export function Process() {
   const selectServer = useProcessStore((state) => state.selectServer)
   const selectTemplate = useProcessStore((state) => state.selectTemplate)
   const setValue = useProcessStore((state) => state.setValue)
-  const addField = useProcessStore((state) => state.addField)
-  const updateField = useProcessStore((state) => state.updateField)
-  const removeField = useProcessStore((state) => state.removeField)
   const submit = useProcessStore((state) => state.submit)
   const reset = useProcessStore((state) => state.reset)
 
@@ -585,19 +260,8 @@ export function Process() {
     selectTemplate(match)
   }, [activeTemplates, searchParams, selectTemplate])
 
-  const fixedFields = useMemo(
-    () =>
-      FIXED_FIELD_KEYS.map((key) => fields.find((field) => field.property_key === key)).filter(
-        (field): field is TemplateKey => field !== undefined,
-      ),
-    [fields],
-  )
-
-  const dynamicRows = useMemo<FieldRow[]>(
-    () =>
-      fields
-        .map((field, index) => ({ field, index }))
-        .filter(({ field }) => !isFixedField(field)),
+  const visibleFields = useMemo(
+    () => fields.filter((field) => field.property_key.trim() !== '' && !field.is_hidden),
     [fields],
   )
 
@@ -608,16 +272,10 @@ export function Process() {
 
   // A server issue is only shown inline when the field is actually rendered;
   // the rest (e.g. hidden or unknown keys) are listed separately.
-  const renderedKeys = useMemo(() => {
-    const keys = new Set<string>()
-    for (const field of fields) {
-      const key = field.property_key.trim()
-      if (key === '') continue
-      if (template !== 'none' && field.is_hidden) continue
-      keys.add(key)
-    }
-    return keys
-  }, [fields, template])
+  const renderedKeys = useMemo(
+    () => new Set(visibleFields.map((field) => field.property_key.trim())),
+    [visibleFields],
+  )
 
   const orphanIssues = useMemo(
     () => issues.filter((issue) => !renderedKeys.has(issue.field)),
@@ -632,8 +290,8 @@ export function Process() {
     [fields],
   )
 
-  // Required keys the form does not render a row for (e.g. the user removed the
-  // script row in None mode); these cannot show inline, so they get an alert.
+  // Required keys the form does not render a row for (e.g. a template that
+  // omits one); these cannot show inline, so they get an alert.
   const missingRequiredKeys = useMemo(
     () =>
       REQUIRED_FIELD_KEYS.filter(
@@ -681,10 +339,6 @@ export function Process() {
       description: error.message,
     })
   }
-
-  const visibleDynamicFields = dynamicRows.filter(
-    ({ field }) => field.property_key.trim() !== '' && !field.is_hidden,
-  )
 
   return (
     <div className='mx-auto w-full max-w-[75%]'>
@@ -843,69 +497,7 @@ export function Process() {
       {serversStatus === 'success' && activeServers.length > 0 && step === 2 && server && (
         <div className='grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]'>
           <div className='space-y-4'>
-            <Card>
-              <CardHeader>
-                <CardTitle>Base</CardTitle>
-                <CardDescription>
-                  Identity for the process. Name and interpreter are required.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
-                {fixedFields
-                  .filter((field) => !field.is_hidden)
-                  .map((field) => (
-                    <div
-                      key={field.property_key}
-                      className={cn(
-                        (field.property_key === 'cwd' || field.property_key === 'interpreter') &&
-                          'sm:col-span-2',
-                      )}
-                    >
-                      <ProcessField
-                        field={field}
-                        error={errors[field.property_key]}
-                        onChange={(value) => setValue(field.property_key, value)}
-                      />
-                    </div>
-                  ))}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Configuration</CardTitle>
-                <CardDescription>
-                  {template === 'none'
-                    ? 'Build the PM2 options manually. Only keys accepted by the agent are offered.'
-                    : `Fields defined by the ${template.template_name} template.`}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {template === 'none' ? (
-                  <KeyEditor
-                    rows={dynamicRows}
-                    onUpdate={updateField}
-                    onAdd={addField}
-                    onRemove={removeField}
-                  />
-                ) : visibleDynamicFields.length === 0 ? (
-                  <p className='text-sm text-muted-foreground'>
-                    This template defines no extra fields.
-                  </p>
-                ) : (
-                  <div className='space-y-4'>
-                    {visibleDynamicFields.map(({ field }) => (
-                      <ProcessField
-                        key={field.property_key}
-                        field={field}
-                        error={errors[field.property_key]}
-                        onChange={(value) => setValue(field.property_key, value)}
-                      />
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <ProcessForm fields={visibleFields} errors={errors} onChange={setValue} />
 
             <div className='flex items-center justify-between'>
               <Button type='button' variant='outline' onClick={() => goToStep(1)}>
