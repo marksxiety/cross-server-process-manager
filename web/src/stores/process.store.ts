@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { processService } from "@/api/services/process.service";
 import { toApiError, toUnreachableError } from "@/lib/error-code";
+import { buildCatalogFields, catalogField, toTemplateKey } from "@/lib/process-fields";
 import { useDashboardStore } from "@/stores/dashboard.store";
 import type { ApiError, ApiResponse } from "@/types/api";
 import type { LoadStatus } from "@/types/dashboard";
@@ -8,47 +9,35 @@ import type { ProcessSummary, StartIssue, StartProcessPayload } from "@/types/pr
 import type { RegisteredServer } from "@/types/server";
 import type { ProcessTemplate, TemplateKey } from "@/types/template";
 
-/** Fields the page always renders, regardless of the selected template. */
-export const FIXED_FIELD_KEYS = ["name", "namespace", "cwd", "interpreter"] as const;
+/** Catalog rows the page always renders, whichever template is selected. */
+const BASE_FIELD_KEYS: readonly string[] = [
+    "name",
+    "namespace",
+    "cwd",
+    "interpreter",
+    "script",
+];
 
-const REQUIRED_FIXED_FIELDS: readonly string[] = ["name", "interpreter"];
-
-export function isFixedField(field: TemplateKey): boolean {
-    return (FIXED_FIELD_KEYS as readonly string[]).includes(field.property_key);
+function baseField(propertyKey: string): TemplateKey {
+    const spec = catalogField(propertyKey);
+    if (!spec) {
+        throw new Error(`Unknown base field "${propertyKey}" — it is missing from the catalog`);
+    }
+    return toTemplateKey(spec);
 }
 
-function blankField(): TemplateKey {
-    return {
-        property_key: "",
-        property_value: "",
-        data_type: "string",
-        is_required: false,
-        is_hidden: false,
-    };
-}
-
-function fixedField(propertyKey: string): TemplateKey {
-    return {
-        property_key: propertyKey,
-        property_value: null,
-        data_type: "string",
-        is_required: REQUIRED_FIXED_FIELDS.includes(propertyKey),
-        is_hidden: false,
-    };
-}
-
-// Adds the fixed rows without disturbing rows a template already defines for
-// them, so template flags (required) win for matching keys.
-function ensureFixedFields(fields: TemplateKey[]): TemplateKey[] {
+// Adds the base rows without disturbing rows a template already defines for
+// them, so template values and flags win for matching keys.
+function ensureBaseFields(fields: TemplateKey[]): TemplateKey[] {
     const present = new Set(fields.map((field) => field.property_key));
-    const missing = FIXED_FIELD_KEYS.filter((key) => !present.has(key)).map(fixedField);
+    const missing = BASE_FIELD_KEYS.filter((key) => !present.has(key)).map(baseField);
     return [...fields, ...missing];
 }
 
 function fieldsForTemplate(template: ProcessTemplate | "none"): TemplateKey[] {
-    if (template === "none") return ensureFixedFields([blankField()]);
+    if (template === "none") return buildCatalogFields();
     // Clone so editing a value never mutates the cached template.
-    return ensureFixedFields(template.keys.map((key) => ({ ...key })));
+    return ensureBaseFields(template.keys.map((key) => ({ ...key })));
 }
 
 export type TemplateChoice = ProcessTemplate | "none";
@@ -66,9 +55,6 @@ interface ProcessState {
     selectServer: (server: RegisteredServer | null) => void;
     selectTemplate: (template: TemplateChoice) => void;
     setValue: (propertyKey: string, value: string) => void;
-    addField: () => void;
-    updateField: (index: number, patch: Partial<TemplateKey>) => void;
-    removeField: (index: number) => void;
     submit: (payload: StartProcessPayload) => Promise<ApiResponse<ProcessSummary[] | StartIssue[]>>;
     reset: () => void;
 }
@@ -103,18 +89,6 @@ export const useProcessStore = create<ProcessState>()((set, get) => ({
                 field.property_key === propertyKey ? { ...field, property_value: value } : field
             ),
         })),
-
-    addField: () => set((state) => ({ fields: [...state.fields, blankField()] })),
-
-    updateField: (index, patch) =>
-        set((state) => ({
-            fields: state.fields.map((field, fieldIndex) =>
-                fieldIndex === index ? { ...field, ...patch } : field
-            ),
-        })),
-
-    removeField: (index) =>
-        set((state) => ({ fields: state.fields.filter((_, fieldIndex) => fieldIndex !== index) })),
 
     // Submits a payload the page already validated and built. On success the
     // process list of the target server is re-synced so the dashboard reflects
