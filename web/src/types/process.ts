@@ -20,6 +20,11 @@ export interface StartProcessPayload {
     instances?: number | "max";
     autorestart?: boolean;
     max_restarts?: number;
+    min_uptime?: string | number;
+    restart_delay?: number;
+    max_memory_restart?: string | number;
+    increment_var?: string;
+    kill_timeout?: number;
     windowsHide?: boolean;
     env?: Record<string, string>;
     watch?: boolean | string[];
