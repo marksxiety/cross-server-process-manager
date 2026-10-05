@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { Check, Copy, FileText, Plus, RefreshCw, Trash2, Wand2, X } from 'lucide-react'
+import { Check, Copy, FileText, Plus, RefreshCw, Trash2, Wand2 } from 'lucide-react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,7 +14,6 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -23,13 +22,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Spinner } from '@/components/ui/spinner'
 import { Switch } from '@/components/ui/switch'
@@ -44,20 +36,17 @@ import {
 } from '@/components/ui/empty'
 import { PageHeader } from '@/components/custom/page-header'
 import { ErrorAlert } from '@/components/custom/error-alert'
+import { ProcessForm } from '@/components/custom/process-form'
 import { TemplateCard } from '@/components/custom/template-card'
 import { TemplatePreview } from '@/components/custom/template-preview'
 import { useTemplateStore } from '@/stores/template.store'
 import { errorCodeLabel, toApiError } from '@/lib/error-code'
+import { ALLOWED_FIELD_KEYS, catalogField, toTemplateKey } from '@/lib/process-fields'
 import { toSavableKeys } from '@/lib/template-keys'
 import { buildTemplatePayload } from '@/lib/template-payload'
-import { cn, copyText } from '@/lib/utils'
+import { copyText } from '@/lib/utils'
 import type { ApiResponse } from '@/types/api'
-import type {
-  ProcessTemplate,
-  TemplateDataType,
-  TemplateInput,
-  TemplateKey,
-} from '@/types/template'
+import type { ProcessTemplate, TemplateInput, TemplateKey } from '@/types/template'
 
 type StatusFilter = 'all' | 'active' | 'inactive'
 
@@ -69,27 +58,12 @@ type TemplateDraft = {
   is_active: boolean
 }
 
-const DATA_TYPES: TemplateDataType[] = ['string', 'boolean', 'number', 'array', 'object']
-
 const EMPTY_DRAFT: TemplateDraft = {
   template_name: '',
   category: '',
   description: '',
   preview: '',
   is_active: true,
-}
-
-const KEY_GRID =
-  'grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7rem_4.5rem_4.5rem_1.5rem] items-center gap-2'
-
-function newKey(): TemplateKey {
-  return {
-    property_key: '',
-    property_value: '',
-    data_type: 'string',
-    is_required: false,
-    is_hidden: false,
-  }
 }
 
 export function Template() {
@@ -176,17 +150,28 @@ export function Template() {
   const handleDelete = (template: ProcessTemplate): Promise<ApiResponse<ProcessTemplate>> =>
     remove(template.id)
 
-  const updateKey = (index: number, patch: Partial<TemplateKey>) => {
-    setKeys((prev) => prev.map((key, i) => (i === index ? { ...key, ...patch } : key)))
+  const updateKey = (propertyKey: string, patch: Partial<TemplateKey>) => {
+    setKeys((prev) =>
+      prev.map((key) => (key.property_key === propertyKey ? { ...key, ...patch } : key)),
+    )
   }
 
-  const removeKey = (index: number) => {
-    setKeys((prev) => prev.filter((_, i) => i !== index))
+  const removeKey = (propertyKey: string) => {
+    setKeys((prev) => prev.filter((key) => key.property_key !== propertyKey))
   }
 
-  const addKey = () => {
-    setKeys((prev) => [...prev, newKey()])
+  const addKey = (propertyKey: string) => {
+    const spec = catalogField(propertyKey)
+    if (!spec) return
+    setKeys((prev) =>
+      prev.some((key) => key.property_key === propertyKey) ? prev : [...prev, toTemplateKey(spec)],
+    )
   }
+
+  const addableKeys = useMemo(() => {
+    const present = new Set(keys.map((key) => key.property_key))
+    return [...ALLOWED_FIELD_KEYS].filter((key) => !present.has(key))
+  }, [keys])
 
   const copyPayload = async () => {
     if (!(await copyText(payloadJson))) {
@@ -385,94 +370,17 @@ export function Template() {
             </DialogHeader>
 
             <div className='grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]'>
-              <div className='space-y-2'>
-                <div className='flex items-center justify-between'>
-                  <p className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>
-                    Fields
-                  </p>
-                  <Button type='button' variant='outline' size='sm' onClick={addKey}>
-                    + Add field
-                  </Button>
-                </div>
-
-                {/* Header lives outside the ScrollArea so only the rows scroll. */}
-                <div className={cn(KEY_GRID, 'pr-3 text-xs font-medium text-muted-foreground')}>
-                  <span>Key</span>
-                  <span>Value</span>
-                  <span>Data Type</span>
-                  <span className='text-center'>Required</span>
-                  <span className='text-center'>Hidden</span>
-                  <span />
-                </div>
-
-                <ScrollArea className='max-h-105 **:data-[slot=scroll-area-viewport]:max-h-105'>
-                  <div className='space-y-2 pr-3'>
-                    {keys.map((key, index) => (
-                      <div key={index} className={KEY_GRID}>
-                        <Input
-                          className='font-mono text-xs'
-                          placeholder='key'
-                          value={key.property_key}
-                          onChange={(event) =>
-                            updateKey(index, { property_key: event.target.value })
-                          }
-                        />
-                        <Input
-                          className='font-mono text-xs'
-                          placeholder='value'
-                          value={key.property_value ?? ''}
-                          onChange={(event) =>
-                            updateKey(index, { property_value: event.target.value })
-                          }
-                        />
-                        <Select
-                          value={key.data_type}
-                          onValueChange={(value) =>
-                            updateKey(index, { data_type: value as TemplateDataType })
-                          }
-                        >
-                          <SelectTrigger className='w-full'>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {DATA_TYPES.map((type) => (
-                              <SelectItem key={type} value={type}>
-                                {type}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <div className='flex justify-center'>
-                          <Checkbox
-                            checked={key.is_required}
-                            onCheckedChange={(checked) =>
-                              updateKey(index, { is_required: checked === true })
-                            }
-                          />
-                        </div>
-                        <div className='flex justify-center'>
-                          <Checkbox
-                            checked={key.is_hidden}
-                            onCheckedChange={(checked) =>
-                              updateKey(index, { is_hidden: checked === true })
-                            }
-                          />
-                        </div>
-                        <Button
-                          type='button'
-                          variant='ghost'
-                          size='icon-sm'
-                          aria-label={`Remove ${key.property_key || 'key'}`}
-                          title='Remove key'
-                          onClick={() => removeKey(index)}
-                        >
-                          <X strokeWidth={2} />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </div>
+              <ProcessForm
+                mode='template'
+                fields={keys}
+                onChange={(propertyKey, value) =>
+                  updateKey(propertyKey, { property_value: value })
+                }
+                onUpdate={updateKey}
+                onRemove={removeKey}
+                onAdd={addKey}
+                addableKeys={addableKeys}
+              />
 
               <div className='space-y-2'>
                 <p className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>
@@ -661,94 +569,17 @@ export function Template() {
             </div>
 
             <div className='grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]'>
-              <div className='space-y-2'>
-                <div className='flex items-center justify-between'>
-                  <p className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>
-                    Fields
-                  </p>
-                  <Button type='button' variant='outline' size='sm' onClick={addKey}>
-                    + Add field
-                  </Button>
-                </div>
-
-                {/* Header lives outside the ScrollArea so only the rows scroll. */}
-                <div className={cn(KEY_GRID, 'pr-3 text-xs font-medium text-muted-foreground')}>
-                  <span>Key</span>
-                  <span>Value</span>
-                  <span>Data Type</span>
-                  <span className='text-center'>Required</span>
-                  <span className='text-center'>Hidden</span>
-                  <span />
-                </div>
-
-                <ScrollArea className='max-h-105 **:data-[slot=scroll-area-viewport]:max-h-105'>
-                  <div className='space-y-2 pr-3'>
-                    {keys.map((key, index) => (
-                      <div key={index} className={KEY_GRID}>
-                        <Input
-                          className='font-mono text-xs'
-                          placeholder='key'
-                          value={key.property_key}
-                          onChange={(event) =>
-                            updateKey(index, { property_key: event.target.value })
-                          }
-                        />
-                        <Input
-                          className='font-mono text-xs'
-                          placeholder='value'
-                          value={key.property_value ?? ''}
-                          onChange={(event) =>
-                            updateKey(index, { property_value: event.target.value })
-                          }
-                        />
-                        <Select
-                          value={key.data_type}
-                          onValueChange={(value) =>
-                            updateKey(index, { data_type: value as TemplateDataType })
-                          }
-                        >
-                          <SelectTrigger className='w-full'>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {DATA_TYPES.map((type) => (
-                              <SelectItem key={type} value={type}>
-                                {type}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <div className='flex justify-center'>
-                          <Checkbox
-                            checked={key.is_required}
-                            onCheckedChange={(checked) =>
-                              updateKey(index, { is_required: checked === true })
-                            }
-                          />
-                        </div>
-                        <div className='flex justify-center'>
-                          <Checkbox
-                            checked={key.is_hidden}
-                            onCheckedChange={(checked) =>
-                              updateKey(index, { is_hidden: checked === true })
-                            }
-                          />
-                        </div>
-                        <Button
-                          type='button'
-                          variant='ghost'
-                          size='icon-sm'
-                          aria-label={`Remove ${key.property_key || 'key'}`}
-                          title='Remove key'
-                          onClick={() => removeKey(index)}
-                        >
-                          <X strokeWidth={2} />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </div>
+              <ProcessForm
+                mode='template'
+                fields={keys}
+                onChange={(propertyKey, value) =>
+                  updateKey(propertyKey, { property_value: value })
+                }
+                onUpdate={updateKey}
+                onRemove={removeKey}
+                onAdd={addKey}
+                addableKeys={addableKeys}
+              />
 
               <div className='space-y-2'>
                 <p className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>
