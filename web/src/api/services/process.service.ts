@@ -39,5 +39,6 @@ export function processService(server: RegisteredServer) {
         stop: (pmId: number) => api.post<ProcessSummary[]>(`/pm2/stop/${pmId}`),
         restart: (pmId: number) => api.post<ProcessSummary[]>(`/pm2/restart/${pmId}`),
         reload: (pmId: number) => api.post<ProcessSummary[]>(`/pm2/reload/${pmId}`),
+        remove: (pmId: number) => api.del<ProcessSummary[]>(`/pm2/delete/${pmId}`),
     };
 }
