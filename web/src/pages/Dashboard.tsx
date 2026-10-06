@@ -7,8 +7,20 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogMedia,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
   Check,
   Circle,
+  Pause,
   Play,
   RefreshCw,
   RotateCcw,
@@ -45,10 +57,13 @@ import {
 } from '@/components/ui/sheet'
 import { Separator } from '@/components/ui/separator'
 import { Spinner } from '@/components/ui/spinner'
+import { toast } from '@/components/ui/toast'
 import { ErrorAlert } from '@/components/custom/error-alert'
 import { ProcessCard } from '@/components/custom/process-card'
 import { ServerHeader } from '@/components/custom/server-header'
 import { useProcessDescribe } from '@/hooks/use-process-describe'
+import { errorCodeLabel, toApiError } from '@/lib/error-code'
+import { canRunProcessCommand } from '@/lib/process-runtime'
 import {
   processTone,
   serverTone,
@@ -66,7 +81,8 @@ import {
   useProcessLogsStore,
   type LogsEntry,
 } from '@/stores/process-logs.store'
-import type { ProcessDescribe, ProcessSummary } from '@/types/process'
+import type { ApiError } from '@/types/api'
+import type { ProcessCommand, ProcessDescribe, ProcessSummary } from '@/types/process'
 import type { RegisteredServer } from '@/types/server'
 
 // ---------------------------------------------------------------------------
@@ -414,6 +430,14 @@ function ProcessSheetBody({
 // Dashboard
 // ---------------------------------------------------------------------------
 
+const COMMAND_LABELS: Record<ProcessCommand, { loading: string; success: string }> = {
+  start: { loading: 'Starting process…', success: 'Process started' },
+  stop: { loading: 'Pausing process…', success: 'Process paused' },
+  restart: { loading: 'Restarting process…', success: 'Process restarted' },
+  reload: { loading: 'Reloading process…', success: 'Process reloaded' },
+  delete: { loading: 'Deleting process…', success: 'Process deleted' },
+}
+
 export function Dashboard() {
   const servers = useDashboardStore((state) => state.servers)
   const serversStatus = useDashboardStore((state) => state.serversStatus)
@@ -423,6 +447,16 @@ export function Dashboard() {
   const load = useDashboardStore((state) => state.load)
   const refresh = useDashboardStore((state) => state.refresh)
   const reload = useDashboardStore((state) => state.reload)
+  const isStarting = useDashboardStore((state) => state.isStarting)
+  const isStopping = useDashboardStore((state) => state.isStopping)
+  const isRestarting = useDashboardStore((state) => state.isRestarting)
+  const isReloading = useDashboardStore((state) => state.isReloading)
+  const isDeleting = useDashboardStore((state) => state.isDeleting)
+  const startProcess = useDashboardStore((state) => state.startProcess)
+  const stopProcess = useDashboardStore((state) => state.stopProcess)
+  const restartProcess = useDashboardStore((state) => state.restartProcess)
+  const reloadProcess = useDashboardStore((state) => state.reloadProcess)
+  const deleteProcess = useDashboardStore((state) => state.deleteProcess)
 
   const [openServers, setOpenServers] = useState<string[] | null>(null)
   const [selected, setSelected] = useState<{
@@ -431,6 +465,7 @@ export function Dashboard() {
   } | null>(null)
   const [pathsOpen, setPathsOpen] = useState(false)
   const [logsOpen, setLogsOpen] = useState(false)
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false)
 
   const describe = useProcessDescribe(
     selected?.server ?? null,
@@ -444,9 +479,81 @@ export function Dashboard() {
   )
   const loadLogs = useProcessLogsStore((state) => state.load)
 
-  const selectedTone = selected
-    ? processTone(selected.process.status)
-    : 'neutral'
+  // The sheet's live view of the selected process: prefer the freshest cached
+  // summary, falling back to the snapshot it was opened with.
+  const selectedProcess = useMemo(() => {
+    if (!selected) return null
+    const entry = processesByServer[selected.server.server]
+    const current = entry?.processes.find((item) => item.pm_id === selected.process.pm_id)
+    return current ?? selected.process
+  }, [selected, processesByServer])
+
+  const selectedTone = selectedProcess ? processTone(selectedProcess.status) : 'neutral'
+
+  const isCommandPending =
+    isStarting || isStopping || isRestarting || isReloading || isDeleting
+
+  const showReload =
+    selectedProcess !== null && canRunProcessCommand(selectedProcess, 'reload')
+
+  const runAction = async (command: Exclude<ProcessCommand, 'delete'>) => {
+    if (!selected || !selectedProcess) return
+
+    const commands = {
+      start: startProcess,
+      stop: stopProcess,
+      restart: restartProcess,
+      reload: reloadProcess,
+    }
+    const request = commands[command](selected.server, selectedProcess).then((result) => {
+      if (!result.success) throw toApiError(result)
+      return result
+    })
+
+    try {
+      await toast.promise(request, {
+        loading: { title: COMMAND_LABELS[command].loading },
+        success: {
+          title: COMMAND_LABELS[command].success,
+          description: `${selectedProcess.name} on ${selected.server.server}.`,
+        },
+        error: (error: ApiError) => ({
+          title: errorCodeLabel(error.code),
+          description: error.message,
+        }),
+      })
+      describe.retry()
+    } catch {
+      // toast.promise already surfaced the error; the store left the process untouched.
+    }
+  }
+
+  const confirmDelete = async () => {
+    if (!selected || !selectedProcess) return
+
+    const request = deleteProcess(selected.server, selectedProcess).then((result) => {
+      if (!result.success) throw toApiError(result)
+      return result
+    })
+
+    try {
+      await toast.promise(request, {
+        loading: { title: COMMAND_LABELS.delete.loading },
+        success: {
+          title: COMMAND_LABELS.delete.success,
+          description: `${selectedProcess.name} was removed from ${selected.server.server}.`,
+        },
+        error: (error: ApiError) => ({
+          title: errorCodeLabel(error.code),
+          description: error.message,
+        }),
+      })
+      setIsDeleteOpen(false)
+      setSelected(null)
+    } catch {
+      // toast.promise already surfaced the error; keep the dialog open.
+    }
+  }
 
   const defaultOpen = useMemo(
     () =>
@@ -618,18 +725,18 @@ export function Dashboard() {
             <div className='flex items-start justify-between gap-3 pr-6'>
               <div className='flex min-w-0 items-center gap-2'>
                 <SheetTitle className='truncate'>
-                  {selected?.process.name ?? ''}
+                  {selectedProcess?.name ?? ''}
                 </SheetTitle>
-                {selected && (
+                {selectedProcess && (
                   <Badge
                     variant='outline'
                     className='shrink-0 font-normal text-muted-foreground'
                   >
-                    {selected.process.namespace}
+                    {selectedProcess.namespace}
                   </Badge>
                 )}
               </div>
-              {selected && (
+              {selectedProcess && (
                 <Badge
                   variant={toneBadgeVariant[selectedTone]}
                   className='shrink-0 gap-1.5 font-normal'
@@ -641,7 +748,7 @@ export function Dashboard() {
                     )}
                     strokeWidth={0}
                   />
-                  {selected.process.status}
+                  {selectedProcess.status}
                 </Badge>
               )}
             </div>
@@ -649,7 +756,7 @@ export function Dashboard() {
 
           <ScrollArea className='flex-1 min-h-0'>
             <div className='px-6 pb-6'>
-              {selected && (
+              {selected && selectedProcess && (
                 <>
                   <div className='grid grid-cols-2 gap-3'>
                     <div className='rounded-lg bg-muted/50 p-3'>
@@ -667,13 +774,13 @@ export function Dashboard() {
                     <div className='rounded-lg bg-muted/50 p-3'>
                       <p className='text-xs text-muted-foreground'>PID</p>
                       <p className='mt-0.5 truncate font-mono text-sm font-medium'>
-                        {orDash(selected.process.pid)}
+                        {orDash(selectedProcess.pid)}
                       </p>
                     </div>
                     <div className='rounded-lg bg-muted/50 p-3'>
                       <p className='text-xs text-muted-foreground'>PM ID</p>
                       <p className='mt-0.5 truncate font-mono text-sm font-medium'>
-                        {orDash(selected.process.pm_id)}
+                        {orDash(selectedProcess.pm_id)}
                       </p>
                     </div>
                   </div>
@@ -707,25 +814,106 @@ export function Dashboard() {
           </ScrollArea>
 
           <SheetFooter className='grid grid-cols-2 gap-2'>
-            <Button type='button' variant='outline' className='w-full'>
-              <Play strokeWidth={2} />
-              Start
-            </Button>
-            <Button type='button' variant='outline' className='w-full'>
-              <RotateCw strokeWidth={2} />
-              Reload
-            </Button>
-            <Button type='button' variant='outline' className='w-full'>
-              <RotateCcw strokeWidth={2} />
+            {selectedProcess?.status === 'online' ? (
+              <Button
+                type='button'
+                variant='outline'
+                className='w-full'
+                disabled={isCommandPending}
+                onClick={() => void runAction('stop')}
+              >
+                {isStopping ? <Spinner className='size-4' /> : <Pause strokeWidth={2} />}
+                Pause
+              </Button>
+            ) : (
+              <Button
+                type='button'
+                variant='outline'
+                className='w-full'
+                disabled={
+                  !selectedProcess ||
+                  isCommandPending ||
+                  !canRunProcessCommand(selectedProcess, 'start')
+                }
+                onClick={() => void runAction('start')}
+              >
+                {isStarting ? <Spinner className='size-4' /> : <Play strokeWidth={2} />}
+                Start
+              </Button>
+            )}
+
+            {showReload && (
+              <Button
+                type='button'
+                variant='outline'
+                className='w-full'
+                disabled={isCommandPending}
+                onClick={() => void runAction('reload')}
+              >
+                {isReloading ? <Spinner className='size-4' /> : <RotateCw strokeWidth={2} />}
+                Reload
+              </Button>
+            )}
+
+            <Button
+              type='button'
+              variant='outline'
+              className='w-full'
+              disabled={
+                !selectedProcess ||
+                isCommandPending ||
+                !canRunProcessCommand(selectedProcess, 'restart')
+              }
+              onClick={() => void runAction('restart')}
+            >
+              {isRestarting ? <Spinner className='size-4' /> : <RotateCcw strokeWidth={2} />}
               Restart
             </Button>
-            <Button type='button' variant='destructive' className='w-full'>
+
+            <Button
+              type='button'
+              variant='destructive'
+              className={cn('w-full', !showReload && 'col-span-2')}
+              disabled={!selectedProcess || isCommandPending}
+              onClick={() => setIsDeleteOpen(true)}
+            >
               <Trash2 strokeWidth={2} />
               Delete
             </Button>
           </SheetFooter>
         </SheetContent>
       </Sheet>
+
+      <AlertDialog
+        open={isDeleteOpen}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) setIsDeleteOpen(false)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogMedia className='text-destructive'>
+              <Trash2 strokeWidth={2} />
+            </AlertDialogMedia>
+            <AlertDialogTitle>Delete Process?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {selectedProcess?.name ?? 'this process'}? It
+              will be stopped and removed from PM2's registry. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant='destructive'
+              disabled={isDeleting}
+              onClick={() => void confirmDelete()}
+            >
+              {isDeleting && <Spinner className='size-4' />}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </ScrollArea>
   )
 }
