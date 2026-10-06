@@ -46,7 +46,7 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { Spinner } from '@/components/ui/spinner'
 import { ErrorAlert } from '@/components/custom/error-alert'
-import { Process } from '@/components/custom/process'
+import { ProcessCard } from '@/components/custom/process-card'
 import { ServerHeader } from '@/components/custom/server-header'
 import { useProcessDescribe } from '@/hooks/use-process-describe'
 import {
@@ -543,7 +543,9 @@ export function Dashboard() {
             {servers.map((server) => {
               const entry = processesByServer[server.server]
               const processes =
-                entry?.status === 'success' ? entry.processes : []
+                entry?.status === 'success'
+                  ? entry.processes.toSorted((a, b) => a.pm_id - b.pm_id)
+                  : []
               const canExpand =
                 entry?.status === 'error' || processes.length > 0
 
@@ -572,23 +574,15 @@ export function Dashboard() {
                         <ServerHeader server={server} entry={entry} />
                       </AccordionTrigger>
                       {entry?.status === 'error' ? (
-                        <AccordionContent className='relative pb-2 pl-9'>
-                          <Separator
-                            orientation='vertical'
-                            className='absolute left-4 top-0 bottom-2'
-                          />
+                        <AccordionContent className='px-2 pb-4'>
                           {entry.requestError && (
                             <ErrorAlert error={entry.requestError} />
                           )}
                         </AccordionContent>
                       ) : canExpand ? (
-                        <AccordionContent className='relative space-y-0.5 pb-2 pl-9'>
-                          <Separator
-                            orientation='vertical'
-                            className='absolute left-4 top-0 bottom-2'
-                          />
+                        <AccordionContent className='grid grid-cols-1 gap-3 px-2 pt-2 pb-4 sm:grid-cols-2 xl:grid-cols-3'>
                           {processes.map((process) => (
-                            <Process
+                            <ProcessCard
                               key={process.pm_id}
                               process={process}
                               onSelect={() => {
