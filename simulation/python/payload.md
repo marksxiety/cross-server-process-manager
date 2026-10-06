@@ -13,7 +13,7 @@ run at once.
 | Headers | `Content-Type: application/json` |
 | Body | raw JSON (below) |
 
-> `cwd` is absolute for this checkout; replace it if the agent runs elsewhere.
+> Replace `C:\path\to\x-process-manager` with the absolute path to your checkout on the machine the agent runs on.
 
 ## Python template → `python-sim`
 
@@ -21,7 +21,7 @@ run at once.
 {
   "name": "python-sim",
   "targetOs": "win32",
-  "cwd": "C:\\Users\\markc\\Desktop\\DEVELOPMENT\\x-process-manager\\simulation\\python",
+  "cwd": "C:\\path\\to\\x-process-manager\\simulation\\python",
   "script": "app.py",
   "interpreter": "C:\\Python312\\python.exe",
   "autorestart": true,
@@ -41,7 +41,7 @@ py -3 -m venv venv
 {
   "name": "python-venv-sim",
   "targetOs": "win32",
-  "cwd": "C:\\Users\\markc\\Desktop\\DEVELOPMENT\\x-process-manager\\simulation\\python",
+  "cwd": "C:\\path\\to\\x-process-manager\\simulation\\python",
   "script": "app.py",
   "interpreter": "venv\\Scripts\\python.exe",
   "autorestart": true,
