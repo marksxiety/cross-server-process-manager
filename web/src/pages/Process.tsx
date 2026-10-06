@@ -50,6 +50,7 @@ import { cn, copyText } from '@/lib/utils'
 import { useServerStore } from '@/stores/server.store'
 import { useProcessStore } from '@/stores/process.store'
 import { useTemplateStore } from '@/stores/template.store'
+import type { ApiError } from '@/types/api'
 import type { StartIssue, StartProcessPayload } from '@/types/process'
 import type { TemplateKey } from '@/types/template'
 
@@ -315,29 +316,35 @@ export function Process() {
     }
 
     const name = payload.name
-    const result = await submit(payload)
+    const targetServer = server.server
 
-    if (result.success) {
+    const request = submit(payload).then((result) => {
+      if (!result.success) throw toApiError(result)
+      return result
+    })
+
+    try {
+      await toast.promise(request, {
+        loading: { title: 'Registering process…' },
+        success: {
+          title: 'Process registered',
+          description: `${name} is starting on ${targetServer}.`,
+          actionProps: {
+            children: 'View dashboard',
+            onClick: () => navigate('/'),
+          },
+        },
+        error: (error: ApiError) => ({
+          title: errorCodeLabel(error.code),
+          description: error.message,
+        }),
+      })
+
       reset()
       setClientErrors({})
-      toast.add({
-        type: 'success',
-        title: 'Process registered',
-        description: `${name} is starting on ${server.server}.`,
-        actionProps: {
-          children: 'View dashboard',
-          onClick: () => navigate('/'),
-        },
-      })
-      return
+    } catch {
+      // toast.promise already surfaced the error; inline issues remain visible.
     }
-
-    const error = toApiError(result)
-    toast.add({
-      type: 'error',
-      title: errorCodeLabel(error.code),
-      description: error.message,
-    })
   }
 
   return (
