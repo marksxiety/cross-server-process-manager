@@ -1,5 +1,12 @@
 export type ProcessStatus = "online" | "stopped" | "stopping" | "launching" | "errored";
 
+export type ProcessCommand = "start" | "stop" | "restart" | "reload" | "delete";
+
+export type ProcessCommandTarget = Pick<
+    ProcessSummary,
+    "pm_id" | "status" | "interpreter" | "exec_mode"
+>;
+
 export type LogStreamType = "both" | "output" | "error";
 
 export interface StartIssue {
