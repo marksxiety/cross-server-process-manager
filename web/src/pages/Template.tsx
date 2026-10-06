@@ -358,7 +358,7 @@ export function Template() {
             if (!open) setSelected(null)
           }}
         >
-          <DialogContent className='sm:max-w-5xl'>
+          <DialogContent className='flex h-[70dvh] flex-col sm:max-w-5xl'>
             <DialogHeader className='pr-6'>
               <DialogTitle>{selected.template_name}</DialogTitle>
               {selected.category && (
@@ -369,18 +369,20 @@ export function Template() {
               <TemplatePreview template={selected} className='mt-1 w-fit max-w-full' />
             </DialogHeader>
 
-            <div className='grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]'>
-              <ProcessForm
-                mode='template'
-                fields={keys}
-                onChange={(propertyKey, value) =>
-                  updateKey(propertyKey, { property_value: value })
-                }
-                onUpdate={updateKey}
-                onRemove={removeKey}
-                onAdd={addKey}
-                addableKeys={addableKeys}
-              />
+            <div className='grid min-h-0 flex-1 grid-cols-1 gap-6 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_320px] lg:overflow-hidden'>
+              <ScrollArea className='h-full min-h-0'>
+                <ProcessForm
+                  mode='template'
+                  fields={keys}
+                  onChange={(propertyKey, value) =>
+                    updateKey(propertyKey, { property_value: value })
+                  }
+                  onUpdate={updateKey}
+                  onRemove={removeKey}
+                  onAdd={addKey}
+                  addableKeys={addableKeys}
+                />
+              </ScrollArea>
 
               <div className='space-y-2'>
                 <p className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>
@@ -476,110 +478,114 @@ export function Template() {
             if (!open && !creating) setCreateOpen(false)
           }}
         >
-          <DialogContent className='sm:max-w-5xl'>
+          <DialogContent className='flex h-[70dvh] flex-col sm:max-w-5xl'>
             <DialogHeader className='pr-6'>
               <DialogTitle>New Template</DialogTitle>
             </DialogHeader>
 
-            <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
-              <div className='space-y-1.5'>
-                <label
-                  htmlFor='template_name'
-                  className='text-xs font-medium text-muted-foreground'
-                >
-                  Template name
-                </label>
-                <Input
-                  id='template_name'
-                  placeholder='e.g. Deno'
-                  maxLength={100}
-                  aria-invalid={nameError}
-                  value={draft.template_name}
-                  onChange={(event) => {
-                    setNameError(false)
-                    updateDraft({ template_name: event.target.value })
-                  }}
-                />
-                {nameError && (
-                  <p className='text-xs text-destructive'>Template name is required.</p>
-                )}
-              </div>
+            <div className='grid min-h-0 flex-1 grid-cols-1 gap-6 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_320px] lg:overflow-hidden'>
+              <ScrollArea className='h-full min-h-0'>
+                <div className='space-y-4'>
+                  <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
+                    <div className='space-y-1.5'>
+                      <label
+                        htmlFor='template_name'
+                        className='text-xs font-medium text-muted-foreground'
+                      >
+                        Template name
+                      </label>
+                      <Input
+                        id='template_name'
+                        placeholder='e.g. Deno'
+                        maxLength={100}
+                        aria-invalid={nameError}
+                        value={draft.template_name}
+                        onChange={(event) => {
+                          setNameError(false)
+                          updateDraft({ template_name: event.target.value })
+                        }}
+                      />
+                      {nameError && (
+                        <p className='text-xs text-destructive'>Template name is required.</p>
+                      )}
+                    </div>
 
-              <div className='space-y-1.5'>
-                <label
-                  htmlFor='template_category'
-                  className='text-xs font-medium text-muted-foreground'
-                >
-                  Category
-                </label>
-                <Input
-                  id='template_category'
-                  placeholder='e.g. Deno / TypeScript'
-                  maxLength={255}
-                  value={draft.category}
-                  onChange={(event) => updateDraft({ category: event.target.value })}
-                />
-              </div>
+                    <div className='space-y-1.5'>
+                      <label
+                        htmlFor='template_category'
+                        className='text-xs font-medium text-muted-foreground'
+                      >
+                        Category
+                      </label>
+                      <Input
+                        id='template_category'
+                        placeholder='e.g. Deno / TypeScript'
+                        maxLength={255}
+                        value={draft.category}
+                        onChange={(event) => updateDraft({ category: event.target.value })}
+                      />
+                    </div>
 
-              <div className='space-y-1.5'>
-                <label
-                  htmlFor='template_description'
-                  className='text-xs font-medium text-muted-foreground'
-                >
-                  Description
-                </label>
-                <Input
-                  id='template_description'
-                  placeholder='What does this template run?'
-                  maxLength={255}
-                  value={draft.description}
-                  onChange={(event) => updateDraft({ description: event.target.value })}
-                />
-              </div>
+                    <div className='space-y-1.5'>
+                      <label
+                        htmlFor='template_description'
+                        className='text-xs font-medium text-muted-foreground'
+                      >
+                        Description
+                      </label>
+                      <Input
+                        id='template_description'
+                        placeholder='What does this template run?'
+                        maxLength={255}
+                        value={draft.description}
+                        onChange={(event) => updateDraft({ description: event.target.value })}
+                      />
+                    </div>
 
-              <div className='space-y-1.5'>
-                <label
-                  htmlFor='template_preview'
-                  className='text-xs font-medium text-muted-foreground'
-                >
-                  Preview command
-                </label>
-                <Input
-                  id='template_preview'
-                  className='font-mono'
-                  placeholder='deno run --allow-net main.ts'
-                  maxLength={255}
-                  value={draft.preview}
-                  onChange={(event) => updateDraft({ preview: event.target.value })}
-                />
-              </div>
-            </div>
+                    <div className='space-y-1.5'>
+                      <label
+                        htmlFor='template_preview'
+                        className='text-xs font-medium text-muted-foreground'
+                      >
+                        Preview command
+                      </label>
+                      <Input
+                        id='template_preview'
+                        className='font-mono'
+                        placeholder='deno run --allow-net main.ts'
+                        maxLength={255}
+                        value={draft.preview}
+                        onChange={(event) => updateDraft({ preview: event.target.value })}
+                      />
+                    </div>
+                  </div>
 
-            <div className='flex items-center justify-between rounded-md border px-3 py-2'>
-              <div>
-                <p className='text-sm font-medium'>Active</p>
-                <p className='text-xs text-muted-foreground'>
-                  Available when registering processes.
-                </p>
-              </div>
-              <Switch
-                checked={draft.is_active}
-                onCheckedChange={(checked) => updateDraft({ is_active: checked })}
-              />
-            </div>
+                  <div className='flex items-center justify-between rounded-md border px-3 py-2'>
+                    <div>
+                      <p className='text-sm font-medium'>Active</p>
+                      <p className='text-xs text-muted-foreground'>
+                        Available when registering processes.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={draft.is_active}
+                      onCheckedChange={(checked) => updateDraft({ is_active: checked })}
+                    />
+                  </div>
 
-            <div className='grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]'>
-              <ProcessForm
-                mode='template'
-                fields={keys}
-                onChange={(propertyKey, value) =>
-                  updateKey(propertyKey, { property_value: value })
-                }
-                onUpdate={updateKey}
-                onRemove={removeKey}
-                onAdd={addKey}
-                addableKeys={addableKeys}
-              />
+                  <ProcessForm
+                    mode='template'
+                    fields={keys}
+                    onChange={(propertyKey, value) =>
+                      updateKey(propertyKey, { property_value: value })
+                    }
+                    onUpdate={updateKey}
+                    onRemove={removeKey}
+                    onAdd={addKey}
+                    addableKeys={addableKeys}
+                  />
+                </div>
+              </ScrollArea>
 
               <div className='space-y-2'>
                 <p className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>
