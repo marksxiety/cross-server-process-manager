@@ -492,6 +492,7 @@ export function Dashboard() {
 
   const isCommandPending =
     isStarting || isStopping || isRestarting || isReloading || isDeleting
+  const isActionDisabled = isCommandPending || describe.isDescribing
 
   const showReload =
     selectedProcess !== null && canRunProcessCommand(selectedProcess, 'reload')
@@ -819,7 +820,7 @@ export function Dashboard() {
                 type='button'
                 variant='outline'
                 className='w-full'
-                disabled={isCommandPending}
+                disabled={isActionDisabled}
                 onClick={() => void runAction('stop')}
               >
                 {isStopping ? <Spinner className='size-4' /> : <Pause strokeWidth={2} />}
@@ -832,7 +833,7 @@ export function Dashboard() {
                 className='w-full'
                 disabled={
                   !selectedProcess ||
-                  isCommandPending ||
+                  isActionDisabled ||
                   !canRunProcessCommand(selectedProcess, 'start')
                 }
                 onClick={() => void runAction('start')}
@@ -847,7 +848,7 @@ export function Dashboard() {
                 type='button'
                 variant='outline'
                 className='w-full'
-                disabled={isCommandPending}
+                disabled={isActionDisabled}
                 onClick={() => void runAction('reload')}
               >
                 {isReloading ? <Spinner className='size-4' /> : <RotateCw strokeWidth={2} />}
@@ -861,7 +862,7 @@ export function Dashboard() {
               className='w-full'
               disabled={
                 !selectedProcess ||
-                isCommandPending ||
+                isActionDisabled ||
                 !canRunProcessCommand(selectedProcess, 'restart')
               }
               onClick={() => void runAction('restart')}
@@ -874,7 +875,7 @@ export function Dashboard() {
               type='button'
               variant='destructive'
               className={cn('w-full', !showReload && 'col-span-2')}
-              disabled={!selectedProcess || isCommandPending}
+              disabled={!selectedProcess || isActionDisabled}
               onClick={() => setIsDeleteOpen(true)}
             >
               <Trash2 strokeWidth={2} />
