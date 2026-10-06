@@ -1,7 +1,9 @@
 # php-sim — register payload
 
-Log loop (`worker.php`) run by PHP's CLI. Maps to the seeded **PHP** template,
-with `args` changed to run the script directly instead of `php -S`.
+Log loop (`worker.php`) run by PHP's CLI (`php worker.php`). Unlike the
+seeded **PHP** template (which inverts to `script: php.exe` + `interpreter: none`
+so `php -S ...` flags land before the script), a plain CLI script uses the
+normal form: `script` is the `.php` file, `interpreter` is the `php.exe` path.
 
 ## Postman
 
@@ -12,7 +14,7 @@ with `args` changed to run the script directly instead of `php -S`.
 | Headers | `Content-Type: application/json` |
 | Body | raw JSON (below) |
 
-> `cwd` is absolute for this checkout; replace it if the agent runs elsewhere.
+> Replace `C:\path\to\x-process-manager` with the absolute path to your checkout on the machine the agent runs on.
 
 ## PHP template → `php-sim`
 
@@ -20,10 +22,9 @@ with `args` changed to run the script directly instead of `php -S`.
 {
   "name": "php-sim",
   "targetOs": "win32",
-  "cwd": "C:\\Users\\markc\\Desktop\\DEVELOPMENT\\x-process-manager\\simulation\\php",
-  "script": "C:\\php\\php.exe",
-  "interpreter": "none",
-  "args": ["worker.php"],
+  "cwd": "C:\\path\\to\\x-process-manager\\simulation\\php",
+  "script": "worker.php",
+  "interpreter": "C:\\php\\php.exe",
   "autorestart": true,
   "windowsHide": true
 }
