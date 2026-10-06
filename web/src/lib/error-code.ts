@@ -2,6 +2,7 @@ import type { ApiError, ApiResponse } from "@/types/api";
 
 export const UNREACHABLE_ERROR_CODE = "UNREACHABLE";
 export const UNKNOWN_ERROR_CODE = "UNKNOWN";
+export const PROCESS_STATE_CONFLICT_CODE = "PROCESS_STATE_CONFLICT";
 
 const ERROR_CODE_LABELS: Record<string, string> = {
     PROCESS_NOT_FOUND: "Process not found",
@@ -10,6 +11,7 @@ const ERROR_CODE_LABELS: Record<string, string> = {
     PM2_OPERATION_FAILED: "PM2 operation failed",
     INVALID_PROCESS_ID: "Invalid process id",
     INVALID_PROCESS_CONFIGURATION: "Invalid process configuration",
+    [PROCESS_STATE_CONFLICT_CODE]: "Action not available in the current state",
     VALIDATION_FAILED: "Validation failed",
     UNAUTHORIZED: "Unauthorized",
     NOT_FOUND: "Not found",
