@@ -77,14 +77,18 @@ export function useProcessDescribe(
 
   const isCurrent =
     result !== null && result.key === key && result.attempt === attempt
+  const status: LoadStatus =
+    key === null ? 'idle' : isCurrent ? result.status : 'loading'
 
   return {
-    status: key === null ? 'idle' : isCurrent ? result.status : 'loading',
+    status,
+    isDescribing: status === 'loading',
     data: isCurrent ? result.data : null,
     requestError: isCurrent ? result.requestError : null,
     retry,
   } satisfies {
     status: LoadStatus
+    isDescribing: boolean
     data: ProcessDescribe | null
     requestError: ApiError | null
     retry: () => void
