@@ -12,7 +12,7 @@ Log loop (`index.js`). Maps to the seeded **Node** (`node-sim`) and **npm**
 | Headers | `Content-Type: application/json` |
 | Body | raw JSON (below) |
 
-> `cwd` is absolute for this checkout; replace it if the agent runs elsewhere.
+> Replace `C:\path\to\x-process-manager` with the absolute path to your checkout on the machine the agent runs on.
 
 ## Node template → `node-sim`
 
@@ -20,7 +20,7 @@ Log loop (`index.js`). Maps to the seeded **Node** (`node-sim`) and **npm**
 {
   "name": "node-sim",
   "targetOs": "win32",
-  "cwd": "C:\\Users\\markc\\Desktop\\DEVELOPMENT\\x-process-manager\\simulation\\node",
+  "cwd": "C:\\path\\to\\x-process-manager\\simulation\\node",
   "script": "index.js",
   "interpreter": "C:\\Program Files\\nodejs\\node.exe",
   "autorestart": true,
@@ -38,7 +38,7 @@ Log loop (`index.js`). Maps to the seeded **Node** (`node-sim`) and **npm**
 {
   "name": "npm-sim",
   "targetOs": "win32",
-  "cwd": "C:\\Users\\markc\\Desktop\\DEVELOPMENT\\x-process-manager\\simulation\\node",
+  "cwd": "C:\\path\\to\\x-process-manager\\simulation\\node",
   "script": "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
   "interpreter": "C:\\Program Files\\nodejs\\node.exe",
   "args": ["run", "dev"],
