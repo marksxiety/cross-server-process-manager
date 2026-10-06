@@ -20,7 +20,7 @@ template (`my-go-app.exe`).
 | Headers | `Content-Type: application/json` |
 | Body | raw JSON (below) |
 
-> `cwd` is absolute for this checkout; replace it if the agent runs elsewhere.
+> Replace `C:\path\to\x-process-manager` with the absolute path to your checkout on the machine the agent runs on.
 
 ## Go template → `go-sim`
 
@@ -28,7 +28,7 @@ template (`my-go-app.exe`).
 {
   "name": "go-sim",
   "targetOs": "win32",
-  "cwd": "C:\\Users\\markc\\Desktop\\DEVELOPMENT\\x-process-manager\\simulation\\go",
+  "cwd": "C:\\path\\to\\x-process-manager\\simulation\\go",
   "script": "my-go-app.exe",
   "interpreter": "none",
   "autorestart": true,
