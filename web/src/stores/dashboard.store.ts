@@ -2,15 +2,23 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { serverService } from "@/api/services/server.service";
 import { processService } from "@/api/services/process.service";
-import { toApiError, toUnreachableError } from "@/lib/error-code";
+import { PROCESS_STATE_CONFLICT_CODE, toApiError, toUnreachableError } from "@/lib/error-code";
+import { canRunProcessCommand } from "@/lib/process-runtime";
 import { withRetry } from "@/lib/retry";
 import { isCacheFresh } from "@/lib/swr";
 import { toSystemOverview } from "@/lib/system-overview";
 import type { ApiError, ApiResponse } from "@/types/api";
 import type { LoadStatus, ServerProcesses } from "@/types/dashboard";
-import type { ProcessSummary } from "@/types/process";
+import type { ProcessCommand, ProcessCommandTarget, ProcessSummary } from "@/types/process";
 import type { RegisteredServer } from "@/types/server";
 import type { SystemOverview } from "@/types/system";
+
+type CommandPendingKey =
+    | "isStarting"
+    | "isStopping"
+    | "isRestarting"
+    | "isReloading"
+    | "isDeleting";
 
 interface DashboardState {
     servers: RegisteredServer[];
@@ -19,10 +27,20 @@ interface DashboardState {
     requestError: ApiError | null;
     processesByServer: Record<string, ServerProcesses>;
     isRefreshing: boolean;
+    isStarting: boolean;
+    isStopping: boolean;
+    isRestarting: boolean;
+    isReloading: boolean;
+    isDeleting: boolean;
     load: () => Promise<void>;
     refresh: () => Promise<void>;
     refreshServer: (server: RegisteredServer) => Promise<void>;
     reload: () => Promise<void>;
+    startProcess: (server: RegisteredServer, process: ProcessCommandTarget) => Promise<ApiResponse<ProcessSummary[]>>;
+    stopProcess: (server: RegisteredServer, process: ProcessCommandTarget) => Promise<ApiResponse<ProcessSummary[]>>;
+    restartProcess: (server: RegisteredServer, process: ProcessCommandTarget) => Promise<ApiResponse<ProcessSummary[]>>;
+    reloadProcess: (server: RegisteredServer, process: ProcessCommandTarget) => Promise<ApiResponse<ProcessSummary[]>>;
+    deleteProcess: (server: RegisteredServer, process: ProcessCommandTarget) => Promise<ApiResponse<ProcessSummary[]>>;
 }
 
 export const useDashboardStore = create<DashboardState>()(
@@ -176,6 +194,72 @@ export const useDashboardStore = create<DashboardState>()(
                 await syncProcesses(get().servers);
             }
 
+            // Synthesizes the shared envelope for a command the store refuses to run.
+            function commandConflict(message: string): ApiResponse<ProcessSummary[]> {
+                return {
+                    success: false,
+                    message,
+                    code: PROCESS_STATE_CONFLICT_CODE,
+                    info: null,
+                    status: 0,
+                };
+            }
+
+            // True while any lifecycle command is in flight; used to reject overlapping
+            // commands before they reach the agent.
+            function isAnyCommandPending(state: DashboardState): boolean {
+                return (
+                    state.isStarting ||
+                    state.isStopping ||
+                    state.isRestarting ||
+                    state.isReloading ||
+                    state.isDeleting
+                );
+            }
+
+            // Shared lifecycle-command runner. Guards against overlapping commands and
+            // against commands the process's current state does not allow, then refreshes
+            // the server's processes on success. Used by every command action.
+            async function runCommand(
+                command: ProcessCommand,
+                pendingKey: CommandPendingKey,
+                server: RegisteredServer,
+                process: ProcessCommandTarget,
+                call: () => Promise<ApiResponse<ProcessSummary[]>>,
+            ): Promise<ApiResponse<ProcessSummary[]>> {
+                if (isAnyCommandPending(get())) {
+                    return commandConflict("Another action is already in progress.");
+                }
+
+                // Prefer the freshest cached summary; the caller's snapshot is the
+                // fallback while a server's processes are loading or errored.
+                const cached = get().processesByServer[server.server]?.processes.find(
+                    (entry) => entry.pm_id === process.pm_id,
+                );
+                if (!canRunProcessCommand(cached ?? process, command)) {
+                    return commandConflict("Action is not available for the process's current state.");
+                }
+
+                set({ [pendingKey]: true } as Pick<DashboardState, CommandPendingKey>);
+
+                try {
+                    const result = await call();
+                    if (result.success) await get().refreshServer(server);
+                    return result;
+                } catch (cause) {
+                    const requestError = toUnreachableError(cause);
+                    return {
+                        success: false,
+                        message: requestError.message,
+                        code: requestError.code,
+                        info: null,
+                        status: requestError.status,
+                    };
+                } finally {
+                    set({ [pendingKey]: false } as Pick<DashboardState, CommandPendingKey>);
+                }
+            }
+
             return {
                 servers: [],
                 serversFetchedAt: null,
@@ -183,6 +267,11 @@ export const useDashboardStore = create<DashboardState>()(
                 requestError: null,
                 processesByServer: {},
                 isRefreshing: false,
+                isStarting: false,
+                isStopping: false,
+                isRestarting: false,
+                isReloading: false,
+                isDeleting: false,
 
                 // Entry action called by Dashboard.tsx on mount; runs runLoad once.
                 load: async () => {
@@ -246,6 +335,34 @@ export const useDashboardStore = create<DashboardState>()(
                         set({ isRefreshing: false });
                     }
                 },
+
+                // Lifecycle commands. Each sets its own pending flag (read by the
+                // dashboard to disable/spin the matching button) and is guarded by
+                // runCommand before any request reaches the agent.
+                startProcess: (server, process) =>
+                    runCommand("start", "isStarting", server, process, () =>
+                        processService(server).restart(process.pm_id),
+                    ),
+
+                stopProcess: (server, process) =>
+                    runCommand("stop", "isStopping", server, process, () =>
+                        processService(server).stop(process.pm_id),
+                    ),
+
+                restartProcess: (server, process) =>
+                    runCommand("restart", "isRestarting", server, process, () =>
+                        processService(server).restart(process.pm_id),
+                    ),
+
+                reloadProcess: (server, process) =>
+                    runCommand("reload", "isReloading", server, process, () =>
+                        processService(server).reload(process.pm_id),
+                    ),
+
+                deleteProcess: (server, process) =>
+                    runCommand("delete", "isDeleting", server, process, () =>
+                        processService(server).remove(process.pm_id),
+                    ),
             };
         },
         {
