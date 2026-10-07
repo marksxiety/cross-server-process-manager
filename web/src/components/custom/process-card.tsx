@@ -4,6 +4,7 @@ import {
   Card,
   CardAction,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
@@ -20,10 +21,11 @@ import type { ProcessSummary } from '@/types/process'
 
 type ProcessCardProps = {
   process: ProcessSummary
+  serverLabel?: string
   onSelect?: () => void
 }
 
-export function ProcessCard({ process, onSelect }: ProcessCardProps) {
+export function ProcessCard({ process, serverLabel, onSelect }: ProcessCardProps) {
   const tone = processTone(process.status)
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -41,7 +43,7 @@ export function ProcessCard({ process, onSelect }: ProcessCardProps) {
       onClick={onSelect}
       onKeyDown={handleKeyDown}
       className={cn(
-        'cursor-pointer transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+        'h-full cursor-pointer transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
         tone === 'danger'
           ? cn(toneSurfaceClasses.danger, 'hover:bg-destructive/15')
           : 'hover:bg-accent/40',
@@ -65,6 +67,11 @@ export function ProcessCard({ process, onSelect }: ProcessCardProps) {
             {process.namespace}
           </Badge>
         </CardTitle>
+        {serverLabel && (
+          <CardDescription className='truncate font-mono text-[11px]'>
+            {serverLabel}
+          </CardDescription>
+        )}
         <CardAction>
           <Badge variant={toneBadgeVariant[tone]}>{process.status}</Badge>
         </CardAction>
