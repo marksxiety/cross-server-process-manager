@@ -266,7 +266,7 @@ export function Process() {
     [fields],
   )
 
-  const payload = useMemo(() => buildProcessPayload(fields), [fields])
+  const payload = useMemo(() => buildProcessPayload(visibleFields), [visibleFields])
 
   const issueMap = useMemo(() => mapIssues(issues), [issues])
   const errors: Record<string, string> = { ...clientErrors, ...issueMap }
@@ -285,26 +285,26 @@ export function Process() {
 
   const unknownKeys = useMemo(
     () =>
-      fields
+      visibleFields
         .map((field) => field.property_key.trim())
         .filter((key) => key !== '' && !ALLOWED_FIELD_KEYS.has(key)),
-    [fields],
+    [visibleFields],
   )
 
   // Required keys the form does not render a row for (e.g. a template that
-  // omits one); these cannot show inline, so they get an alert.
+  // omits or hides one); these cannot show inline, so they get an alert.
   const missingRequiredKeys = useMemo(
     () =>
       REQUIRED_FIELD_KEYS.filter(
-        (key) => !fields.some((field) => field.property_key.trim() === key),
+        (key) => !visibleFields.some((field) => field.property_key.trim() === key),
       ),
-    [fields],
+    [visibleFields],
   )
 
   const handleSubmit = async () => {
     if (!server || status === 'loading') return
 
-    const validationErrors = validateFields(fields)
+    const validationErrors = validateFields(visibleFields)
     setClientErrors(validationErrors)
     if (Object.keys(validationErrors).length > 0) {
       toast.add({
