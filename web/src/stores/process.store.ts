@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { processService } from "@/api/services/process.service";
 import { toApiError, toUnreachableError } from "@/lib/error-code";
-import { buildCatalogFields, catalogField, toTemplateKey } from "@/lib/process-fields";
+import { buildCatalogFields, mergeCatalogFields } from "@/lib/process-fields";
 import { useDashboardStore } from "@/stores/dashboard.store";
 import type { ApiError, ApiResponse } from "@/types/api";
 import type { LoadStatus } from "@/types/dashboard";
@@ -9,35 +9,11 @@ import type { ProcessSummary, StartIssue, StartProcessPayload } from "@/types/pr
 import type { RegisteredServer } from "@/types/server";
 import type { ProcessTemplate, TemplateKey } from "@/types/template";
 
-/** Catalog rows the page always renders, whichever template is selected. */
-const BASE_FIELD_KEYS: readonly string[] = [
-    "name",
-    "namespace",
-    "cwd",
-    "interpreter",
-    "script",
-];
-
-function baseField(propertyKey: string): TemplateKey {
-    const spec = catalogField(propertyKey);
-    if (!spec) {
-        throw new Error(`Unknown base field "${propertyKey}" — it is missing from the catalog`);
-    }
-    return toTemplateKey(spec);
-}
-
-// Adds the base rows without disturbing rows a template already defines for
-// them, so template values and flags win for matching keys.
-function ensureBaseFields(fields: TemplateKey[]): TemplateKey[] {
-    const present = new Set(fields.map((field) => field.property_key));
-    const missing = BASE_FIELD_KEYS.filter((key) => !present.has(key)).map(baseField);
-    return [...fields, ...missing];
-}
-
 function fieldsForTemplate(template: ProcessTemplate | "none"): TemplateKey[] {
+    // None pre-fills the xpm defaults; a template contributes its own values and
+    // leaves every catalog key it does not define blank.
     if (template === "none") return buildCatalogFields();
-    // Clone so editing a value never mutates the cached template.
-    return ensureBaseFields(template.keys.map((key) => ({ ...key })));
+    return mergeCatalogFields(template.keys);
 }
 
 export type TemplateChoice = ProcessTemplate | "none";
