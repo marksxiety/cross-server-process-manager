@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import {
   Accordion,
@@ -61,12 +61,14 @@ import { toast } from '@/components/ui/toast'
 import { ErrorAlert } from '@/components/custom/error-alert'
 import { ProcessCard } from '@/components/custom/process-card'
 import { ServerHeader } from '@/components/custom/server-header'
+import { useFlipReorder } from '@/hooks/use-flip-reorder'
 import { useProcessDescribe } from '@/hooks/use-process-describe'
 import { errorCodeLabel, toApiError } from '@/lib/error-code'
 import { canRunProcessCommand } from '@/lib/process-runtime'
+import { processItemKey, sortProcesses } from '@/lib/sort-processes'
+import type { ProcessSortKey } from '@/lib/sort-processes'
 import {
   processTone,
-  serverTone,
   toneBadgeVariant,
   toneSurfaceClasses,
 } from '@/lib/status-tone'
@@ -438,6 +440,14 @@ const COMMAND_LABELS: Record<ProcessCommand, { loading: string; success: string 
   delete: { loading: 'Deleting process…', success: 'Process deleted' },
 }
 
+const SORT_OPTIONS: { value: ProcessSortKey; label: string }[] = [
+  { value: 'memory', label: 'Memory' },
+  { value: 'cpu', label: 'CPU' },
+  { value: 'host', label: 'Host' },
+  { value: 'namespace', label: 'Namespace' },
+  { value: 'pm_id', label: 'PM ID' },
+]
+
 export function Dashboard() {
   const servers = useDashboardStore((state) => state.servers)
   const serversStatus = useDashboardStore((state) => state.serversStatus)
@@ -458,7 +468,6 @@ export function Dashboard() {
   const reloadProcess = useDashboardStore((state) => state.reloadProcess)
   const deleteProcess = useDashboardStore((state) => state.deleteProcess)
 
-  const [openServers, setOpenServers] = useState<string[] | null>(null)
   const [selected, setSelected] = useState<{
     server: RegisteredServer
     process: ProcessSummary
@@ -466,6 +475,7 @@ export function Dashboard() {
   const [pathsOpen, setPathsOpen] = useState(false)
   const [logsOpen, setLogsOpen] = useState(false)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
+  const [sortKey, setSortKey] = useState<ProcessSortKey>('memory')
 
   const describe = useProcessDescribe(
     selected?.server ?? null,
@@ -556,23 +566,34 @@ export function Dashboard() {
     }
   }
 
-  const defaultOpen = useMemo(
+  // Flat, cross-server view of every process. Servers that are still loading or
+  // unreachable are surfaced on their own tile instead.
+  const processItems = useMemo(
     () =>
-      servers
-        .filter((s) => serverTone(processesByServer[s.server]) !== 'success')
-        .map((s) => s.server),
+      servers.flatMap((server) => {
+        const entry = processesByServer[server.server]
+        if (entry?.status !== 'success') return []
+        return entry.processes.map((process) => ({ server, process }))
+      }),
     [servers, processesByServer],
   )
 
-  const openList = openServers ?? defaultOpen
+  const sortedProcessItems = useMemo(
+    () => sortProcesses(processItems, sortKey),
+    [processItems, sortKey],
+  )
 
-  const handleOpenChange = (serverName: string, isOpen: boolean) => {
-    setOpenServers(
-      isOpen
-        ? [...openList, serverName]
-        : openList.filter((name) => name !== serverName),
-    )
-  }
+  const orderSignature = useMemo(
+    () => sortedProcessItems.map(processItemKey).join('|'),
+    [sortedProcessItems],
+  )
+
+  const isLoadingProcesses = servers.some(
+    (server) => processesByServer[server.server]?.status === 'loading',
+  )
+
+  const processGridRef = useRef<HTMLDivElement | null>(null)
+  useFlipReorder({ containerRef: processGridRef, orderSignature })
 
   useEffect(() => {
     void load()
@@ -647,67 +668,90 @@ export function Dashboard() {
         )}
 
         {serversStatus === 'success' && servers.length > 0 && (
-          <div className='mt-4 space-y-2'>
-            {servers.map((server) => {
-              const entry = processesByServer[server.server]
-              const processes =
-                entry?.status === 'success'
-                  ? entry.processes.toSorted((a, b) => a.pm_id - b.pm_id)
-                  : []
-              const canExpand =
-                entry?.status === 'error' || processes.length > 0
-
-              return (
-                <Card key={server.server}>
-                  <Accordion
-                    value={
-                      openList.includes(server.server) ? [server.server] : []
-                    }
-                    onValueChange={(value) =>
-                      handleOpenChange(
-                        server.server,
-                        value.includes(server.server),
-                      )
-                    }
-                    className='rounded-none border-0'
-                  >
-                    <AccordionItem
-                      value={server.server}
-                      className='border-0 data-open:bg-transparent'
-                    >
-                      <AccordionTrigger
-                        className='px-(--card-spacing) py-2.5 hover:no-underline'
-                        disabled={!canExpand}
-                      >
-                        <ServerHeader server={server} entry={entry} />
-                      </AccordionTrigger>
-                      {entry?.status === 'error' ? (
-                        <AccordionContent className='px-2 pb-4'>
-                          {entry.requestError && (
-                            <ErrorAlert error={entry.requestError} />
-                          )}
-                        </AccordionContent>
-                      ) : canExpand ? (
-                        <AccordionContent className='grid grid-cols-1 gap-3 px-2 pt-2 pb-4 sm:grid-cols-2 xl:grid-cols-3'>
-                          {processes.map((process) => (
-                            <ProcessCard
-                              key={process.pm_id}
-                              process={process}
-                              onSelect={() => {
-                                setSelected({ server, process })
-                                setPathsOpen(false)
-                                setLogsOpen(false)
-                              }}
-                            />
-                          ))}
-                        </AccordionContent>
-                      ) : null}
-                    </AccordionItem>
-                  </Accordion>
+          <>
+            <div className='mt-4 flex flex-wrap gap-3'>
+              {servers.map((server) => (
+                <Card
+                  key={server.server}
+                  className='@container/server min-w-48 grow basis-[calc(20%_-_0.625rem)]'
+                >
+                  <ServerHeader
+                    server={server}
+                    entry={processesByServer[server.server]}
+                  />
                 </Card>
-              )
-            })}
-          </div>
+              ))}
+            </div>
+
+            <div className='mt-6 flex items-center gap-3'>
+              <p className='shrink-0 text-xs font-medium text-muted-foreground'>
+                Processes ({sortedProcessItems.length})
+              </p>
+              <Separator className='flex-1' />
+              <div className='flex shrink-0 items-center gap-2'>
+                <span className='text-xs text-muted-foreground'>Sort</span>
+                <Select
+                  value={sortKey}
+                  onValueChange={(value) => setSortKey(value as ProcessSortKey)}
+                >
+                  <SelectTrigger size='sm' className='w-32'>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SORT_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {sortedProcessItems.length > 0 ? (
+              <div
+                ref={processGridRef}
+                className='mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3'
+              >
+                {sortedProcessItems.map((item) => {
+                  const key = processItemKey(item)
+                  return (
+                    <div key={key} data-flip-key={key} className='grid'>
+                      <ProcessCard
+                        process={item.process}
+                        serverLabel={`${item.server.server} · ${item.server.host}:${item.server.port}`}
+                        onSelect={() => {
+                          setSelected({
+                            server: item.server,
+                            process: item.process,
+                          })
+                          setPathsOpen(false)
+                          setLogsOpen(false)
+                        }}
+                      />
+                    </div>
+                  )
+                })}
+              </div>
+            ) : isLoadingProcesses ? (
+              <div className='mt-4 flex items-center gap-2 text-sm text-muted-foreground'>
+                <Spinner className='size-4' />
+                Loading processes…
+              </div>
+            ) : (
+              <Empty className='mt-4'>
+                <EmptyHeader>
+                  <EmptyMedia variant='icon'>
+                    <ServerOff strokeWidth={2} />
+                  </EmptyMedia>
+                  <EmptyTitle>No processes</EmptyTitle>
+                  <EmptyDescription>
+                    None of the registered servers are reporting processes.
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            )}
+          </>
         )}
       </div>
 
