@@ -32,7 +32,7 @@ template (`my-go-app.exe`).
   "script": "my-go-app.exe",
   "interpreter": "none",
   "autorestart": true,
-  "windowsHide": true
+  "windowsHide": false
 }
 ```
 
