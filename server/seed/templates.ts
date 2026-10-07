@@ -113,7 +113,7 @@ const templates: Template[] = [
       { key: 'exec_mode', value: null, type: 'string', required: false, hidden: true },
       { key: 'instances', value: null, type: 'number', required: false, hidden: true },
       { key: 'autorestart', value: 'true', type: 'boolean', required: false, hidden: false },
-      { key: 'windowsHide', value: 'true', type: 'boolean', required: false, hidden: false },
+      { key: 'windowsHide', value: 'false', type: 'boolean', required: false, hidden: false },
     ]
   }
 ];
