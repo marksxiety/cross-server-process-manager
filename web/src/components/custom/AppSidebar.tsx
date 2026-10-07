@@ -1,7 +1,6 @@
 import { NavLink, useLocation } from 'react-router'
-import { Bot, ChevronRight, Cog, FileText, LayoutDashboard, Server } from 'lucide-react'
+import { Cog, FileText, LayoutDashboard, Server } from 'lucide-react'
 import xpmIcon from '@/assets/xpm-icon.svg'
-import { version } from '../../../package.json'
 import {
   Sidebar,
   SidebarContent,
@@ -12,17 +11,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
   SidebarRail,
   useSidebar,
 } from '@/components/ui/sidebar'
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible'
 import {
   Tooltip,
   TooltipContent,
@@ -32,18 +23,14 @@ import { Badge } from '@/components/ui/badge'
 
 const navItems = [
   { title: 'Dashboard', url: '/', icon: LayoutDashboard },
-  { title: 'Templates', url: '/template', icon: FileText },
-]
-
-const registerItems = [
-  { title: 'Server', url: '/server', icon: Server },
   { title: 'Process', url: '/process', icon: Cog },
+  { title: 'Templates', url: '/template', icon: FileText },
+  { title: 'Servers', url: '/server', icon: Server },
 ]
 
 export function AppSidebar() {
   const { pathname } = useLocation()
   const { state, isMobile } = useSidebar()
-  const isRegisterActive = registerItems.some((item) => item.url === pathname)
 
   return (
     <Sidebar collapsible='icon'>
@@ -104,48 +91,6 @@ export function AppSidebar() {
                 </SidebarMenuButton>
               </SidebarMenuItem>
             ))}
-
-            <SidebarMenuItem>
-              <Collapsible defaultOpen={isRegisterActive}>
-                <CollapsibleTrigger
-                  render={
-                    <SidebarMenuButton
-                      tooltip='Register'
-                      className='group/collapsible'
-                    >
-                      <Bot strokeWidth={2} className='size-4 shrink-0' />
-                      <span className='group-data-[collapsible=icon]:hidden'>
-                        Register
-                      </span>
-                      <ChevronRight
-                        strokeWidth={2}
-                        className='ml-auto size-4 shrink-0 transition-transform group-data-[collapsible=icon]:hidden group-aria-expanded/collapsible:rotate-90'
-                      />
-                    </SidebarMenuButton>
-                  }
-                />
-                <CollapsibleContent>
-                  <SidebarMenuSub>
-                    {registerItems.map((item) => (
-                      <SidebarMenuSubItem key={item.title}>
-                        <SidebarMenuSubButton
-                          render={
-                            <NavLink
-                              to={item.url}
-                              className='flex items-center gap-2 w-full'
-                            />
-                          }
-                          isActive={pathname === item.url}
-                        >
-                          <item.icon strokeWidth={2} className='size-4 shrink-0' />
-                          <span>{item.title}</span>
-                        </SidebarMenuSubButton>
-                      </SidebarMenuSubItem>
-                    ))}
-                  </SidebarMenuSub>
-                </CollapsibleContent>
-              </Collapsible>
-            </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
@@ -155,7 +100,7 @@ export function AppSidebar() {
           variant='secondary'
           className='w-fit font-mono font-normal normal-case tracking-wider text-muted-foreground/70 group-data-[collapsible=icon]:hidden'
         >
-          v{version}
+          v{__APP_VERSION__}
         </Badge>
       </SidebarFooter>
 
