@@ -227,9 +227,40 @@ export function toTemplateKey(spec: ProcessFieldSpec): TemplateKey {
     };
 }
 
+function toBlankTemplateKey(spec: ProcessFieldSpec): TemplateKey {
+    return {
+        property_key: spec.key,
+        property_value: null,
+        data_type: spec.dataType,
+        is_required: spec.isRequired,
+        is_hidden: false,
+    };
+}
+
 /** Full catalog with xpm defaults; used when the "None" template is selected. */
 export function buildCatalogFields(): TemplateKey[] {
     return PROCESS_FIELDS.map(toTemplateKey);
+}
+
+/**
+ * Blends a template's stored keys into the full catalog so the editor and the
+ * registration form always show every field. Template rows win (value and
+ * flags kept), catalog keys the template does not define appear blank, and keys
+ * outside the catalog are kept at the end.
+ */
+export function mergeCatalogFields(templateKeys: readonly TemplateKey[]): TemplateKey[] {
+    const byKey = new Map(templateKeys.map((field) => [field.property_key, field]));
+
+    const catalogRows = PROCESS_FIELDS.map((spec) => {
+        const templateRow = byKey.get(spec.key);
+        return templateRow ? { ...templateRow } : toBlankTemplateKey(spec);
+    });
+
+    const extraRows = templateKeys
+        .filter((field) => !isCatalogField(field.property_key))
+        .map((field) => ({ ...field }));
+
+    return [...catalogRows, ...extraRows];
 }
 
 /**
