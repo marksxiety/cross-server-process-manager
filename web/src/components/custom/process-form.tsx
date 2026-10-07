@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ChevronDown, X } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -24,7 +24,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { catalogField, catalogFields, groupTemplateKeys } from '@/lib/process-fields'
+import { catalogField, groupTemplateKeys } from '@/lib/process-fields'
 import { cn } from '@/lib/utils'
 import type { FieldGroup } from '@/lib/process-fields'
 import type { TemplateKey } from '@/types/template'
@@ -38,12 +38,6 @@ interface ProcessFormProps {
   onChange: (propertyKey: string, value: string) => void
   /** Template mode: updates the required/hidden flags of an existing row. */
   onUpdate?: (propertyKey: string, patch: Partial<TemplateKey>) => void
-  /** Template mode: removes a row. */
-  onRemove?: (propertyKey: string) => void
-  /** Template mode: appends a catalog row. */
-  onAdd?: (propertyKey: string) => void
-  /** Template mode: catalog keys that are not part of the template yet. */
-  addableKeys?: readonly string[]
   mode?: ProcessFormMode
 }
 
@@ -162,12 +156,10 @@ function TemplateFieldRow({
   field,
   onChange,
   onUpdate,
-  onRemove,
 }: {
   field: TemplateKey
   onChange: (value: string) => void
   onUpdate: (patch: Partial<TemplateKey>) => void
-  onRemove: () => void
 }) {
   return (
     <div className='space-y-2 rounded-md border p-3'>
@@ -188,16 +180,6 @@ function TemplateFieldRow({
             />
             Hidden
           </label>
-          <Button
-            type='button'
-            variant='ghost'
-            size='icon-sm'
-            aria-label={`Remove ${field.property_key}`}
-            title='Remove field'
-            onClick={onRemove}
-          >
-            <X strokeWidth={2} />
-          </Button>
         </div>
       </div>
       <div className='flex items-center gap-2'>
@@ -212,34 +194,6 @@ function TemplateFieldRow({
   )
 }
 
-function AddFieldSelect({
-  group,
-  addableKeys,
-  onAdd,
-}: {
-  group: FieldGroup
-  addableKeys: readonly string[]
-  onAdd: (propertyKey: string) => void
-}) {
-  const options = catalogFields(group).filter((field) => addableKeys.includes(field.key))
-  if (options.length === 0) return null
-
-  return (
-    <Select value='' onValueChange={(key) => key && onAdd(key)}>
-      <SelectTrigger className='w-full'>
-        <SelectValue placeholder='Add a field…' />
-      </SelectTrigger>
-      <SelectContent>
-        {options.map((option) => (
-          <SelectItem key={option.key} value={option.key}>
-            {option.key}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  )
-}
-
 /**
  * Renders the process configuration as two cards (Basic and Advanced). Process
  * registration and template editing share this layout; validation and
@@ -250,9 +204,6 @@ export function ProcessForm({
   errors = {},
   onChange,
   onUpdate,
-  onRemove,
-  onAdd,
-  addableKeys = [],
   mode = 'process',
 }: ProcessFormProps) {
   const { basic, advanced } = useMemo(() => groupTemplateKeys(fields), [fields])
@@ -274,7 +225,6 @@ export function ProcessForm({
             field={field}
             onChange={(value) => onChange(field.property_key, value)}
             onUpdate={(patch) => onUpdate?.(field.property_key, patch)}
-            onRemove={() => onRemove?.(field.property_key)}
           />
         ) : (
           <div key={field.property_key} className={cn(isWideField(field) && 'sm:col-span-2')}>
@@ -285,9 +235,6 @@ export function ProcessForm({
             />
           </div>
         ),
-      )}
-      {mode === 'template' && onAdd && (
-        <AddFieldSelect group={group} addableKeys={addableKeys} onAdd={onAdd} />
       )}
     </div>
   )
