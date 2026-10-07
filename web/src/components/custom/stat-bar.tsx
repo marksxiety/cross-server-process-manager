@@ -11,7 +11,7 @@ type StatBarProps = {
 
 export function StatBar({ label, value, tone }: StatBarProps) {
   return (
-    <div className='w-40 shrink-0'>
+    <div className='w-full min-w-0'>
       <div className='mb-0.5 flex justify-between text-xs uppercase tracking-wide text-muted-foreground'>
         <span>{label}</span>
         <span className={cn('font-semibold', toneTextClasses[tone])}>
