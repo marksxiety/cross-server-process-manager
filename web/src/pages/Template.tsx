@@ -41,7 +41,7 @@ import { TemplateCard } from '@/components/custom/template-card'
 import { TemplatePreview } from '@/components/custom/template-preview'
 import { useTemplateStore } from '@/stores/template.store'
 import { errorCodeLabel, toApiError } from '@/lib/error-code'
-import { ALLOWED_FIELD_KEYS, catalogField, toTemplateKey } from '@/lib/process-fields'
+import { mergeCatalogFields } from '@/lib/process-fields'
 import { toSavableKeys } from '@/lib/template-keys'
 import { buildTemplatePayload } from '@/lib/template-payload'
 import { copyText } from '@/lib/utils'
@@ -116,23 +116,27 @@ export function Template() {
     return [...groups.entries()]
   }, [filteredTemplates])
 
-  const payload = useMemo(() => buildTemplatePayload(keys), [keys])
+  const payload = useMemo(
+    () => buildTemplatePayload(keys.filter((key) => !key.is_hidden)),
+    [keys],
+  )
   const payloadJson = useMemo(() => JSON.stringify(payload, null, 2), [payload])
 
   const handleUse = (template: ProcessTemplate) => {
     void navigate(`/process?template=${template.id}`)
   }
 
-  // Seeds the editor rows when a template is opened.
+  // Seeds the editor with the full catalog: template values win, the rest show
+  // blank so a field that isn't needed can simply be marked Hidden.
   const openTemplate = (template: ProcessTemplate) => {
-    setKeys(template.keys)
+    setKeys(mergeCatalogFields(template.keys))
     setSelected(template)
   }
 
   const openCreate = () => {
     setDraft(EMPTY_DRAFT)
     setNameError(false)
-    setKeys([])
+    setKeys(mergeCatalogFields([]))
     setCreateOpen(true)
   }
 
@@ -155,23 +159,6 @@ export function Template() {
       prev.map((key) => (key.property_key === propertyKey ? { ...key, ...patch } : key)),
     )
   }
-
-  const removeKey = (propertyKey: string) => {
-    setKeys((prev) => prev.filter((key) => key.property_key !== propertyKey))
-  }
-
-  const addKey = (propertyKey: string) => {
-    const spec = catalogField(propertyKey)
-    if (!spec) return
-    setKeys((prev) =>
-      prev.some((key) => key.property_key === propertyKey) ? prev : [...prev, toTemplateKey(spec)],
-    )
-  }
-
-  const addableKeys = useMemo(() => {
-    const present = new Set(keys.map((key) => key.property_key))
-    return [...ALLOWED_FIELD_KEYS].filter((key) => !present.has(key))
-  }, [keys])
 
   const copyPayload = async () => {
     if (!(await copyText(payloadJson))) {
@@ -378,9 +365,6 @@ export function Template() {
                     updateKey(propertyKey, { property_value: value })
                   }
                   onUpdate={updateKey}
-                  onRemove={removeKey}
-                  onAdd={addKey}
-                  addableKeys={addableKeys}
                 />
               </ScrollArea>
 
@@ -580,9 +564,6 @@ export function Template() {
                       updateKey(propertyKey, { property_value: value })
                     }
                     onUpdate={updateKey}
-                    onRemove={removeKey}
-                    onAdd={addKey}
-                    addableKeys={addableKeys}
                   />
                 </div>
               </ScrollArea>
