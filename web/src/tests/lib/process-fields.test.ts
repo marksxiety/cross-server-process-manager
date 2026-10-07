@@ -6,6 +6,7 @@ import {
   buildCatalogFields,
   catalogField,
   groupTemplateKeys,
+  mergeCatalogFields,
   validateFields,
 } from '@/lib/process-fields'
 import type { TemplateKey } from '@/types/template'
@@ -58,6 +59,55 @@ describe('process field catalog', () => {
     expect(catalogField('autorestart')?.dataType).toBe('boolean')
     expect(catalogField('script')?.isRequired).toBe(true)
     expect(catalogField('not-a-field')).toBeUndefined()
+  })
+})
+
+describe('mergeCatalogFields', () => {
+  it('keeps template values and flags for keys the template defines', () => {
+    const merged = mergeCatalogFields([
+      key({
+        property_key: 'windowsHide',
+        property_value: 'false',
+        data_type: 'boolean',
+        is_required: true,
+        is_hidden: true,
+      }),
+    ])
+
+    expect(merged.find((field) => field.property_key === 'windowsHide')).toEqual({
+      property_key: 'windowsHide',
+      property_value: 'false',
+      data_type: 'boolean',
+      is_required: true,
+      is_hidden: true,
+    })
+  })
+
+  it('shows catalog keys the template omits as blank rows with catalog metadata', () => {
+    const merged = mergeCatalogFields([])
+
+    expect(merged.map((field) => field.property_key)).toEqual(
+      PROCESS_FIELDS.map((field) => field.key),
+    )
+    expect(merged.every((field) => field.property_value === null)).toBe(true)
+    expect(merged.find((field) => field.property_key === 'env')?.data_type).toBe('object')
+    expect(merged.find((field) => field.property_key === 'script')?.is_required).toBe(true)
+  })
+
+  it('keeps keys outside the catalog at the end', () => {
+    const merged = mergeCatalogFields([
+      key({ property_key: 'custom_flag', property_value: '1' }),
+    ])
+
+    expect(merged.at(-1)?.property_key).toBe('custom_flag')
+  })
+
+  it('does not mutate the input rows', () => {
+    const rows = [key({ property_key: 'windowsHide', property_value: 'true' })]
+
+    mergeCatalogFields(rows)
+
+    expect(rows[0].property_value).toBe('true')
   })
 })
 
