@@ -9,12 +9,48 @@ export interface ProcessListItem {
 export type ProcessSortKey = 'memory' | 'cpu' | 'host' | 'namespace' | 'pm_id'
 
 // Severity order: unhealthy processes surface above healthy ones for triage.
-const STATUS_RANK: Record<ProcessStatus, number> = {
-  errored: 0,
-  stopped: 1,
-  stopping: 2,
-  launching: 3,
-  online: 4,
+export function getSeverityRank(pm2_env: {
+  status: ProcessStatus
+  autorestart?: boolean
+  cron_restart?: string | null
+  exit_code?: number | null
+}): number {
+  const { status, autorestart, cron_restart, exit_code } = pm2_env
+  const isCronOrOneShot = autorestart === false || Boolean(cron_restart)
+
+  switch (status) {
+    // 1. CRITICAL: Unstable-restart limit exceeded; PM2 gave up
+    case 'errored':
+      return 1
+
+    // 2. HIGH (or CRITICAL / IDLE depending on why it stopped)
+    case 'stopped':
+      if (isCronOrOneShot) {
+        // Cron/One-shot crashed (non-zero exit code) -> Treat as Critical (Rank 2, right under errored)
+        if (exit_code !== undefined && exit_code !== null && exit_code !== 0) {
+          return 2
+        }
+        // Cron/One-shot finished normally (exit_code === 0) -> Not an issue! Push to Rank 6 (right above online)
+        return 6
+      }
+      // Normal long-running service that is stopped -> High severity (Rank 3)
+      return 3
+
+    // 3. MEDIUM: Process exited; backoff/restart timer running
+    case 'waiting restart':
+      return 4
+
+    // 4. INFO: Graceful stop or initial launch in progress
+    case 'stopping':
+    case 'launching':
+      return 5
+
+    // 5. NONE / LEGACY: Healthy online process (Bottom of the list)
+    case 'online':
+    case 'one-launch-status':
+    default:
+      return 7
+  }
 }
 
 const SORT_WATERFALL: ProcessSortKey[] = ['memory', 'cpu', 'namespace', 'host', 'pm_id']
@@ -33,7 +69,7 @@ const comparators: Record<ProcessSortKey, (a: ProcessListItem, b: ProcessListIte
 }
 
 /**
- * Orders the flat dashboard list: non-online statuses first in severity order,
+ * Orders the flat dashboard list by severity rank (see `getSeverityRank`),
  * then the chosen key, then the remaining waterfall keys (memory, CPU,
  * namespace, host, pm_id). Port and server name close the remaining ties, since
  * hosts and pm_ids can repeat across servers, so the order never shuffles
@@ -46,7 +82,7 @@ export function sortProcesses(
   const ordered = [primaryKey, ...SORT_WATERFALL.filter((key) => key !== primaryKey)]
 
   return items.toSorted((a, b) => {
-    const byStatus = STATUS_RANK[a.process.status] - STATUS_RANK[b.process.status]
+    const byStatus = getSeverityRank(a.process) - getSeverityRank(b.process)
     if (byStatus !== 0) return byStatus
 
     for (const key of ordered) {
