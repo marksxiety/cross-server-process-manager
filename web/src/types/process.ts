@@ -1,4 +1,25 @@
-export type ProcessStatus = "online" | "stopped" | "stopping" | "launching" | "errored";
+/** Status values PM2 writes to `pm2_env.status` (plus the agent's "unknown" fallback). */
+export type ProcessStatus =
+    | "online"
+    | "stopping"
+    | "stopped"
+    | "launching"
+    | "errored"
+    | "waiting restart"
+    | "one-launch-status"
+    | "unknown";
+
+/** Derived UI status used for colors, labels and severity. */
+export type EffectiveStatus =
+    | "errored"
+    | "failed_exit"
+    | "degraded"
+    | "waiting_restart"
+    | "transitioning"
+    | "stopped_manual"
+    | "scheduled_idle"
+    | "completed"
+    | "online";
 
 export type ProcessCommand = "start" | "stop" | "restart" | "reload" | "delete";
 
@@ -74,6 +95,10 @@ export interface ProcessSummary {
     ip_address: string;
     watch: boolean;
     autorestart?: boolean;
+    /** Optional for agents predating the field. */
+    cron_restart?: string | null;
+    /** Optional for agents predating the field. */
+    exit_code?: number | null;
     logs?: { out: string[]; error: string[] };
 }
 
