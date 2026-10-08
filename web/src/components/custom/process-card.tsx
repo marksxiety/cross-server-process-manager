@@ -10,12 +10,7 @@ import {
 } from '@/components/ui/card'
 import { StatusDot } from '@/components/custom/status-dot'
 import { formatBytes } from '@/lib/format'
-import {
-  processTone,
-  toneBadgeVariant,
-  toneSurfaceClasses,
-  toneTextClasses,
-} from '@/lib/status-tone'
+import { getStatusVisual } from '@/lib/status-styles'
 import { cn } from '@/lib/utils'
 import type { ProcessSummary } from '@/types/process'
 
@@ -26,7 +21,7 @@ type ProcessCardProps = {
 }
 
 export function ProcessCard({ process, serverLabel, onSelect }: ProcessCardProps) {
-  const tone = processTone(process.status)
+  const visual = getStatusVisual(process)
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'Enter' || event.key === ' ') {
@@ -44,20 +39,15 @@ export function ProcessCard({ process, serverLabel, onSelect }: ProcessCardProps
       onKeyDown={handleKeyDown}
       className={cn(
         'h-full cursor-pointer transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
-        tone === 'danger'
-          ? cn(toneSurfaceClasses.danger, 'hover:bg-destructive/15')
-          : 'hover:bg-accent/40',
+        visual.surface,
+        visual.ring,
+        'hover:bg-accent/40',
       )}
     >
       <CardHeader>
         <CardTitle className='flex min-w-0 items-center gap-2'>
-          <StatusDot tone={tone} />
-          <span
-            className={cn(
-              'min-w-0 truncate',
-              tone === 'danger' && toneTextClasses.danger,
-            )}
-          >
+          <StatusDot process={process} />
+          <span className={cn('min-w-0 truncate', visual.text)}>
             {process.name}
           </span>
           <Badge
@@ -73,7 +63,12 @@ export function ProcessCard({ process, serverLabel, onSelect }: ProcessCardProps
           </CardDescription>
         )}
         <CardAction>
-          <Badge variant={toneBadgeVariant[tone]}>{process.status}</Badge>
+          <Badge
+            variant='outline'
+            className={cn('border', visual.surface, visual.text, visual.border)}
+          >
+            {visual.label}
+          </Badge>
         </CardAction>
       </CardHeader>
 
