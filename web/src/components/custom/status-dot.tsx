@@ -1,7 +1,24 @@
 import { cn } from "@/lib/utils";
-import { toneDotClasses } from "@/lib/status-tone";
-import type { Tone } from "@/types/tone";
+import { getStatusVisual } from "@/lib/status-styles";
+import type { EffectiveStatusInput } from "@/lib/process-status";
 
-export function StatusDot({ tone, className }: { tone: Tone; className?: string }) {
-    return <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", toneDotClasses[tone], className)} />;
+export function StatusDot({
+    process,
+    className,
+}: {
+    process?: EffectiveStatusInput | null;
+    className?: string;
+}) {
+    const visual = getStatusVisual(process);
+
+    return (
+        <span
+            className={cn(
+                "h-1.5 w-1.5 shrink-0 rounded-full",
+                visual.dot,
+                visual.pulse && "animate-pulse",
+                className,
+            )}
+        />
+    );
 }
