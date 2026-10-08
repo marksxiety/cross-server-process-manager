@@ -8,9 +8,9 @@ function interpreterBasename(interpreter: string): string {
     return (segments[segments.length - 1] ?? "").trim().toLowerCase();
 }
 
-/** PM2 statuses where a command is already in progress. */
+/** Wire statuses where a command is already in progress. */
 export function isTransientProcessStatus(status: ProcessStatus): boolean {
-    return status === "stopping" || status === "launching";
+    return status === "stopping" || status === "launching" || status === "one-launch-status";
 }
 
 /**
