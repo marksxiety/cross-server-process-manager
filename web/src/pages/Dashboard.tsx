@@ -6,6 +6,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -67,11 +68,8 @@ import { errorCodeLabel, toApiError } from '@/lib/error-code'
 import { canRunProcessCommand } from '@/lib/process-runtime'
 import { processItemKey, sortProcesses } from '@/lib/sort-processes'
 import type { ProcessSortKey } from '@/lib/sort-processes'
-import {
-  processTone,
-  toneBadgeVariant,
-  toneSurfaceClasses,
-} from '@/lib/status-tone'
+import { toneSurfaceClasses } from '@/lib/status-tone'
+import { getStatusContext, getStatusVisual } from '@/lib/status-styles'
 import { DASHBOARD_AUTO_REFRESH_MS } from '@/lib/swr'
 import { formatArgs, formatBytes, formatLogTimestamp, formatMetricValue, formatUptime } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -151,7 +149,10 @@ function FlagBadge({ label, active }: { label: string; active: boolean }) {
   return (
     <Badge variant='secondary' className='gap-1 font-normal text-muted-foreground'>
       {active ? (
-        <Check className='size-3 text-emerald-600 dark:text-emerald-400' strokeWidth={2.5} />
+        <Check
+          className={cn('size-3', getStatusVisual('online').text)}
+          strokeWidth={2.5}
+        />
       ) : (
         <X className='size-3' strokeWidth={2.5} />
       )}
@@ -280,9 +281,15 @@ function ProcessSheetBody({
         <div className='grid grid-cols-2 gap-x-6'>
           <KeyValueRow label='Exec mode' value={summary.exec_mode} />
           <KeyValueRow label='Interpreter' value={summary.interpreter} />
-          <KeyValueRow label='Node version' value={describe.node_version} />
-          <KeyValueRow label='Node env' value={describe.node_env} />
-          <KeyValueRow label='App version' value={describe.version} />
+          {describe.node_version !== null && (
+            <KeyValueRow label='Node version' value={describe.node_version} />
+          )}
+          {describe.node_env !== null && (
+            <KeyValueRow label='Node env' value={describe.node_env} />
+          )}
+          {describe.version !== null && (
+            <KeyValueRow label='App version' value={describe.version} />
+          )}
           <KeyValueRow label='IP address' value={summary.ip_address} />
         </div>
       </section>
@@ -498,7 +505,9 @@ export function Dashboard() {
     return current ?? selected.process
   }, [selected, processesByServer])
 
-  const selectedTone = selectedProcess ? processTone(selectedProcess.status) : 'neutral'
+  const selectedVisual = getStatusVisual(selectedProcess)
+  const selectedContext = selectedProcess ? getStatusContext(selectedProcess) : null
+  const StatusIcon = selectedVisual.icon
 
   const isCommandPending =
     isStarting || isStopping || isRestarting || isReloading || isDeleting
@@ -783,20 +792,40 @@ export function Dashboard() {
               </div>
               {selectedProcess && (
                 <Badge
-                  variant={toneBadgeVariant[selectedTone]}
-                  className='shrink-0 gap-1.5 font-normal'
+                  variant='outline'
+                  className={cn(
+                    'shrink-0 gap-1.5 border font-normal',
+                    selectedVisual.surface,
+                    selectedVisual.text,
+                    selectedVisual.border,
+                  )}
                 >
                   <Circle
                     className={cn(
                       'fill-current',
-                      selectedTone === 'success' && 'animate-pulse',
+                      selectedVisual.pulse && 'animate-pulse',
                     )}
                     strokeWidth={0}
                   />
-                  {selectedProcess.status}
+                  {selectedVisual.label}
                 </Badge>
               )}
             </div>
+            {selectedContext && (
+              <Alert
+                className={cn(
+                  'border',
+                  selectedVisual.surface,
+                  selectedVisual.text,
+                  selectedVisual.border,
+                )}
+              >
+                <StatusIcon />
+                <AlertDescription className='text-current'>
+                  {selectedContext}
+                </AlertDescription>
+              </Alert>
+            )}
           </SheetHeader>
 
           <ScrollArea className='flex-1 min-h-0'>
