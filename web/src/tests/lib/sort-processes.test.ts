@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { processItemKey, sortProcesses } from '../../lib/sort-processes'
+import { getSeverityRank, processItemKey, sortProcesses } from '../../lib/sort-processes'
 import type { ProcessListItem } from '../../lib/sort-processes'
 import type { ProcessSummary } from '../../types/process'
 import type { RegisteredServer } from '../../types/server'
@@ -149,12 +149,11 @@ describe('sortProcesses', () => {
   test('ranks non-online statuses by severity before any metric', () => {
     const online = makeItem({}, { pm_id: 1, status: 'online', memory: 900 })
     const launching = makeItem({}, { pm_id: 2, status: 'launching', memory: 800 })
-    const stopping = makeItem({}, { pm_id: 3, status: 'stopping', memory: 700 })
-    const stopped = makeItem({}, { pm_id: 4, status: 'stopped', memory: 600 })
-    const errored = makeItem({}, { pm_id: 5, status: 'errored', memory: 500 })
+    const stopped = makeItem({}, { pm_id: 3, status: 'stopped', memory: 700 })
+    const errored = makeItem({}, { pm_id: 4, status: 'errored', memory: 600 })
 
-    expect(pmIds(sortProcesses([online, launching, stopping, stopped, errored]))).toEqual([
-      5, 4, 3, 2, 1,
+    expect(pmIds(sortProcesses([online, launching, stopped, errored]))).toEqual([
+      4, 3, 2, 1,
     ])
   })
 
@@ -180,6 +179,42 @@ describe('sortProcesses', () => {
     const earlierNamespace = makeItem({ host: '10.0.0.9' }, { pm_id: 2, namespace: 'dev' })
 
     expect(pmIds(sortProcesses([laterNamespace, earlierNamespace]))).toEqual([2, 1])
+  })
+})
+
+describe('getSeverityRank', () => {
+  test('ranks errored as most severe', () => {
+    expect(getSeverityRank({ status: 'errored' })).toBe(1)
+  })
+
+  test('ranks crashed cron/one-shot stops just below errored', () => {
+    expect(getSeverityRank({ status: 'stopped', autorestart: false, exit_code: 1 })).toBe(2)
+    expect(getSeverityRank({ status: 'stopped', cron_restart: '0 2 * * *', exit_code: 2 })).toBe(2)
+  })
+
+  test('ranks a normally stopped service as high severity', () => {
+    expect(getSeverityRank({ status: 'stopped' })).toBe(3)
+    expect(getSeverityRank({ status: 'stopped', autorestart: true })).toBe(3)
+  })
+
+  test('ranks waiting restart as medium', () => {
+    expect(getSeverityRank({ status: 'waiting restart' })).toBe(4)
+  })
+
+  test('ranks stopping and launching as info', () => {
+    expect(getSeverityRank({ status: 'stopping' })).toBe(5)
+    expect(getSeverityRank({ status: 'launching' })).toBe(5)
+  })
+
+  test('ranks a cleanly finished cron/one-shot stop right above online', () => {
+    expect(getSeverityRank({ status: 'stopped', autorestart: false, exit_code: 0 })).toBe(6)
+    expect(getSeverityRank({ status: 'stopped', cron_restart: '0 2 * * *', exit_code: 0 })).toBe(6)
+  })
+
+  test('ranks healthy and unknown statuses lowest', () => {
+    expect(getSeverityRank({ status: 'online' })).toBe(7)
+    expect(getSeverityRank({ status: 'one-launch-status' })).toBe(7)
+    expect(getSeverityRank({ status: 'unknown' })).toBe(7)
   })
 })
 
