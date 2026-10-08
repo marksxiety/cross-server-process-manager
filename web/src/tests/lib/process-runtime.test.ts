@@ -17,9 +17,10 @@ function target(overrides: Partial<ProcessCommandTarget> = {}): ProcessCommandTa
 }
 
 describe('isTransientProcessStatus', () => {
-  test('is true only for stopping and launching', () => {
+  test('is true only for stopping, launching and one-launch-status', () => {
     expect(isTransientProcessStatus('stopping')).toBe(true)
     expect(isTransientProcessStatus('launching')).toBe(true)
+    expect(isTransientProcessStatus('one-launch-status')).toBe(true)
     expect(isTransientProcessStatus('online')).toBe(false)
     expect(isTransientProcessStatus('stopped')).toBe(false)
     expect(isTransientProcessStatus('errored')).toBe(false)
@@ -68,6 +69,11 @@ describe('canRunProcessCommand', () => {
     ['launching', 'restart', false],
     ['launching', 'reload', false],
     ['launching', 'delete', true],
+    ['one-launch-status', 'start', false],
+    ['one-launch-status', 'stop', false],
+    ['one-launch-status', 'restart', false],
+    ['one-launch-status', 'reload', false],
+    ['one-launch-status', 'delete', true],
   ]
 
   test.each(cases)('status %s allows %s → %s', (status, command, expected) => {
