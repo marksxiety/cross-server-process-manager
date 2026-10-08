@@ -101,6 +101,22 @@ const templates: Template[] = [
     ]
   },
   {
+    template_name: 'Laravel',
+    category: 'PHP',
+    description: 'Run a Laravel app through the Artisan CLI (php artisan serve).',
+    preview: 'php artisan serve --host=127.0.0.1 --port=8080',
+    keys: [
+      { key: 'script', value: 'artisan', type: 'string', required: true, hidden: false },
+      { key: 'args', value: JSON.stringify(["serve", "--host=127.0.0.1", "--port=8080"]), type: 'array', required: true, hidden: false },
+      { key: 'interpreter', value: 'C:\\php\\php.exe', type: 'string', required: true, hidden: false },
+      { key: 'interpreter_args', value: null, type: 'array', required: false, hidden: true },
+      { key: 'exec_mode', value: null, type: 'string', required: false, hidden: true },
+      { key: 'instances', value: null, type: 'number', required: false, hidden: true },
+      { key: 'autorestart', value: 'true', type: 'boolean', required: false, hidden: false },
+      { key: 'windowsHide', value: 'true', type: 'boolean', required: false, hidden: false },
+    ]
+  },
+  {
     template_name: 'Go',
     category: 'Compiled Binaries',
     description: 'Run a compiled Go binary directly.',
