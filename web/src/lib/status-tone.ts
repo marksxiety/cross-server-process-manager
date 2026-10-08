@@ -1,28 +1,9 @@
-import type { VariantProps } from "class-variance-authority";
-import { badgeVariants } from "@/components/ui/badge";
 import type { ServerProcesses } from "@/types/dashboard";
-import type { ProcessStatus } from "@/types/process";
 import type { Tone } from "@/types/tone";
-
-type BadgeVariant = NonNullable<VariantProps<typeof badgeVariants>["variant"]>;
 
 const PERCENT_WARNING_THRESHOLD = 70;
 const PERCENT_DANGER_THRESHOLD = 90;
 const PROCESS_CPU_WARNING_THRESHOLD = 80;
-
-export const toneBadgeVariant: Record<Tone, BadgeVariant> = {
-    success: "success",
-    warning: "warning",
-    danger: "destructive",
-    neutral: "secondary",
-};
-
-export const toneDotClasses: Record<Tone, string> = {
-    success: "bg-emerald-500",
-    warning: "bg-amber-500",
-    danger: "bg-destructive",
-    neutral: "bg-muted-foreground/40",
-};
 
 export const toneIconClasses: Record<Tone, string> = {
     success: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
@@ -56,12 +37,6 @@ export function percentTone(value: number): Tone {
     if (value >= PERCENT_DANGER_THRESHOLD) return "danger";
     if (value >= PERCENT_WARNING_THRESHOLD) return "warning";
     return "success";
-}
-
-export function processTone(status: ProcessStatus): Tone {
-    if (status === "online") return "success";
-    if (status === "errored") return "danger";
-    return "neutral";
 }
 
 export function serverTone(entry: ServerProcesses | undefined): Tone {
