@@ -1,7 +1,7 @@
 import { Client } from 'pg';
 import '../config/env';
 
-const MAINTENANCE_DB = process.env.DB_MAINTENANCE || 'postgres';
+const MAINTENANCE_DB = process.env.DB_MAINTENANCE_NAME || 'postgres';
 
 function quoteIdentifier(name: string): string {
     return `"${name.replace(/"/g, '""')}"`;

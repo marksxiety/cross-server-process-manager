@@ -8,7 +8,19 @@ import { index as templates, create as createTemplate, update as updateTemplate,
 import { fail } from './utils/response';
 
 const app = express();
-const port = parseInt(process.env.PORT || '3000', 10);
+
+const MIN_PORT = 1;
+const MAX_PORT = 65535;
+
+const rawPort = process.env.SERVER_PORT;
+const port = Number(rawPort);
+if (!rawPort || !Number.isInteger(port) || port < MIN_PORT || port > MAX_PORT) {
+    console.error(
+        `XPM server failed to start: SERVER_PORT is not set or invalid (received "${rawPort ?? ''}"). ` +
+            'Set SERVER_PORT in .env (e.g. SERVER_PORT=5638).'
+    );
+    process.exit(1);
+}
 
 app.use(cors());
 app.use(express.json());

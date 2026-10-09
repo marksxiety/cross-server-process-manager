@@ -1,5 +1,9 @@
 const path = require("path");
 
+require("dotenv").config({ path: path.join(__dirname, ".env") });
+
+const WEB_PORT = process.env.VITE_WEB_PORT || "3000";
+
 module.exports = {
   apps: [
     {
@@ -34,7 +38,7 @@ module.exports = {
       namespace: "XPM",
       cwd: path.join(__dirname, "web"),
       script: "../node_modules/serve/build/main.js",
-      args: "-s dist -l 3000",
+      args: `-s dist -l ${WEB_PORT}`,
       interpreter: "node",
       exec_mode: "fork",
       instances: 1,

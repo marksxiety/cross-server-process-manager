@@ -6,7 +6,10 @@ import type { LogStreamType, ProcessDescribe, ProcessLogs, ProcessSummary, Start
 import type { SystemOverview } from "@/types/system";
 
 export function processService(server: RegisteredServer) {
-    const api = createConnection(server);
+    const api = createConnection({
+        ...server,
+        authToken: import.meta.env.VITE_AGENT_AUTH_TOKEN || undefined,
+    });
 
     return {
         list: () => api.get<ProcessSummary[]>("/pm2/list"),

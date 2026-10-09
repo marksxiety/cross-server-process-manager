@@ -3,7 +3,9 @@ import type { RegisteredServer } from "@/types/server";
 
 type Method = "GET" | "POST" | "PUT" | "DELETE";
 
-export type ApiTarget = Pick<RegisteredServer, "protocol" | "host" | "port">;
+export type ApiTarget = Pick<RegisteredServer, "protocol" | "host" | "port"> & {
+    authToken?: string;
+};
 
 function buildUrl(target: ApiTarget, path: string): string {
     const cleanPath = path.startsWith("/") ? path : `/${path}`;
@@ -11,8 +13,12 @@ function buildUrl(target: ApiTarget, path: string): string {
 }
 
 export function createConnection(target: ApiTarget) {
+    const authHeaders = target.authToken
+        ? { Authorization: `Bearer ${target.authToken}` }
+        : undefined;
+
     const request = <T = unknown>(path: string, method: Method, body?: unknown) =>
-        httpRequest<T>({ url: buildUrl(target, path), method, body });
+        httpRequest<T>({ url: buildUrl(target, path), method, body, headers: authHeaders });
 
     return {
         get: <T = unknown>(path: string) => request<T>(path, "GET"),
