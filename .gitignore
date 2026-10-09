@@ -26,6 +26,4 @@ dist-ssr
 *.env
 
 # Simulation build artifacts
-simulation/go/*.exe
-simulation/python/venv/
-simulation/python/__pycache__/
+simulation/
