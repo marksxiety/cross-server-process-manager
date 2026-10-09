@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { serverService } from "@/api/services/server.service";
 import { processService } from "@/api/services/process.service";
+import { isDemoMode } from "@/lib/demo-mode";
 import { PROCESS_STATE_CONFLICT_CODE, toApiError, toUnreachableError } from "@/lib/error-code";
 import { canRunProcessCommand } from "@/lib/process-runtime";
 import { withRetry } from "@/lib/retry";
@@ -366,7 +367,7 @@ export const useDashboardStore = create<DashboardState>()(
             };
         },
         {
-            name: "servers-cache",
+            name: isDemoMode() ? "servers-cache-demo" : "servers-cache",
             // Only the server list and its fetch timestamp are cached; process data is volatile.
             partialize: (state) => ({
                 servers: state.servers,

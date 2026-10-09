@@ -1,4 +1,5 @@
 import type { ApiResponse } from "@/types/api";
+import { isDemoMode } from "@/lib/demo-mode";
 
 interface HttpRequestOptions {
     url: string;
@@ -31,6 +32,12 @@ export async function httpRequest<T = unknown>({
     }
 
     const endpoint = hasScheme ? url : `${protocol}://${url}${port !== undefined ? `:${port}` : ""}`;
+
+    if (isDemoMode()) {
+        const { resolveFixture } = await import("@/demo/fixtures");
+        const fixture = resolveFixture(endpoint, method);
+        if (fixture !== null) return fixture as ApiResponse<T>;
+    }
 
     let response: Response;
     try {

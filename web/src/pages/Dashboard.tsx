@@ -720,7 +720,7 @@ export function Dashboard() {
             {sortedProcessItems.length > 0 ? (
               <div
                 ref={processGridRef}
-                className='mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3'
+                className='mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4'
               >
                 {sortedProcessItems.map((item) => {
                   const key = processItemKey(item)

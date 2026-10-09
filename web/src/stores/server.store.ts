@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { serverService } from "@/api/services/server.service";
+import { isDemoMode } from "@/lib/demo-mode";
 import { toApiError } from "@/lib/error-code";
 import { isCacheFresh } from "@/lib/swr";
 import { persistedStore } from "@/lib/persisted";
@@ -98,7 +99,7 @@ export const useServerStore = create<ServerState>()(
             };
         },
         persistedStore<ServerState, typeof serverPersistSchema>({
-            name: "server-registry-cache",
+            name: isDemoMode() ? "server-registry-cache-demo" : "server-registry-cache",
             schema: serverPersistSchema,
         })
     )
