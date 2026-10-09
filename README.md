@@ -60,6 +60,13 @@ Ready to connect your own servers → **[docs/setup-actual.md](docs/setup-actual
 | **Process** | CPU %, memory, status, PID, uptime, restart & unstable-restart counts, exec mode, instances, interpreter, watch & autorestart flags, working directory |
 | **Logs** | stdout / stderr, last 5–300 lines, optional auto-refresh |
 
-## Related repository
+## Platform Support
 
-- **[xpm-agent](https://github.com/marksxiety/xpm-agent)** — included in this repo as the `agent/` git submodule; the Bun + Elysia REST API that drives PM2 on each server. XPM is its dashboard: every metric and action here flows through the agents you deploy.
+**Windows is fully supported today.**
+
+| Platform | Status | Notes |
+|---|---|---|
+| **Windows** | Supported | End-to-end: dashboard, registry, and agents that boot with the machine via [`pm2-windows-startup`](https://www.npmjs.com/package/pm2-windows-startup) |
+| Linux / macOS | Not yet | The agent only ships Windows boot integration for now |
+
+Want to run XPM on another OS? Open an issue — contributions are welcome.
