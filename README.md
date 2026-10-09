@@ -2,48 +2,50 @@
 
 <p align="center"><b>Every server. Every process. One dashboard.</b></p>
 
-<!-- <p align="center"><img src="docs/dashboard-preview.png" width="720" alt="XPM dashboard showing multiple servers and processes" /></p> -->
+<p align="center">
+  <b>Running your processes with PM2? This one's for you.</b><br/>
+  The control plane for <a href="https://github.com/marksxiety/xpm-agent">xpm-agent</a> —
+  included here as a git submodule, watch and control every process from here.
+</p>
+
+<p align="center"><img src="web/src/assets/images/demo.png" width="100%" alt="XPM dashboard showing five servers and 28 processes across online, errored, stopped, scheduled, and degraded states" /></p>
 
 ## The 2 AM problem
 
-A application is down. You don't know which server it's on, so you SSH into the first one and run `pm2 list`. Not there. Second server. Not there either. By the time you find it on server four, you've opened four terminals, typed the same three commands sixteen times, and you're no closer to knowing *why* it crashed — just that it did.
+An application is down. You don't know which server it's on, so you SSH into the first one and run `pm2 list`. Not there. Second server. Not there either. By the time you find it on server four, you've opened four terminals, typed the same three commands sixteen times, and you're no closer to knowing *why* it crashed — just that it did.
 
 Multiply that by however many boxes run your stack, and "checking on PM2" quietly becomes a tax you pay every incident.
 
-### What PM2 is, for Context
+### What PM2 is, for context
+
 PM2 is a process manager — the engine that keeps your apps alive in the background, restarts them when they crash, and tracks their logs and resource usage. If you run Node.js, Python, PHP, or background workers on a server, PM2 is very likely what's keeping them running. It's excellent at its job. It just only ever shows you one machine at a time.
 
-### The Solution
-**Cross-Server Process Manager (XPM)** ends the hunt. It connects to every server running `xpm-agent` at once and pulls your entire fleet into a single browser window. No SSH. No memorized flags. One screen that tells you everything you'd otherwise log in five times to learn.
+### The solution
 
-* **Fleet-wide Visibility:** View every running process, status, CPU load, and memory footprint across all nodes simultaneously.
-* **Direct Control:** Start, restart, reload, stop, or flush logs across servers directly from the UI.
-* **Unified Diagnostics:** Tail stdout and stderr streams across your fleet in real time.
+**Cross-Server Process Manager (XPM)** ends the hunt. It connects to every server running [`xpm-agent`](https://github.com/marksxiety/xpm-agent) at once and pulls all of your processes into a single browser window. No SSH. No memorized flags. One screen that tells you everything you'd otherwise log in five times to learn.
 
-## Quick start
+* **Complete visibility:** every process, status, CPU load, and memory footprint across all nodes at once.
+* **Direct control:** start, restart, reload, stop, or flush logs on any server from the UI.
+* **Unified diagnostics:** tail stdout and stderr from any process without a terminal.
 
-```bash
-# 1. Run xpm-agent on each server you want to monitor
-git clone https://github.com/marksxiety/xpm-agent
-cd xpm-agent && bun install && bun run start
+## How it works
 
-# 2. Clone XPM and install dependencies for the dashboard and server workspace
-git clone https://github.com/marksxiety/cross-server-process-manager
-cd cross-server-process-manager && npm install
+XPM is two workspaces in this repo plus one git submodule that runs on every monitored server:
 
-# 3. Create/migrate the database, then start the XPM server
-npm run db:setup -w server
-npm run dev -w server
+| Piece | Where | Role |
+|---|---|---|
+| **xpm-web** | this repo (`web/`) | The dashboard you open in the browser |
+| **xpm-server** | this repo (`server/`) | Registry API — stores your server list (PostgreSQL) |
+| **xpm-agent** | git submodule — [`agent/`](https://github.com/marksxiety/xpm-agent) | REST wrapper around PM2 — one per server, the only thing that touches PM2 |
 
-# 4. In a second terminal, start the dashboard
-npm run dev
+The dashboard reads your server list from **xpm-server**, then talks to each **xpm-agent** directly to pull live process data and send lifecycle commands. Agents are guarded by `AUTH_TOKEN`; give the dashboard the matching `VITE_AGENT_AUTH_TOKEN`.
 
-# 5. Register your servers in the database, and watch your fleet appear
-```
+**New here?** See it instantly with sample data → **[docs/setup-demo.md](docs/setup-demo.md)**.
+Ready to connect your own servers → **[docs/setup-actual.md](docs/setup-actual.md)**.
 
 ## What you can do
 
-- **See your whole fleet at a glance** — every server, every process, on one dashboard
+- **See every process at a glance** — every server, every process, on one dashboard
 - **Spot trouble instantly** — health warnings and problem processes rise to the surface before you even click
 - **Inspect anything, anywhere** — open any process and get its full story: how it's running, how it's been behaving, and what it's saying
 - **Follow live logs** — watch stdout/stderr stream in as it happens, no terminal required
@@ -58,13 +60,6 @@ npm run dev
 | **Process** | CPU %, memory, status, PID, uptime, restart & unstable-restart counts, exec mode, instances, interpreter, watch & autorestart flags, working directory |
 | **Logs** | stdout / stderr, last 5–300 lines, optional auto-refresh |
 
-## Built on
+## Related repository
 
-- **React 19** + **TypeScript** + **Vite**
-- **Tailwind CSS 4** + **shadcn/ui**
-- **xpm-agent** — a Bun + Elysia service that drives **PM2**
-
-## Roadmap
-
-- **Templates** — a library of ready-made presets (e.g. a Node.js app) so registering a new service is a two-click job, not a form to fill from scratch
-- **Register (simplified)** — pick a server and a template, then configure. That's it — no PM2 syntax to learn
+- **[xpm-agent](https://github.com/marksxiety/xpm-agent)** — included in this repo as the `agent/` git submodule; the Bun + Elysia REST API that drives PM2 on each server. XPM is its dashboard: every metric and action here flows through the agents you deploy.
