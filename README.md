@@ -5,7 +5,7 @@
 <p align="center">
   <b>Running your processes with PM2? This one's for you.</b><br/>
   The control plane for <a href="https://github.com/marksxiety/xpm-agent">xpm-agent</a> —
-  included here as a git submodule, watch and control every process from here.
+  watch and control every process from here.
 </p>
 
 <p align="center"><img src="web/src/assets/images/demo.png" width="100%" alt="XPM dashboard showing five servers and 28 processes across online, errored, stopped, scheduled, and degraded states" /></p>
@@ -30,13 +30,13 @@ PM2 is a process manager — the engine that keeps your apps alive in the backgr
 
 ## How it works
 
-XPM is two workspaces in this repo plus one git submodule that runs on every monitored server:
+XPM is two workspaces in this repo, plus the agent that runs on every monitored server:
 
 | Piece | Where | Role |
 |---|---|---|
 | **xpm-web** | this repo (`web/`) | The dashboard you open in the browser |
 | **xpm-server** | this repo (`server/`) | Registry API — stores your server list (PostgreSQL) |
-| **xpm-agent** | git submodule — [`agent/`](https://github.com/marksxiety/xpm-agent) | REST wrapper around PM2 — one per server, the only thing that touches PM2 |
+| **xpm-agent** | separate repo — [`xpm-agent`](https://github.com/marksxiety/xpm-agent) | REST wrapper around PM2 — one per server, the only thing that touches PM2 |
 
 The dashboard reads your server list from **xpm-server**, then talks to each **xpm-agent** directly to pull live process data and send lifecycle commands. Agents are guarded by `AUTH_TOKEN`; give the dashboard the matching `VITE_AGENT_AUTH_TOKEN`.
 

@@ -9,7 +9,7 @@ Everything needed to run the registry API (`xpm-server`), the dashboard (`xpm-we
 ## Prerequisites
 
 - **Node.js** and **PostgreSQL** — for the registry and dashboard.
-- **[xpm-agent](https://github.com/marksxiety/xpm-agent)** — included in this repo as the `agent/` git submodule; deploy it on every server you want to monitor (it requires **Bun** and **PM2**; see the [agent setup guide](https://github.com/marksxiety/xpm-agent/blob/main/docs/SETUP.md)).
+- **[xpm-agent](https://github.com/marksxiety/xpm-agent)** — deploy it from its own repo on every server you want to monitor (it requires **Bun** and **PM2**; see the [agent setup guide](https://github.com/marksxiety/xpm-agent/blob/main/docs/SETUP.md)).
 
 ## 1. Install xpm-agent on each monitored server
 

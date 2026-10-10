@@ -27,3 +27,6 @@ dist-ssr
 
 # Simulation build artifacts
 simulation/
+
+# Local agent deployment (xpm-agent lives in its own repo)
+agent/
