@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -8,7 +8,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import { Checkbox } from '@/components/ui/checkbox'
 import {
   Collapsible,
   CollapsibleContent,
@@ -16,6 +15,7 @@ import {
 } from '@/components/ui/collapsible'
 import { Field, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { Separator } from '@/components/ui/separator'
 import {
   Select,
   SelectContent,
@@ -24,56 +24,241 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { catalogField, groupTemplateKeys } from '@/lib/process-fields'
+import {
+  ADVANCED_GROUPS,
+  advancedFields,
+  advancedGroupFields,
+  basicFields,
+  isFieldEnabled,
+} from '@/lib/process-fields'
 import { cn } from '@/lib/utils'
-import type { FieldGroup } from '@/lib/process-fields'
-import type { TemplateKey } from '@/types/template'
-
-type ProcessFormMode = 'process' | 'template'
+import type { ProcessFieldSpec } from '@/lib/process-fields'
+import type { TemplateValues } from '@/types/template'
 
 interface ProcessFormProps {
-  /** Rows to render. Hidden filtering is the caller's responsibility. */
-  fields: TemplateKey[]
+  /** Sparse map of PM2 option keys to values; missing keys are untouched. */
+  values: TemplateValues
   errors?: Record<string, string>
-  onChange: (propertyKey: string, value: string) => void
-  /** Template mode: updates the required/hidden flags of an existing row. */
-  onUpdate?: (propertyKey: string, patch: Partial<TemplateKey>) => void
-  mode?: ProcessFormMode
+  onChange: (key: string, value: unknown) => void
 }
 
 const WIDE_FIELD_KEYS = new Set(['cwd', 'interpreter', 'script'])
 
-function isWideField(field: TemplateKey): boolean {
+function isWideField(spec: ProcessFieldSpec): boolean {
+  return spec.type === 'array' || spec.type === 'object' || WIDE_FIELD_KEYS.has(spec.key)
+}
+
+function typeTag(spec: ProcessFieldSpec): string {
+  return spec.type.toUpperCase()
+}
+
+// ---------------------------------------------------------------------------
+// Value controls
+// ---------------------------------------------------------------------------
+
+function TagInput({
+  spec,
+  value,
+  disabled,
+  onChange,
+}: {
+  spec: ProcessFieldSpec
+  value: unknown
+  disabled: boolean
+  onChange: (value: string[]) => void
+}) {
+  const tags = Array.isArray(value) ? (value as string[]) : []
+  const [draft, setDraft] = useState('')
+
+  const commit = () => {
+    const next = draft.trim()
+    if (next === '') return
+    onChange([...tags, next])
+    setDraft('')
+  }
+
+  const removeAt = (index: number) => onChange(tags.filter((_, i) => i !== index))
+
   return (
-    field.data_type === 'array' ||
-    field.data_type === 'object' ||
-    WIDE_FIELD_KEYS.has(field.property_key)
+    <div className={cn(disabled && 'opacity-60')}>
+      <div className='flex gap-2'>
+        <Input
+          className='font-mono text-xs'
+          value={draft}
+          disabled={disabled}
+          placeholder={spec.placeholder}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault()
+              commit()
+            } else if (event.key === 'Backspace' && draft === '' && tags.length > 0) {
+              removeAt(tags.length - 1)
+            }
+          }}
+        />
+        <Button
+          type='button'
+          variant='outline'
+          size='icon'
+          disabled={disabled || draft.trim() === ''}
+          aria-label={`Add to ${spec.key}`}
+          onClick={commit}
+        >
+          <Plus strokeWidth={2} />
+        </Button>
+      </div>
+      {tags.length > 0 && (
+        <div className='mt-2 flex flex-wrap gap-1.5'>
+          {tags.map((tag, index) => (
+            <span
+              key={`${tag}-${index}`}
+              className='inline-flex items-center gap-1 rounded-md border bg-muted/40 py-0.5 pr-1 pl-2 font-mono text-[11px]'
+            >
+              {tag}
+              <button
+                type='button'
+                disabled={disabled}
+                aria-label={`Remove ${tag}`}
+                className='rounded-sm p-0.5 text-muted-foreground transition-colors hover:text-foreground disabled:pointer-events-none'
+                onClick={() => removeAt(index)}
+              >
+                <X className='size-3' strokeWidth={2} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+type EnvRow = { key: string; value: string }
+
+function rowsFromObject(value: unknown): EnvRow[] {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return []
+  return Object.entries(value as Record<string, unknown>).map(([key, entry]) => ({
+    key,
+    value: entry === null || entry === undefined ? '' : String(entry),
+  }))
+}
+
+function rowsToObject(rows: EnvRow[]): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const row of rows) {
+    const key = row.key.trim()
+    if (key === '') continue
+    out[key] = row.value
+  }
+  return out
+}
+
+function KeyValueEditor({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: unknown
+  disabled: boolean
+  onChange: (value: Record<string, string>) => void
+}) {
+  const serialized = JSON.stringify(value ?? {})
+  const [rows, setRows] = useState<EnvRow[]>(() => rowsFromObject(value))
+  const [synced, setSynced] = useState(serialized)
+
+  // Adjust state during render (React's documented pattern) instead of an
+  // effect: reseed only when the incoming object no longer matches what the
+  // local rows produce, so blank in-progress rows survive while typing.
+  if (synced !== serialized) {
+    setSynced(serialized)
+    if (JSON.stringify(rowsToObject(rows)) !== serialized) {
+      setRows(rowsFromObject(value))
+    }
+  }
+
+  const update = (next: EnvRow[]) => {
+    setRows(next)
+    onChange(rowsToObject(next))
+  }
+
+  return (
+    <div className={cn('space-y-2', disabled && 'opacity-60')}>
+      {rows.map((row, index) => (
+        <div key={index} className='flex gap-2'>
+          <Input
+            className='font-mono text-xs'
+            placeholder='KEY'
+            disabled={disabled}
+            value={row.key}
+            onChange={(event) =>
+              update(rows.map((r, i) => (i === index ? { ...r, key: event.target.value } : r)))
+            }
+          />
+          <Input
+            className='font-mono text-xs'
+            placeholder='value'
+            disabled={disabled}
+            value={row.value}
+            onChange={(event) =>
+              update(rows.map((r, i) => (i === index ? { ...r, value: event.target.value } : r)))
+            }
+          />
+          <Button
+            type='button'
+            variant='outline'
+            size='icon'
+            disabled={disabled}
+            aria-label='Remove variable'
+            onClick={() => update(rows.filter((_, i) => i !== index))}
+          >
+            <X strokeWidth={2} />
+          </Button>
+        </div>
+      ))}
+      <Button
+        type='button'
+        variant='outline'
+        size='sm'
+        disabled={disabled}
+        onClick={() => update([...rows, { key: '', value: '' }])}
+      >
+        <Plus strokeWidth={2} />
+        Add variable
+      </Button>
+    </div>
   )
 }
 
 function FieldControl({
-  field,
+  spec,
+  value,
+  disabled,
   onChange,
 }: {
-  field: TemplateKey
-  onChange: (value: string) => void
+  spec: ProcessFieldSpec
+  value: unknown
+  disabled: boolean
+  onChange: (value: unknown) => void
 }) {
-  const value = field.property_value ?? ''
-  const spec = catalogField(field.property_key)
-
-  if (field.data_type === 'boolean') {
+  if (spec.type === 'boolean') {
+    const resting = spec.defaultValue === true
+    const checked = value === undefined ? resting : value === true || value === 'true'
     return (
       <Switch
-        checked={value === 'true'}
-        onCheckedChange={(checked) => onChange(checked ? 'true' : 'false')}
+        checked={checked}
+        disabled={disabled}
+        onCheckedChange={(next) => onChange(next === true)}
       />
     )
   }
 
-  if (spec?.options) {
+  if (spec.select && spec.options) {
     return (
-      <Select value={value} onValueChange={(next) => onChange(next ?? '')}>
-        <SelectTrigger className='w-full'>
+      <Select
+        value={typeof value === 'string' ? value : ''}
+        onValueChange={(next) => onChange(next ?? '')}
+      >
+        <SelectTrigger className='w-full' disabled={disabled}>
           <SelectValue placeholder='Select a value' />
         </SelectTrigger>
         <SelectContent>
@@ -87,160 +272,111 @@ function FieldControl({
     )
   }
 
-  if (field.data_type === 'array' || field.data_type === 'object') {
+  if (spec.combobox && spec.options) {
+    const listId = `list-${spec.key}`
     return (
-      <textarea
-        className='min-h-20 w-full rounded-md border border-input bg-input/20 p-2 font-mono text-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30'
-        placeholder={
-          spec?.placeholder ??
-          (field.data_type === 'array' ? '["--port", "3000"]' : '{ "NODE_ENV": "production" }')
-        }
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
+      <>
+        <Input
+          className='font-mono text-xs'
+          list={listId}
+          disabled={disabled}
+          placeholder={spec.placeholder}
+          value={typeof value === 'string' ? value : ''}
+          onChange={(event) => onChange(event.target.value)}
+        />
+        <datalist id={listId}>
+          {spec.options.map((option) => (
+            <option key={option} value={option} />
+          ))}
+        </datalist>
+      </>
     )
   }
 
-  if (field.data_type === 'number') {
-    return (
-      <Input
-        className='font-mono text-xs'
-        type={field.property_key === 'instances' ? 'text' : 'number'}
-        inputMode='numeric'
-        placeholder={spec?.placeholder}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    )
+  if (spec.type === 'array') {
+    return <TagInput spec={spec} value={value} disabled={disabled} onChange={onChange} />
   }
 
+  if (spec.type === 'object') {
+    return <KeyValueEditor value={value} disabled={disabled} onChange={onChange} />
+  }
+
+  const isNumeric = spec.type === 'number' || spec.type === 'duration'
   return (
     <Input
       className='font-mono text-xs'
-      placeholder={spec?.placeholder}
-      value={value}
+      type='text'
+      inputMode={isNumeric ? 'numeric' : undefined}
+      disabled={disabled}
+      placeholder={spec.placeholder}
+      value={typeof value === 'string' || typeof value === 'number' ? String(value) : ''}
       onChange={(event) => onChange(event.target.value)}
     />
   )
 }
 
 function ProcessField({
-  field,
+  spec,
+  value,
   error,
+  values,
   onChange,
 }: {
-  field: TemplateKey
+  spec: ProcessFieldSpec
+  value: unknown
   error: string | undefined
-  onChange: (value: string) => void
+  values: TemplateValues
+  onChange: (value: unknown) => void
 }) {
-  const required = field.is_required || catalogField(field.property_key)?.isRequired === true
+  const disabled = !isFieldEnabled(spec, values)
+  const showHint = spec.hint !== undefined && (spec.enabledWhen === undefined || disabled)
 
   return (
-    <Field data-invalid={!!error}>
+    <Field data-invalid={!!error} data-disabled={disabled}>
       <div className='flex items-center justify-between gap-2'>
-        <FieldLabel htmlFor={field.property_key} className='text-muted-foreground'>
-          {field.property_key}
-          {required && <span className='text-destructive'>*</span>}
+        <FieldLabel htmlFor={spec.key} className='text-muted-foreground'>
+          {spec.key}
+          {spec.required && <span className='text-destructive'>*</span>}
         </FieldLabel>
         <span className='text-[10px] tracking-wide text-muted-foreground uppercase'>
-          {field.data_type}
+          {typeTag(spec)}
         </span>
       </div>
-      <FieldControl field={field} onChange={onChange} />
+      <FieldControl spec={spec} value={value} disabled={disabled} onChange={onChange} />
+      {showHint && <p className='text-[11px] text-muted-foreground'>{spec.hint}</p>}
       <FieldError errors={[error ? { message: error } : undefined]} />
     </Field>
   )
 }
 
-function TemplateFieldRow({
-  field,
-  onChange,
-  onUpdate,
-}: {
-  field: TemplateKey
-  onChange: (value: string) => void
-  onUpdate: (patch: Partial<TemplateKey>) => void
-}) {
-  return (
-    <div className='space-y-2 rounded-md border p-3'>
-      <div className='flex items-center justify-between gap-2'>
-        <span className='font-mono text-xs font-medium'>{field.property_key}</span>
-        <div className='flex items-center gap-3'>
-          <label className='flex items-center gap-1.5 text-[11px] text-muted-foreground'>
-            <Checkbox
-              checked={field.is_required}
-              onCheckedChange={(checked) => onUpdate({ is_required: checked === true })}
-            />
-            Required
-          </label>
-          <label className='flex items-center gap-1.5 text-[11px] text-muted-foreground'>
-            <Checkbox
-              checked={field.is_hidden}
-              onCheckedChange={(checked) => onUpdate({ is_hidden: checked === true })}
-            />
-            Hidden
-          </label>
-        </div>
-      </div>
-      <div className='flex items-center gap-2'>
-        <span className='w-20 shrink-0 text-[10px] tracking-wide text-muted-foreground uppercase'>
-          {field.data_type}
-        </span>
-        <div className='min-w-0 flex-1'>
-          <FieldControl field={field} onChange={onChange} />
-        </div>
-      </div>
-    </div>
-  )
-}
-
 /**
- * Renders the process configuration as two cards (Basic and Advanced). Process
- * registration and template editing share this layout; validation and
- * submission stay with the page that owns them.
+ * Renders the process configuration as two cards (Basic and Advanced) from the
+ * master field list. Process registration and template editing share this
+ * component; validation and submission stay with the page that owns them.
  */
-export function ProcessForm({
-  fields,
-  errors = {},
-  onChange,
-  onUpdate,
-  mode = 'process',
-}: ProcessFormProps) {
-  const { basic, advanced } = useMemo(() => groupTemplateKeys(fields), [fields])
+export function ProcessForm({ values, errors = {}, onChange }: ProcessFormProps) {
+  const [advancedOpen, setAdvancedOpen] = useState(false)
 
-  const hasAdvancedError = advanced.some((field) => errors[field.property_key] !== undefined)
-  const [advancedOpen, setAdvancedOpen] = useState(mode === 'template')
-  // Errors force the card open so advanced issues can never be missed.
+  const hasAdvancedError = useMemo(
+    () => advancedFields().some((spec) => errors[spec.key] !== undefined),
+    [errors],
+  )
   const advancedExpanded = advancedOpen || hasAdvancedError
 
-  const renderFields = (group: FieldGroup, groupFields: TemplateKey[]) => (
-    <div className={cn('gap-4', mode === 'process' ? 'grid grid-cols-1 sm:grid-cols-2' : 'space-y-3')}>
-      {groupFields.length === 0 && mode === 'template' && (
-        <p className='text-sm text-muted-foreground'>No {group} fields.</p>
-      )}
-      {groupFields.map((field) =>
-        mode === 'template' ? (
-          <TemplateFieldRow
-            key={field.property_key}
-            field={field}
-            onChange={(value) => onChange(field.property_key, value)}
-            onUpdate={(patch) => onUpdate?.(field.property_key, patch)}
-          />
-        ) : (
-          <div key={field.property_key} className={cn(isWideField(field) && 'sm:col-span-2')}>
-            <ProcessField
-              field={field}
-              error={errors[field.property_key]}
-              onChange={(value) => onChange(field.property_key, value)}
-            />
-          </div>
-        ),
-      )}
+  const renderField = (spec: ProcessFieldSpec) => (
+    <div key={spec.key} className={cn(isWideField(spec) && 'sm:col-span-2')}>
+      <ProcessField
+        spec={spec}
+        value={values[spec.key]}
+        error={errors[spec.key]}
+        values={values}
+        onChange={(next) => onChange(spec.key, next)}
+      />
     </div>
   )
 
   return (
-    <div className='space-y-4'>
+    <div className='space-y-4 m-2'>
       <Card>
         <CardHeader>
           <CardTitle>Basic</CardTitle>
@@ -248,7 +384,11 @@ export function ProcessForm({
             Identity, runtime and execution settings for the process.
           </CardDescription>
         </CardHeader>
-        <CardContent>{renderFields('basic', basic)}</CardContent>
+        <CardContent>
+          <div className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
+            {basicFields().map(renderField)}
+          </div>
+        </CardContent>
       </Card>
 
       <Card>
@@ -258,7 +398,7 @@ export function ProcessForm({
               <div className='space-y-1.5'>
                 <CardTitle>Advanced</CardTitle>
                 <CardDescription>
-                  Stability, scaling and recovery. Defaults are pre-filled.
+                  Stability, scheduling and recovery. Leave blank to use agent defaults.
                 </CardDescription>
               </div>
               <CollapsibleTrigger
@@ -280,7 +420,21 @@ export function ProcessForm({
             </div>
           </CardHeader>
           <CollapsibleContent>
-            <CardContent>{renderFields('advanced', advanced)}</CardContent>
+            <CardContent className='space-y-6'>
+              {ADVANCED_GROUPS.map((group) => (
+                <div key={group.id}>
+                  <div className='mb-3 flex items-center gap-3'>
+                    <span className='text-[10px] font-medium tracking-wide text-muted-foreground uppercase'>
+                      {group.label}
+                    </span>
+                    <Separator className='flex-1' />
+                  </div>
+                  <div className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
+                    {advancedGroupFields(group.id).map(renderField)}
+                  </div>
+                </div>
+              ))}
+            </CardContent>
           </CollapsibleContent>
         </Collapsible>
       </Card>
