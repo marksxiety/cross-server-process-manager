@@ -60,11 +60,13 @@ function TagInput({
   spec,
   value,
   disabled,
+  invalid,
   onChange,
 }: {
   spec: ProcessFieldSpec
   value: unknown
   disabled: boolean
+  invalid: boolean
   onChange: (value: string[]) => void
 }) {
   const tags = Array.isArray(value) ? (value as string[]) : []
@@ -86,6 +88,7 @@ function TagInput({
           className='font-mono text-xs'
           value={draft}
           disabled={disabled}
+          aria-invalid={invalid || undefined}
           placeholder={spec.placeholder}
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={(event) => {
@@ -233,11 +236,13 @@ function FieldControl({
   spec,
   value,
   disabled,
+  invalid,
   onChange,
 }: {
   spec: ProcessFieldSpec
   value: unknown
   disabled: boolean
+  invalid: boolean
   onChange: (value: unknown) => void
 }) {
   if (spec.type === 'boolean') {
@@ -247,6 +252,7 @@ function FieldControl({
       <Switch
         checked={checked}
         disabled={disabled}
+        aria-invalid={invalid || undefined}
         onCheckedChange={(next) => onChange(next === true)}
       />
     )
@@ -258,7 +264,7 @@ function FieldControl({
         value={typeof value === 'string' ? value : ''}
         onValueChange={(next) => onChange(next ?? '')}
       >
-        <SelectTrigger className='w-full' disabled={disabled}>
+        <SelectTrigger className='w-full' disabled={disabled} aria-invalid={invalid || undefined}>
           <SelectValue placeholder='Select a value' />
         </SelectTrigger>
         <SelectContent>
@@ -280,6 +286,7 @@ function FieldControl({
           className='font-mono text-xs'
           list={listId}
           disabled={disabled}
+          aria-invalid={invalid || undefined}
           placeholder={spec.placeholder}
           value={typeof value === 'string' ? value : ''}
           onChange={(event) => onChange(event.target.value)}
@@ -294,7 +301,9 @@ function FieldControl({
   }
 
   if (spec.type === 'array') {
-    return <TagInput spec={spec} value={value} disabled={disabled} onChange={onChange} />
+    return (
+      <TagInput spec={spec} value={value} disabled={disabled} invalid={invalid} onChange={onChange} />
+    )
   }
 
   if (spec.type === 'object') {
@@ -308,6 +317,7 @@ function FieldControl({
       type='text'
       inputMode={isNumeric ? 'numeric' : undefined}
       disabled={disabled}
+      aria-invalid={invalid || undefined}
       placeholder={spec.placeholder}
       value={typeof value === 'string' || typeof value === 'number' ? String(value) : ''}
       onChange={(event) => onChange(event.target.value)}
@@ -330,9 +340,10 @@ function ProcessField({
 }) {
   const disabled = !isFieldEnabled(spec, values)
   const showHint = spec.hint !== undefined && (spec.enabledWhen === undefined || disabled)
+  const invalid = !!error
 
   return (
-    <Field data-invalid={!!error} data-disabled={disabled}>
+    <Field data-disabled={disabled}>
       <div className='flex items-center justify-between gap-2'>
         <FieldLabel htmlFor={spec.key} className='text-muted-foreground'>
           {spec.key}
@@ -342,7 +353,13 @@ function ProcessField({
           {typeTag(spec)}
         </span>
       </div>
-      <FieldControl spec={spec} value={value} disabled={disabled} onChange={onChange} />
+      <FieldControl
+        spec={spec}
+        value={value}
+        disabled={disabled}
+        invalid={invalid}
+        onChange={onChange}
+      />
       {showHint && <p className='text-[11px] text-muted-foreground'>{spec.hint}</p>}
       <FieldError errors={[error ? { message: error } : undefined]} />
     </Field>
