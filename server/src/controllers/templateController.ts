@@ -2,29 +2,10 @@ import type { Request, Response } from 'express';
 import type { PoolClient } from 'pg';
 import { z } from 'zod';
 import db from '../config/db';
-import { templateInputSchema, templateKeysInputSchema } from '../schemas/templateSchema';
+import { templateInputSchema, templateValuesInputSchema } from '../schemas/templateSchema';
 import { fail, ok } from '../utils/response';
 
-export type TemplateDataType = 'string' | 'boolean' | 'number' | 'array' | 'object';
-
-const INVALID_ID_MESSAGE = 'Template id must be a positive integer';
-const NOT_FOUND_MESSAGE = 'Template not found';
-const VALIDATION_FAILED_CODE = 'VALIDATION_FAILED';
-const CHECK_VIOLATION_CODE = '23514';
-const DUPLICATE_KEY_CODE = '23505';
-const DUPLICATE_TEMPLATE_CODE = 'DUPLICATE_TEMPLATE';
-
-function duplicateTemplateMessage(name: string): string {
-    return `Template "${name}" is already registered`;
-}
-
-export interface TemplateKeyRecord {
-    property_key: string;
-    property_value: string | null;
-    data_type: TemplateDataType;
-    is_required: boolean;
-    is_hidden: boolean;
-}
+export type TemplateValues = Record<string, unknown>;
 
 export interface TemplateRecord {
     id: number;
@@ -33,23 +14,22 @@ export interface TemplateRecord {
     description: string | null;
     preview: string | null;
     is_active: boolean;
-    keys: TemplateKeyRecord[];
+    values: TemplateValues;
 }
 
-export type TemplateSummary = Omit<TemplateRecord, 'keys'>;
+export type TemplateSummary = Omit<TemplateRecord, 'values'>;
 
-interface Templates {
-    id: number;
-    template_name: string;
-    category: string | null;
-    description: string | null;
-    preview: string | null;
-    is_active: boolean;
-    property_key: string | null;
-    property_value: string | null;
-    data_type: TemplateDataType | null;
-    is_required: boolean | null;
-    is_hidden: boolean | null;
+const INVALID_ID_MESSAGE = 'Template id must be a positive integer';
+const NOT_FOUND_MESSAGE = 'Template not found';
+const VALIDATION_FAILED_CODE = 'VALIDATION_FAILED';
+const CHECK_VIOLATION_CODE = '23514';
+const DUPLICATE_KEY_CODE = '23505';
+const DUPLICATE_TEMPLATE_CODE = 'DUPLICATE_TEMPLATE';
+
+const TEMPLATE_COLUMNS = `id, template_name, category, description, preview, is_active, values`;
+
+function duplicateTemplateMessage(name: string): string {
+    return `Template "${name}" is already registered`;
 }
 
 function parseIdParam(value: string | string[] | undefined): number | null {
@@ -58,103 +38,35 @@ function parseIdParam(value: string | string[] | undefined): number | null {
     return Number.isInteger(id) && id > 0 ? id : null;
 }
 
-// Collapses the flat LEFT JOIN rows (one per key) into templates with a nested
-// `keys` array, preserving query order for both templates and keys.
-function groupTemplateRows(rows: Templates[]): TemplateRecord[] {
-    const templates = new Map<number, TemplateRecord>();
-
-    for (const row of rows) {
-        const templateId = row.id;
-        if (!templates.has(templateId)) {
-            templates.set(templateId, {
-                id: templateId,
-                template_name: row.template_name,
-                category: row.category,
-                description: row.description,
-                preview: row.preview,
-                is_active: row.is_active,
-                keys: []
-            });
-        }
-
-        const template = templates.get(templateId);
-        if (template && row.property_key !== null) {
-            template.keys.push({
-                property_key: row.property_key,
-                property_value: row.property_value,
-                data_type: row.data_type ?? 'string',
-                is_required: row.is_required ?? false,
-                is_hidden: row.is_hidden ?? false
-            });
-        }
-    }
-
-    return [...templates.values()];
-}
-
-// Upserts a key by the (template_id, property_key) natural key. Shared by the
-// register and update flows so both persist keys identically.
-async function upsertTemplateKey(
-    client: PoolClient,
-    templateId: number,
-    key: TemplateKeyRecord
-): Promise<void> {
-    await client.query(
-        `INSERT INTO template_keys
-           (template_id, property_key, property_value, data_type, is_required, is_hidden)
-         VALUES ($1, $2, $3, $4, $5, $6)
-         ON CONFLICT (template_id, property_key) DO UPDATE
-         SET property_value = EXCLUDED.property_value,
-             data_type = EXCLUDED.data_type,
-             is_required = EXCLUDED.is_required,
-             is_hidden = EXCLUDED.is_hidden,
-             updated_at = current_timestamp`,
-        [
-            templateId,
-            key.property_key,
-            key.property_value,
-            key.data_type,
-            key.is_required,
-            key.is_hidden
-        ]
-    );
-}
-
 export const index = async (req: Request, res: Response): Promise<void> => {
     const withInactive = req.query.with_inactive === 'true';
 
     try {
-
-        const { rows } = await db.query<Templates>(
+        const { rows } = await db.query<TemplateRecord>(
             `SELECT t.id,
                     t.template_name,
                     t.category,
                     t.description,
                     t.preview,
                     t.is_active,
-                    k.property_key,
-                    k.property_value,
-                    k.data_type,
-                    k.is_required,
-                    k.is_hidden
+                    t.values
              FROM templates t
-             LEFT JOIN template_keys k ON k.template_id = t.id
              LEFT JOIN (
                  SELECT category, COUNT(id) AS cat_count
                  FROM templates
                  GROUP BY category
              ) c ON t.category = c.category
              WHERE ($1::boolean OR t.is_active = TRUE)
-             ORDER BY c.cat_count DESC, t.category ASC, t.template_name ASC, k.id`,
+             ORDER BY c.cat_count DESC, t.category ASC, t.template_name ASC`,
             [withInactive]
-        )
+        );
 
-        ok(res, 'Templates retrieved successfully', groupTemplateRows(rows));
+        ok(res, 'Templates retrieved successfully', rows);
     } catch (error) {
         console.error(error);
         fail(res, 500, 'Failed to retrieve templates', 'INTERNAL_SERVER_ERROR');
     }
-}
+};
 
 export const create = async (req: Request, res: Response): Promise<void> => {
     const parsed = templateInputSchema.safeParse(req.body);
@@ -169,13 +81,14 @@ export const create = async (req: Request, res: Response): Promise<void> => {
         return;
     }
 
-    const { template_name, category, description, preview, is_active, keys } = parsed.data;
+    const { template_name, category, description, preview, is_active, values } = parsed.data;
     const template = {
         template_name,
         category: category || null,
         description: description || null,
         preview: preview || null,
-        is_active: is_active ?? true
+        is_active: is_active ?? true,
+        values: values as TemplateValues,
     };
 
     let client: PoolClient;
@@ -191,15 +104,16 @@ export const create = async (req: Request, res: Response): Promise<void> => {
         await client.query('BEGIN');
 
         const { rows } = await client.query<{ id: number }>(
-            `INSERT INTO templates (template_name, category, description, preview, is_active)
-             VALUES ($1, $2, $3, $4, $5)
+            `INSERT INTO templates (template_name, category, description, preview, is_active, values)
+             VALUES ($1, $2, $3, $4, $5, $6)
              RETURNING id`,
             [
                 template.template_name,
                 template.category,
                 template.description,
                 template.preview,
-                template.is_active
+                template.is_active,
+                template.values,
             ]
         );
 
@@ -210,13 +124,9 @@ export const create = async (req: Request, res: Response): Promise<void> => {
             return;
         }
 
-        for (const key of keys) {
-            await upsertTemplateKey(client, id, key);
-        }
-
         await client.query('COMMIT');
 
-        ok(res, 'Template registered successfully', { id, ...template, keys });
+        ok(res, 'Template registered successfully', { id, ...template });
     } catch (error) {
         await client.query('ROLLBACK').catch(() => undefined);
         console.error(error);
@@ -247,7 +157,7 @@ export const create = async (req: Request, res: Response): Promise<void> => {
     } finally {
         client.release();
     }
-}
+};
 
 export const update = async (req: Request, res: Response): Promise<void> => {
     const id = parseIdParam(req.params.id);
@@ -256,7 +166,7 @@ export const update = async (req: Request, res: Response): Promise<void> => {
         return;
     }
 
-    const parsed = templateKeysInputSchema.safeParse(req.body);
+    const parsed = templateValuesInputSchema.safeParse(req.body);
     if (!parsed.success) {
         fail(
             res,
@@ -268,7 +178,7 @@ export const update = async (req: Request, res: Response): Promise<void> => {
         return;
     }
 
-    const { keys } = parsed.data;
+    const { values } = parsed.data;
 
     let client: PoolClient;
     try {
@@ -292,46 +202,21 @@ export const update = async (req: Request, res: Response): Promise<void> => {
             return;
         }
 
-        // Upsert by the (template_id, property_key) natural key, then prune any
-        // stored keys that were dropped in the editor — all in one transaction.
-        for (const key of keys) {
-            await upsertTemplateKey(client, id, key);
-        }
-
         await client.query(
-            `DELETE FROM template_keys
-             WHERE template_id = $1 AND NOT (property_key = ANY($2::text[]))`,
-            [id, keys.map((key) => key.property_key)]
+            `UPDATE templates
+             SET values = $2, updated_at = current_timestamp
+             WHERE id = $1`,
+            [id, values]
         );
 
-        await client.query(
-            'UPDATE templates SET updated_at = current_timestamp WHERE id = $1',
-            [id]
-        );
-
-        const { rows } = await client.query<Templates>(
-            `SELECT t.id,
-                    t.template_name,
-                    t.category,
-                    t.description,
-                    t.preview,
-                    t.is_active,
-                    k.property_key,
-                    k.property_value,
-                    k.data_type,
-                    k.is_required,
-                    k.is_hidden
-             FROM templates t
-             LEFT JOIN template_keys k ON k.template_id = t.id
-             WHERE t.id = $1
-             ORDER BY k.id`,
+        const { rows } = await client.query<TemplateRecord>(
+            `SELECT ${TEMPLATE_COLUMNS} FROM templates WHERE id = $1`,
             [id]
         );
 
         await client.query('COMMIT');
 
-        const templates = groupTemplateRows(rows);
-        ok(res, 'Template updated successfully', templates[0] ?? null);
+        ok(res, 'Template updated successfully', rows[0] ?? null);
     } catch (error) {
         await client.query('ROLLBACK').catch(() => undefined);
         console.error(error);
@@ -356,7 +241,7 @@ export const update = async (req: Request, res: Response): Promise<void> => {
     } finally {
         client.release();
     }
-}
+};
 
 export const remove = async (req: Request, res: Response): Promise<void> => {
     const id = parseIdParam(req.params.id);
@@ -366,8 +251,6 @@ export const remove = async (req: Request, res: Response): Promise<void> => {
     }
 
     try {
-        // template_keys.template_id references templates(id) ON DELETE CASCADE,
-        // so the key rows are removed atomically with the template.
         const { rows } = await db.query<TemplateSummary>(
             `DELETE FROM templates
              WHERE id = $1
