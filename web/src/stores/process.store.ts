@@ -1,28 +1,50 @@
 import { create } from "zustand";
 import { processService } from "@/api/services/process.service";
 import { toApiError, toUnreachableError } from "@/lib/error-code";
-import { buildCatalogFields, mergeCatalogFields } from "@/lib/process-fields";
 import { useDashboardStore } from "@/stores/dashboard.store";
 import type { ApiError, ApiResponse } from "@/types/api";
 import type { LoadStatus } from "@/types/dashboard";
 import type { ProcessSummary, StartIssue, StartProcessPayload } from "@/types/process";
 import type { RegisteredServer } from "@/types/server";
-import type { ProcessTemplate, TemplateKey } from "@/types/template";
-
-function fieldsForTemplate(template: ProcessTemplate | "none"): TemplateKey[] {
-    // None pre-fills the xpm defaults; a template contributes its own values and
-    // leaves every catalog key it does not define blank.
-    if (template === "none") return buildCatalogFields();
-    return mergeCatalogFields(template.keys);
-}
+import type { ProcessTemplate, TemplateValues } from "@/types/template";
 
 export type TemplateChoice = ProcessTemplate | "none";
+
+function templateValues(template: TemplateChoice): TemplateValues {
+    return template === "none" ? {} : { ...template.values };
+}
+
+/**
+ * Applies a template's values as starting points without discarding fields the
+ * user already edited by hand: a key the user touched keeps its value, every
+ * other key is replaced by the template's (or cleared when choosing "none").
+ */
+function applyTemplate(
+    template: TemplateChoice,
+    current: TemplateValues,
+    dirtyKeys: Set<string>,
+): TemplateValues {
+    const next: TemplateValues = {};
+
+    for (const key of dirtyKeys) {
+        if (current[key] !== undefined) next[key] = current[key];
+    }
+
+    for (const [key, value] of Object.entries(templateValues(template))) {
+        if (dirtyKeys.has(key)) continue;
+        next[key] = value;
+    }
+
+    return next;
+}
 
 interface ProcessState {
     step: 1 | 2;
     server: RegisteredServer | null;
     template: TemplateChoice;
-    fields: TemplateKey[];
+    values: TemplateValues;
+    /** Keys the user edited by hand; protected from template prefill. */
+    dirtyKeys: Set<string>;
     status: LoadStatus;
     requestError: ApiError | null;
     issues: StartIssue[];
@@ -30,7 +52,7 @@ interface ProcessState {
     goToStep: (step: 1 | 2) => void;
     selectServer: (server: RegisteredServer | null) => void;
     selectTemplate: (template: TemplateChoice) => void;
-    setValue: (propertyKey: string, value: string) => void;
+    setValue: (key: string, value: unknown) => void;
     submit: (payload: StartProcessPayload) => Promise<ApiResponse<ProcessSummary[] | StartIssue[]>>;
     reset: () => void;
 }
@@ -39,7 +61,8 @@ export const useProcessStore = create<ProcessState>()((set, get) => ({
     step: 1,
     server: null,
     template: "none",
-    fields: fieldsForTemplate("none"),
+    values: {},
+    dirtyKeys: new Set<string>(),
     status: "idle",
     requestError: null,
     issues: [],
@@ -50,21 +73,26 @@ export const useProcessStore = create<ProcessState>()((set, get) => ({
     selectServer: (server) => set({ server }),
 
     selectTemplate: (template) =>
-        set({
+        set((state) => ({
             template,
-            fields: fieldsForTemplate(template),
+            values: applyTemplate(template, state.values, state.dirtyKeys),
             status: "idle",
             requestError: null,
             issues: [],
             started: null,
-        }),
-
-    setValue: (propertyKey, value) =>
-        set((state) => ({
-            fields: state.fields.map((field) =>
-                field.property_key === propertyKey ? { ...field, property_value: value } : field
-            ),
         })),
+
+    setValue: (key, value) =>
+        set((state) => {
+            const values = { ...state.values };
+            if (value === undefined) delete values[key];
+            else values[key] = value;
+
+            const dirtyKeys = new Set(state.dirtyKeys);
+            dirtyKeys.add(key);
+
+            return { values, dirtyKeys };
+        }),
 
     // Submits a payload the page already validated and built. On success the
     // process list of the target server is re-synced so the dashboard reflects
@@ -106,11 +134,12 @@ export const useProcessStore = create<ProcessState>()((set, get) => ({
         return result;
     },
 
-    // Restores the selected template's defaults, keeping the server and template
+    // Restores the selected template's values, keeping the server and template
     // choices so another process can be registered right away.
     reset: () =>
         set((state) => ({
-            fields: fieldsForTemplate(state.template),
+            values: templateValues(state.template),
+            dirtyKeys: new Set<string>(),
             status: "idle",
             requestError: null,
             issues: [],
