@@ -346,7 +346,7 @@ function ProcessField({
     <Field data-disabled={disabled}>
       <div className='flex items-center justify-between gap-2'>
         <FieldLabel htmlFor={spec.key} className='text-muted-foreground'>
-          {spec.key}
+          {spec.label}
           {spec.required && <span className='text-destructive'>*</span>}
         </FieldLabel>
         <span className='text-[10px] tracking-wide text-muted-foreground uppercase'>

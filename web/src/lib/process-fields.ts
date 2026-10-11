@@ -23,6 +23,7 @@ export type AdvancedGroupId =
 
 export interface ProcessFieldSpec {
     key: string;
+    label: string;
     group: FieldGroup;
     advancedGroup?: AdvancedGroupId;
     type: FieldType;
@@ -51,10 +52,10 @@ export const ADVANCED_GROUPS: readonly { id: AdvancedGroupId; label: string }[] 
     { id: "overrides", label: "Overrides" },
     { id: "scaling", label: "Scaling" },
 ];
-
 export const PROCESS_FIELDS: readonly ProcessFieldSpec[] = [
     {
         key: "name",
+        label: "Process Name",
         group: "basic",
         type: "string",
         required: true,
@@ -62,12 +63,14 @@ export const PROCESS_FIELDS: readonly ProcessFieldSpec[] = [
     },
     {
         key: "namespace",
+        label: "Group (Namespace)",
         group: "basic",
         type: "string",
         placeholder: "default",
     },
     {
         key: "cwd",
+        label: "Working Directory (Project Folder)",
         group: "basic",
         type: "string",
         required: true,
@@ -75,6 +78,7 @@ export const PROCESS_FIELDS: readonly ProcessFieldSpec[] = [
     },
     {
         key: "interpreter",
+        label: "Interpreter (Runtime)",
         group: "basic",
         type: "string",
         required: true,
@@ -85,6 +89,7 @@ export const PROCESS_FIELDS: readonly ProcessFieldSpec[] = [
     },
     {
         key: "script",
+        label: "Script File",
         group: "basic",
         type: "string",
         required: true,
@@ -92,13 +97,15 @@ export const PROCESS_FIELDS: readonly ProcessFieldSpec[] = [
     },
     {
         key: "args",
+        label: "Script Arguments",
         group: "basic",
         type: "array",
         placeholder: "value",
-        hint: "One argument per row. Press Enter to add.",
+        hint: "One argument per row, in the exact order the script expects. Press Enter to add.",
     },
     {
         key: "env",
+        label: "Environment Variables",
         group: "basic",
         type: "object",
     },
@@ -106,6 +113,7 @@ export const PROCESS_FIELDS: readonly ProcessFieldSpec[] = [
     // Advanced — group 1: restart policy
     {
         key: "autorestart",
+        label: "Auto Restart",
         group: "advanced",
         advancedGroup: "restart",
         type: "boolean",
@@ -113,13 +121,16 @@ export const PROCESS_FIELDS: readonly ProcessFieldSpec[] = [
     },
     {
         key: "max_restarts",
+        label: "Max Restart Attempts",
         group: "advanced",
         advancedGroup: "restart",
         type: "number",
         placeholder: "16",
+        hint: "Maximum number of unstable restarts. Once reached, the process will no longer be restarted.",
     },
     {
         key: "min_uptime",
+        label: "Minimum Uptime (Counts as Stable)",
         group: "advanced",
         advancedGroup: "restart",
         type: "duration",
@@ -127,6 +138,7 @@ export const PROCESS_FIELDS: readonly ProcessFieldSpec[] = [
     },
     {
         key: "restart_delay",
+        label: "Delay Between Restarts",
         group: "advanced",
         advancedGroup: "restart",
         type: "duration",
@@ -136,6 +148,7 @@ export const PROCESS_FIELDS: readonly ProcessFieldSpec[] = [
     // Advanced — group 2: schedule
     {
         key: "cron_restart",
+        label: "Scheduled Restart (Cron)",
         group: "advanced",
         advancedGroup: "schedule",
         type: "string",
@@ -146,6 +159,7 @@ export const PROCESS_FIELDS: readonly ProcessFieldSpec[] = [
     // Advanced — group 3: resources & shutdown
     {
         key: "max_memory_restart",
+        label: "Restart When Memory Exceeds",
         group: "advanced",
         advancedGroup: "resources",
         type: "string",
@@ -153,6 +167,7 @@ export const PROCESS_FIELDS: readonly ProcessFieldSpec[] = [
     },
     {
         key: "kill_timeout",
+        label: "Force Stop Timeout",
         group: "advanced",
         advancedGroup: "resources",
         type: "duration",
@@ -162,6 +177,7 @@ export const PROCESS_FIELDS: readonly ProcessFieldSpec[] = [
     // Advanced — group 4: watch
     {
         key: "watch",
+        label: "Restart on File Changes",
         group: "advanced",
         advancedGroup: "watch",
         type: "boolean",
@@ -169,6 +185,7 @@ export const PROCESS_FIELDS: readonly ProcessFieldSpec[] = [
     },
     {
         key: "ignore_watch",
+        label: "Ignored Files / Folders",
         group: "advanced",
         advancedGroup: "watch",
         type: "array",
@@ -178,6 +195,7 @@ export const PROCESS_FIELDS: readonly ProcessFieldSpec[] = [
     },
     {
         key: "watch_delay",
+        label: "Wait Before Restarting",
         group: "advanced",
         advancedGroup: "watch",
         type: "duration",
@@ -189,6 +207,7 @@ export const PROCESS_FIELDS: readonly ProcessFieldSpec[] = [
     // Advanced — group 5: overrides
     {
         key: "interpreter_args",
+        label: "Interpreter Arguments",
         group: "advanced",
         advancedGroup: "overrides",
         type: "array",
@@ -196,6 +215,7 @@ export const PROCESS_FIELDS: readonly ProcessFieldSpec[] = [
     },
     {
         key: "windowsHide",
+        label: "Hide Console Window",
         group: "advanced",
         advancedGroup: "overrides",
         type: "boolean",
@@ -205,6 +225,7 @@ export const PROCESS_FIELDS: readonly ProcessFieldSpec[] = [
     // Advanced — group 6: scaling
     {
         key: "exec_mode",
+        label: "Execution Mode",
         group: "advanced",
         advancedGroup: "scaling",
         type: "string",
@@ -214,6 +235,7 @@ export const PROCESS_FIELDS: readonly ProcessFieldSpec[] = [
     },
     {
         key: "instances",
+        label: "Number of Instances",
         group: "advanced",
         advancedGroup: "scaling",
         type: "number",
@@ -222,7 +244,6 @@ export const PROCESS_FIELDS: readonly ProcessFieldSpec[] = [
         hint: "Available when exec_mode is cluster.",
     },
 ];
-
 const FIELD_BY_KEY = new Map(PROCESS_FIELDS.map((field) => [field.key, field]));
 
 export const ALLOWED_FIELD_KEYS: ReadonlySet<string> = new Set(FIELD_BY_KEY.keys());
