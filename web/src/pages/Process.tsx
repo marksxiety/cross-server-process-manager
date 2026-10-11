@@ -44,7 +44,7 @@ import { ErrorAlert } from '@/components/custom/error-alert'
 import { PageHeader } from '@/components/custom/page-header'
 import { ProcessForm } from '@/components/custom/process-form'
 import { errorCodeLabel, toApiError } from '@/lib/error-code'
-import { ALLOWED_FIELD_KEYS, REQUIRED_FIELD_KEYS, validateFields } from '@/lib/process-fields'
+import { isCatalogField, validateRegisterValues } from '@/lib/process-fields'
 import { buildTemplatePayload } from '@/lib/template-payload'
 import { cn, copyText } from '@/lib/utils'
 import { useServerStore } from '@/stores/server.store'
@@ -52,16 +52,11 @@ import { useProcessStore } from '@/stores/process.store'
 import { useTemplateStore } from '@/stores/template.store'
 import type { ApiError } from '@/types/api'
 import type { StartIssue, StartProcessPayload } from '@/types/process'
-import type { TemplateKey } from '@/types/template'
+import type { TemplateValues } from '@/types/template'
 
-// Coerces values by data_type (via the shared template-payload helper) and adds
-// the API-level targetOs. The one special case is `instances: "max"`, which the
-// numeric coercion would otherwise drop.
-function buildProcessPayload(fields: TemplateKey[]): StartProcessPayload {
-  const payload = buildTemplatePayload(fields)
-  const instances = fields.find((field) => field.property_key.trim() === 'instances')
-  if (instances?.property_value?.trim() === 'max') payload.instances = 'max'
-  return { ...payload, targetOs: 'win32' } as StartProcessPayload
+// Builds the sparse payload from the form values and adds the API-level targetOs.
+function buildProcessPayload(values: TemplateValues): StartProcessPayload {
+  return { ...buildTemplatePayload(values), targetOs: 'win32' } as StartProcessPayload
 }
 
 function mapIssues(issues: StartIssue[]): Record<string, string> {
@@ -198,7 +193,7 @@ export function Process() {
   const step = useProcessStore((state) => state.step)
   const server = useProcessStore((state) => state.server)
   const template = useProcessStore((state) => state.template)
-  const fields = useProcessStore((state) => state.fields)
+  const values = useProcessStore((state) => state.values)
   const status = useProcessStore((state) => state.status)
   const requestError = useProcessStore((state) => state.requestError)
   const issues = useProcessStore((state) => state.issues)
@@ -261,50 +256,22 @@ export function Process() {
     selectTemplate(match)
   }, [activeTemplates, searchParams, selectTemplate])
 
-  const visibleFields = useMemo(
-    () => fields.filter((field) => field.property_key.trim() !== '' && !field.is_hidden),
-    [fields],
-  )
-
-  const payload = useMemo(() => buildProcessPayload(visibleFields), [visibleFields])
+  const payload = useMemo(() => buildProcessPayload(values), [values])
 
   const issueMap = useMemo(() => mapIssues(issues), [issues])
   const errors: Record<string, string> = { ...clientErrors, ...issueMap }
 
-  // A server issue is only shown inline when the field is actually rendered;
-  // the rest (e.g. hidden or unknown keys) are listed separately.
-  const renderedKeys = useMemo(
-    () => new Set(visibleFields.map((field) => field.property_key.trim())),
-    [visibleFields],
-  )
-
+  // Every catalog field is always rendered, so only non-field issues (e.g. an
+  // unknown key from a hand-written template) need to be listed separately.
   const orphanIssues = useMemo(
-    () => issues.filter((issue) => !renderedKeys.has(issue.field)),
-    [issues, renderedKeys],
-  )
-
-  const unknownKeys = useMemo(
-    () =>
-      visibleFields
-        .map((field) => field.property_key.trim())
-        .filter((key) => key !== '' && !ALLOWED_FIELD_KEYS.has(key)),
-    [visibleFields],
-  )
-
-  // Required keys the form does not render a row for (e.g. a template that
-  // omits or hides one); these cannot show inline, so they get an alert.
-  const missingRequiredKeys = useMemo(
-    () =>
-      REQUIRED_FIELD_KEYS.filter(
-        (key) => !visibleFields.some((field) => field.property_key.trim() === key),
-      ),
-    [visibleFields],
+    () => issues.filter((issue) => !isCatalogField(issue.field)),
+    [issues],
   )
 
   const handleSubmit = async () => {
     if (!server || status === 'loading') return
 
-    const validationErrors = validateFields(visibleFields)
+    const validationErrors = validateRegisterValues(values)
     setClientErrors(validationErrors)
     if (Object.keys(validationErrors).length > 0) {
       toast.add({
@@ -504,7 +471,7 @@ export function Process() {
       {serversStatus === 'success' && activeServers.length > 0 && step === 2 && server && (
         <div className='grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]'>
           <div className='space-y-4'>
-            <ProcessForm fields={visibleFields} errors={errors} onChange={setValue} />
+            <ProcessForm values={values} errors={errors} onChange={setValue} />
 
             <div className='flex items-center justify-between'>
               <Button type='button' variant='outline' onClick={() => goToStep(1)}>
@@ -535,26 +502,6 @@ export function Process() {
               </div>
 
               <PayloadPreview payload={payload} />
-
-              {unknownKeys.length > 0 && (
-                <Alert>
-                  <TriangleAlert strokeWidth={2} />
-                  <AlertTitle>Unsupported fields</AlertTitle>
-                  <AlertDescription>
-                    The agent will ignore: {unknownKeys.join(', ')}
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {missingRequiredKeys.length > 0 && (
-                <Alert variant='destructive'>
-                  <TriangleAlert strokeWidth={2} />
-                  <AlertTitle>Missing required fields</AlertTitle>
-                  <AlertDescription>
-                    Add these fields: {missingRequiredKeys.join(', ')}
-                  </AlertDescription>
-                </Alert>
-              )}
 
               {orphanIssues.length > 0 && (
                 <Alert variant='destructive'>
