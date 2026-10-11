@@ -1,18 +1,19 @@
-import type { TemplateKey } from "@/types/template";
+import { isCatalogField, isValueEmpty } from "@/lib/process-fields";
+import type { TemplateValues } from "@/types/template";
 
 /**
- * A row is only dropped when it carries neither a key nor a value: untouched
- * placeholder rows. Rows with a key but no value are valid (the value column is
- * nullable); rows with a value but no key cannot be persisted and are rejected
- * by the server's validation.
+ * Template values are a sparse guide: only fields that actually carry a value
+ * are persisted, and unknown keys are dropped so a template can only ever seed
+ * real PM2 options. Untouched fields stay empty and are simply not stored.
  */
-export function isBlankKey(key: TemplateKey): boolean {
-    const hasKey = key.property_key.trim() !== "";
-    const hasValue = key.property_value !== null && key.property_value.trim() !== "";
-    return !hasKey && !hasValue;
-}
+export function toSavableValues(values: TemplateValues): TemplateValues {
+    const out: TemplateValues = {};
 
-/** Filters the editor's rows down to the ones that should be sent for saving. */
-export function toSavableKeys(keys: TemplateKey[]): TemplateKey[] {
-    return keys.filter((key) => !isBlankKey(key));
+    for (const [key, value] of Object.entries(values)) {
+        if (!isCatalogField(key)) continue;
+        if (isValueEmpty(value)) continue;
+        out[key] = value;
+    }
+
+    return out;
 }
