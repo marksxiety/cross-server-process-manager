@@ -62,6 +62,7 @@ export const PROCESS_FIELDS: readonly ProcessFieldSpec[] = [
         type: "string",
         required: true,
         placeholder: "my-app",
+        hint: "Lowercase recommended, e.g. data-sync. Use dashes instead of spaces.",
     },
     {
         key: "namespace",
@@ -244,7 +245,7 @@ export const PROCESS_FIELDS: readonly ProcessFieldSpec[] = [
         type: "number",
         placeholder: "1",
         enabledWhen: { key: "exec_mode", oneOf: ["cluster"] },
-        hint: "Available when exec_mode is cluster.",
+        hint: "Available when execution mode is cluster.",
     },
 ];
 const FIELD_BY_KEY = new Map(PROCESS_FIELDS.map((field) => [field.key, field]));
