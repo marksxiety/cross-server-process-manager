@@ -22,7 +22,7 @@ type TemplateCardProps = {
 }
 
 export function TemplateCard({ template, onOpen, onUse }: TemplateCardProps) {
-  const hidden = template.keys.filter((key) => key.is_hidden).length
+  const fieldCount = Object.keys(template.values).length
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'Enter' || event.key === ' ') {
@@ -55,9 +55,7 @@ export function TemplateCard({ template, onOpen, onUse }: TemplateCardProps) {
       </CardHeader>
 
       <CardContent className='space-y-2'>
-        <p className='text-xs text-muted-foreground'>
-          {template.keys.length} fields · {hidden} hidden
-        </p>
+        <p className='text-xs text-muted-foreground'>{fieldCount} fields</p>
         <TemplatePreview template={template} />
       </CardContent>
 
