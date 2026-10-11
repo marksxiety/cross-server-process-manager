@@ -280,16 +280,22 @@ function FieldControl({
 
   if (spec.combobox && spec.options) {
     const listId = `list-${spec.key}`
+    const uppercase = spec.format === 'uppercase'
     return (
       <>
         <Input
-          className='font-mono text-xs'
+          className={cn('font-mono text-xs', uppercase && 'uppercase')}
           list={listId}
           disabled={disabled}
           aria-invalid={invalid || undefined}
+          autoCapitalize={uppercase ? 'characters' : undefined}
+          autoCorrect={uppercase ? 'off' : undefined}
+          spellCheck={uppercase ? false : undefined}
           placeholder={spec.placeholder}
           value={typeof value === 'string' ? value : ''}
-          onChange={(event) => onChange(event.target.value)}
+          onChange={(event) =>
+            onChange(uppercase ? event.target.value.toUpperCase() : event.target.value)
+          }
         />
         <datalist id={listId}>
           {spec.options.map((option) => (
@@ -311,16 +317,22 @@ function FieldControl({
   }
 
   const isNumeric = spec.type === 'number' || spec.type === 'duration'
+  const uppercase = spec.format === 'uppercase'
   return (
     <Input
-      className='font-mono text-xs'
+      className={cn('font-mono text-xs', uppercase && 'uppercase')}
       type='text'
       inputMode={isNumeric ? 'numeric' : undefined}
       disabled={disabled}
       aria-invalid={invalid || undefined}
+      autoCapitalize={uppercase ? 'characters' : undefined}
+      autoCorrect={uppercase ? 'off' : undefined}
+      spellCheck={uppercase ? false : undefined}
       placeholder={spec.placeholder}
       value={typeof value === 'string' || typeof value === 'number' ? String(value) : ''}
-      onChange={(event) => onChange(event.target.value)}
+      onChange={(event) =>
+        onChange(uppercase ? event.target.value.toUpperCase() : event.target.value)
+      }
     />
   )
 }

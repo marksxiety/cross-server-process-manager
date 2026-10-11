@@ -39,8 +39,12 @@ export function buildTemplatePayload(values: TemplateValues): Record<string, unk
             case "object":
                 payload[spec.key] = raw;
                 break;
-            default:
-                payload[spec.key] = typeof raw === "string" ? raw : String(raw);
+            default: {
+                const text = typeof raw === "string" ? raw : String(raw);
+                payload[spec.key] =
+                    spec.format === "uppercase" ? text.trim().toUpperCase() : text;
+                break;
+            }
         }
     }
 

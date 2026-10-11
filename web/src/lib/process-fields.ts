@@ -36,6 +36,8 @@ export interface ProcessFieldSpec {
     combobox?: boolean;
     /** Placeholder text, always language-agnostic. */
     placeholder?: string;
+    /** Display/value transform applied by the form and payload builder. */
+    format?: "uppercase";
     /** Short muted hint shown under the control. */
     hint?: string;
     /** Shown as the control's resting state when the field is empty; never sent. */
@@ -66,7 +68,8 @@ export const PROCESS_FIELDS: readonly ProcessFieldSpec[] = [
         label: "Group (Namespace)",
         group: "basic",
         type: "string",
-        placeholder: "default",
+        placeholder: "DEFAULT",
+        format: "uppercase",
     },
     {
         key: "cwd",
