@@ -405,7 +405,7 @@ export function ProcessForm({ values, errors = {}, onChange }: ProcessFormProps)
   )
 
   return (
-    <div className='space-y-4 m-2'>
+    <div className='space-y-4 mx-2 mb-2'>
       <Card>
         <CardHeader>
           <CardTitle>Basic</CardTitle>
