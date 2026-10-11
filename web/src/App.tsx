@@ -1,4 +1,4 @@
-import { Outlet } from 'react-router'
+import { Outlet, useLocation } from 'react-router'
 import { Maximize, Minimize2 } from 'lucide-react'
 import { SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/custom/AppSidebar'
@@ -19,6 +19,8 @@ export function App() {
 function AppLayout() {
   const { isFullscreen, toggleFullscreen } = useFullscreen()
   const { setOpenMobile } = useSidebar()
+  const { pathname } = useLocation()
+  const showFullscreenToggle = pathname === '/'
 
   const handleToggleFullscreen = () => {
     if (!isFullscreen) setOpenMobile(false)
@@ -44,20 +46,22 @@ function AppLayout() {
           {/* Theme & Fullscreen Triggers */}
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-foreground"
-              onClick={() => void handleToggleFullscreen()}
-              title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
-              aria-label={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
-            >
-              {isFullscreen ? (
-                <Minimize2 size={18} strokeWidth={2} />
-              ) : (
-                <Maximize size={18} strokeWidth={2} />
-              )}
-            </Button>
+            {showFullscreenToggle && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                onClick={() => void handleToggleFullscreen()}
+                title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+                aria-label={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+              >
+                {isFullscreen ? (
+                  <Minimize2 size={18} strokeWidth={2} />
+                ) : (
+                  <Maximize size={18} strokeWidth={2} />
+                )}
+              </Button>
+            )}
           </div>
         </header>
 
