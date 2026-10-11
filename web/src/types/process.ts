@@ -49,15 +49,14 @@ export interface StartProcessPayload {
     autorestart?: boolean;
     max_restarts?: number;
     min_uptime?: string | number;
-    restart_delay?: number;
+    restart_delay?: number | string;
     max_memory_restart?: string | number;
-    increment_var?: string;
-    kill_timeout?: number;
+    kill_timeout?: number | string;
     windowsHide?: boolean;
     env?: Record<string, string>;
     watch?: boolean | string[];
     ignore_watch?: string[];
-    watch_delay?: number;
+    watch_delay?: number | string;
     cron_restart?: string;
 }
 
