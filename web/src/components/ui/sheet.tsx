@@ -39,6 +39,7 @@ const sheetSizeClasses = {
   sm: "data-[side=left]:sm:max-w-sm data-[side=right]:sm:max-w-sm",
   md: "data-[side=left]:sm:max-w-md data-[side=right]:sm:max-w-md",
   lg: "data-[side=left]:sm:max-w-lg data-[side=right]:sm:max-w-lg",
+  "5xl": "data-[side=left]:sm:max-w-5xl data-[side=right]:sm:max-w-5xl",
 } as const
 
 function SheetContent({

@@ -14,15 +14,15 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import {
+  Sheet,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
 import { Spinner } from '@/components/ui/spinner'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -332,264 +332,263 @@ export function Template() {
           <p className='py-6 text-sm text-muted-foreground'>No {filter} templates.</p>
         ))}
 
-      {selected && (
-        <Dialog
-          open
-          onOpenChange={(open) => {
-            if (!open) setSelected(null)
-          }}
-        >
-          <DialogContent className='flex h-[70dvh] flex-col sm:max-w-5xl'>
-            <DialogHeader className='pr-6'>
-              <DialogTitle>{selected.template_name}</DialogTitle>
-              {selected.category && (
-                <Badge variant='outline' className='w-fit font-normal text-muted-foreground'>
-                  {selected.category}
-                </Badge>
-              )}
+      <Sheet
+        open={selected !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelected(null)
+        }}
+      >
+        <SheetContent size='5xl' className='flex flex-col overflow-hidden'>
+          <SheetHeader className='pr-6'>
+            <SheetTitle>{selected?.template_name}</SheetTitle>
+            {selected?.category && (
+              <Badge variant='outline' className='w-fit font-normal text-muted-foreground'>
+                {selected.category}
+              </Badge>
+            )}
+            {selected && (
               <TemplatePreview template={selected} className='mt-1 w-fit max-w-full' />
-            </DialogHeader>
+            )}
+          </SheetHeader>
 
-            <div className='grid min-h-0 flex-1 grid-cols-1 gap-6 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_320px] lg:overflow-hidden'>
-              <ScrollArea className='h-full min-h-0 p-4'>
-                <ProcessForm values={values} onChange={updateValue} />
+          <div className='grid min-h-0 flex-1 grid-cols-1 gap-6 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_320px] lg:overflow-hidden'>
+            <ScrollArea className='h-full min-h-0 p-4'>
+              <ProcessForm values={values} onChange={updateValue} />
+            </ScrollArea>
+
+            <div className='space-y-2 mr-6'>
+              <p className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>
+                Payload preview
+              </p>
+              <ScrollArea className='max-h-105 rounded-md border bg-muted **:data-[slot=scroll-area-viewport]:max-h-105'>
+                <pre className='whitespace-pre-wrap wrap-break-words p-3 font-mono text-[11px] leading-relaxed'>
+                  {payloadJson}
+                </pre>
               </ScrollArea>
-
-              <div className='space-y-2'>
-                <p className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>
-                  Payload preview
-                </p>
-                <ScrollArea className='max-h-105 rounded-md border bg-muted **:data-[slot=scroll-area-viewport]:max-h-105'>
-                  <pre className='whitespace-pre-wrap wrap-break-words p-3 font-mono text-[11px] leading-relaxed'>
-                    {payloadJson}
-                  </pre>
-                </ScrollArea>
-                <Button
-                  type='button'
-                  variant='outline'
-                  className='w-full'
-                  onClick={() => void copyPayload()}
-                >
-                  {copied ? (
-                    <Check className='mr-1 h-3.5 w-3.5' />
-                  ) : (
-                    <Copy className='mr-1 h-3.5 w-3.5' />
-                  )}
-                  {copied ? 'Copied' : 'Copy JSON'}
-                </Button>
-              </div>
-            </div>
-
-            <DialogFooter className='sm:justify-between'>
-              <Button
-                type='button'
-                onClick={() => {
-                  handleUse(selected)
-                  setSelected(null)
-                }}
-              >
-                <Wand2 strokeWidth={2} />
-                Use template
-              </Button>
-              <div className='flex gap-2'>
-                <Button
-                  type='button'
-                  variant='destructive'
-                  disabled={deleting}
-                  onClick={() => setConfirmOpen(true)}
-                >
-                  <Trash2 strokeWidth={2} />
-                  Delete
-                </Button>
-                <Button type='button' disabled={saving} onClick={() => void saveKeys()}>
-                  {saving && <Spinner className='size-3.5' />}
-                  Save
-                </Button>
-              </div>
-            </DialogFooter>
-
-            <AlertDialog
-              open={confirmOpen}
-              onOpenChange={(nextOpen) => {
-                if (!nextOpen && !deleting) setConfirmOpen(false)
-              }}
-            >
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogMedia className='text-destructive'>
-                    <Trash2 strokeWidth={2} />
-                  </AlertDialogMedia>
-                  <AlertDialogTitle>Delete Template?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Are you sure you want to delete “{selected.template_name}”? This permanently
-                    removes the template and its fields, and cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    variant='destructive'
-                    disabled={deleting}
-                    onClick={() => void confirmDelete()}
-                  >
-                    {deleting && <Spinner className='size-3.5' />}
-                    Delete
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {createOpen && (
-        <Dialog
-          open
-          onOpenChange={(open) => {
-            if (!open && !creating) setCreateOpen(false)
-          }}
-        >
-          <DialogContent className='flex h-[70dvh] flex-col sm:max-w-5xl'>
-            <DialogHeader className='pr-6'>
-              <DialogTitle>New Template</DialogTitle>
-            </DialogHeader>
-
-            <div className='grid min-h-0 flex-1 grid-cols-1 gap-6 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_320px] lg:overflow-hidden'>
-              <ScrollArea className='h-full min-h-0'>
-                <div className='space-y-4'>
-                  <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
-                    <div className='space-y-1.5'>
-                      <label
-                        htmlFor='template_name'
-                        className='text-xs font-medium text-muted-foreground'
-                      >
-                        Template name
-                      </label>
-                      <Input
-                        id='template_name'
-                        placeholder='e.g. Deno'
-                        maxLength={100}
-                        aria-invalid={nameError}
-                        value={draft.template_name}
-                        onChange={(event) => {
-                          setNameError(false)
-                          updateDraft({ template_name: event.target.value })
-                        }}
-                      />
-                      {nameError && (
-                        <p className='text-xs text-destructive'>Template name is required.</p>
-                      )}
-                    </div>
-
-                    <div className='space-y-1.5'>
-                      <label
-                        htmlFor='template_category'
-                        className='text-xs font-medium text-muted-foreground'
-                      >
-                        Category
-                      </label>
-                      <Input
-                        id='template_category'
-                        placeholder='e.g. Deno / TypeScript'
-                        maxLength={255}
-                        value={draft.category}
-                        onChange={(event) => updateDraft({ category: event.target.value })}
-                      />
-                    </div>
-
-                    <div className='space-y-1.5'>
-                      <label
-                        htmlFor='template_description'
-                        className='text-xs font-medium text-muted-foreground'
-                      >
-                        Description
-                      </label>
-                      <Input
-                        id='template_description'
-                        placeholder='What does this template run?'
-                        maxLength={255}
-                        value={draft.description}
-                        onChange={(event) => updateDraft({ description: event.target.value })}
-                      />
-                    </div>
-
-                    <div className='space-y-1.5'>
-                      <label
-                        htmlFor='template_preview'
-                        className='text-xs font-medium text-muted-foreground'
-                      >
-                        Preview command
-                      </label>
-                      <Input
-                        id='template_preview'
-                        className='font-mono'
-                        placeholder='deno run --allow-net main.ts'
-                        maxLength={255}
-                        value={draft.preview}
-                        onChange={(event) => updateDraft({ preview: event.target.value })}
-                      />
-                    </div>
-                  </div>
-
-                  <div className='flex items-center justify-between rounded-md border px-3 py-2'>
-                    <div>
-                      <p className='text-sm font-medium'>Active</p>
-                      <p className='text-xs text-muted-foreground'>
-                        Available when registering processes.
-                      </p>
-                    </div>
-                    <Switch
-                      checked={draft.is_active}
-                      onCheckedChange={(checked) => updateDraft({ is_active: checked })}
-                    />
-                  </div>
-
-                  <ProcessForm values={values} onChange={updateValue} />
-                </div>
-              </ScrollArea>
-
-              <div className='space-y-2'>
-                <p className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>
-                  Payload preview
-                </p>
-                <ScrollArea className='max-h-105 rounded-md border bg-muted **:data-[slot=scroll-area-viewport]:max-h-105'>
-                  <pre className='whitespace-pre-wrap wrap-break-words p-3 font-mono text-[11px] leading-relaxed'>
-                    {payloadJson}
-                  </pre>
-                </ScrollArea>
-                <Button
-                  type='button'
-                  variant='outline'
-                  className='w-full'
-                  onClick={() => void copyPayload()}
-                >
-                  {copied ? (
-                    <Check className='mr-1 h-3.5 w-3.5' />
-                  ) : (
-                    <Copy className='mr-1 h-3.5 w-3.5' />
-                  )}
-                  {copied ? 'Copied' : 'Copy JSON'}
-                </Button>
-              </div>
-            </div>
-
-            <DialogFooter className='sm:justify-end'>
               <Button
                 type='button'
                 variant='outline'
-                disabled={creating}
-                onClick={() => setCreateOpen(false)}
+                className='w-full'
+                onClick={() => void copyPayload()}
               >
-                Cancel
+                {copied ? (
+                  <Check className='mr-1 h-3.5 w-3.5' />
+                ) : (
+                  <Copy className='mr-1 h-3.5 w-3.5' />
+                )}
+                {copied ? 'Copied' : 'Copy JSON'}
               </Button>
-              <Button type='button' disabled={creating} onClick={() => void registerTemplate()}>
-                {creating && <Spinner className='size-3.5' />}
-                Register template
+            </div>
+          </div>
+
+          <SheetFooter className='flex-row items-center justify-between'>
+            <Button
+              type='button'
+              onClick={() => {
+                if (!selected) return
+                handleUse(selected)
+                setSelected(null)
+              }}
+            >
+              <Wand2 strokeWidth={2} />
+              Use template
+            </Button>
+            <div className='flex gap-2'>
+              <Button
+                type='button'
+                variant='destructive'
+                disabled={deleting}
+                onClick={() => setConfirmOpen(true)}
+              >
+                <Trash2 strokeWidth={2} />
+                Delete
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
+              <Button type='button' disabled={saving} onClick={() => void saveKeys()}>
+                {saving && <Spinner className='size-3.5' />}
+                Save
+              </Button>
+            </div>
+          </SheetFooter>
+
+          <AlertDialog
+            open={confirmOpen}
+            onOpenChange={(nextOpen) => {
+              if (!nextOpen && !deleting) setConfirmOpen(false)
+            }}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogMedia className='text-destructive'>
+                  <Trash2 strokeWidth={2} />
+                </AlertDialogMedia>
+                <AlertDialogTitle>Delete Template?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to delete “{selected?.template_name}”? This permanently
+                  removes the template and its fields, and cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  variant='destructive'
+                  disabled={deleting}
+                  onClick={() => void confirmDelete()}
+                >
+                  {deleting && <Spinner className='size-3.5' />}
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet
+        open={createOpen}
+        onOpenChange={(open) => {
+          if (!open && !creating) setCreateOpen(false)
+        }}
+      >
+        <SheetContent size='5xl' className='flex flex-col overflow-hidden'>
+          <SheetHeader className='pr-6'>
+            <SheetTitle>New Template</SheetTitle>
+          </SheetHeader>
+
+          <div className='grid min-h-0 flex-1 grid-cols-1 gap-6 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_320px] lg:overflow-hidden'>
+            <ScrollArea className='h-full min-h-0 p-4'>
+              <div className='space-y-4'>
+                <div className='grid grid-cols-1 gap-3 sm:grid-cols-2 mx-2'>
+                  <div className='space-y-1.5'>
+                    <label
+                      htmlFor='template_name'
+                      className='text-xs font-medium text-muted-foreground'
+                    >
+                      Template name
+                    </label>
+                    <Input
+                      id='template_name'
+                      placeholder='e.g. Deno'
+                      maxLength={100}
+                      aria-invalid={nameError}
+                      value={draft.template_name}
+                      onChange={(event) => {
+                        setNameError(false)
+                        updateDraft({ template_name: event.target.value })
+                      }}
+                    />
+                    {nameError && (
+                      <p className='text-xs text-destructive'>Template name is required.</p>
+                    )}
+                  </div>
+
+                  <div className='space-y-1.5'>
+                    <label
+                      htmlFor='template_category'
+                      className='text-xs font-medium text-muted-foreground'
+                    >
+                      Category
+                    </label>
+                    <Input
+                      id='template_category'
+                      placeholder='e.g. Deno / TypeScript'
+                      maxLength={255}
+                      value={draft.category}
+                      onChange={(event) => updateDraft({ category: event.target.value })}
+                    />
+                  </div>
+
+                  <div className='space-y-1.5'>
+                    <label
+                      htmlFor='template_description'
+                      className='text-xs font-medium text-muted-foreground'
+                    >
+                      Description
+                    </label>
+                    <Input
+                      id='template_description'
+                      placeholder='What does this template run?'
+                      maxLength={255}
+                      value={draft.description}
+                      onChange={(event) => updateDraft({ description: event.target.value })}
+                    />
+                  </div>
+
+                  <div className='space-y-1.5'>
+                    <label
+                      htmlFor='template_preview'
+                      className='text-xs font-medium text-muted-foreground'
+                    >
+                      Preview command
+                    </label>
+                    <Input
+                      id='template_preview'
+                      className='font-mono'
+                      placeholder='deno run --allow-net main.ts'
+                      maxLength={255}
+                      value={draft.preview}
+                      onChange={(event) => updateDraft({ preview: event.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className='flex items-center justify-between rounded-md border px-3 py-2 mx-2'>
+                  <div>
+                    <p className='text-sm font-medium'>Active</p>
+                    <p className='text-xs text-muted-foreground'>
+                      Available when registering processes.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={draft.is_active}
+                    onCheckedChange={(checked) => updateDraft({ is_active: checked })}
+                  />
+                </div>
+
+                <ProcessForm values={values} onChange={updateValue} />
+              </div>
+            </ScrollArea>
+
+            <div className='space-y-2 mr-6'>
+              <p className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>
+                Payload preview
+              </p>
+              <ScrollArea className='max-h-105 rounded-md border bg-muted **:data-[slot=scroll-area-viewport]:max-h-105'>
+                <pre className='whitespace-pre-wrap wrap-break-words p-3 font-mono text-[11px] leading-relaxed'>
+                  {payloadJson}
+                </pre>
+              </ScrollArea>
+              <Button
+                type='button'
+                variant='outline'
+                className='w-full'
+                onClick={() => void copyPayload()}
+              >
+                {copied ? (
+                  <Check className='mr-1 h-3.5 w-3.5' />
+                ) : (
+                  <Copy className='mr-1 h-3.5 w-3.5' />
+                )}
+                {copied ? 'Copied' : 'Copy JSON'}
+              </Button>
+            </div>
+          </div>
+
+          <SheetFooter className='flex-row items-center justify-end'>
+            <Button
+              type='button'
+              variant='outline'
+              disabled={creating}
+              onClick={() => setCreateOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button type='button' disabled={creating} onClick={() => void registerTemplate()}>
+              {creating && <Spinner className='size-3.5' />}
+              Register template
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }
