@@ -1,12 +1,7 @@
 import { z } from "zod";
 
-export const templateKeySchema = z.object({
-    property_key: z.string(),
-    property_value: z.string().nullable(),
-    data_type: z.enum(["string", "boolean", "number", "array", "object"]),
-    is_required: z.boolean(),
-    is_hidden: z.boolean(),
-});
+/** A sparse map of PM2 option keys to values. */
+export const templateValuesSchema = z.record(z.string(), z.unknown());
 
 export const processTemplateSchema = z.object({
     id: z.number(),
@@ -15,7 +10,7 @@ export const processTemplateSchema = z.object({
     description: z.string().nullable(),
     preview: z.string().nullable(),
     is_active: z.boolean(),
-    keys: z.array(templateKeySchema),
+    values: templateValuesSchema,
 });
 
 // Persisted slice — these keys drive `partialize` and the rehydration merge.
