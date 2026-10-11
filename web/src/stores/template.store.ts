@@ -7,7 +7,7 @@ import { persistedStore } from "@/lib/persisted";
 import { templatePersistSchema } from "@/schemas/template.schema";
 import type { ApiError, ApiResponse } from "@/types/api";
 import type { LoadStatus } from "@/types/dashboard";
-import type { ProcessTemplate, TemplateInput, TemplateKey } from "@/types/template";
+import type { ProcessTemplate, TemplateInput, TemplateValues } from "@/types/template";
 
 interface TemplateState {
     templates: ProcessTemplate[];
@@ -18,7 +18,7 @@ interface TemplateState {
     load: () => Promise<void>;
     reload: () => Promise<void>;
     register: (payload: TemplateInput) => Promise<ApiResponse<ProcessTemplate>>;
-    save: (templateId: number, keys: TemplateKey[]) => Promise<ApiResponse<ProcessTemplate>>;
+    save: (templateId: number, values: TemplateValues) => Promise<ApiResponse<ProcessTemplate>>;
     remove: (templateId: number) => Promise<ApiResponse<ProcessTemplate>>;
 }
 
@@ -116,8 +116,8 @@ export const useTemplateStore = create<TemplateState>()(
                 // Persists an edited template's keys and swaps the server's
                 // canonical copy into the cached list. Returns the envelope so
                 // the caller can surface success/failure feedback.
-                save: async (templateId, keys) => {
-                    const result = await templateService().update(templateId, keys);
+                save: async (templateId, values) => {
+                    const result = await templateService().update(templateId, values);
 
                     const saved = result.info;
                     if (result.success && saved) {
