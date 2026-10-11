@@ -41,7 +41,6 @@ import { Spinner } from '@/components/ui/spinner'
 import { Toggle } from '@/components/ui/toggle'
 import { toast } from '@/components/ui/toast'
 import { ErrorAlert } from '@/components/custom/error-alert'
-import { PageHeader } from '@/components/custom/page-header'
 import { ProcessForm } from '@/components/custom/process-form'
 import { errorCodeLabel, toApiError } from '@/lib/error-code'
 import { isCatalogField, validateRegisterValues } from '@/lib/process-fields'
@@ -95,7 +94,7 @@ function StepMarker({
 
 function Stepper({ step }: { step: 1 | 2 }) {
   return (
-    <div className='mx-auto mb-6 flex w-[70%] items-center gap-2'>
+    <div className='flex w-full max-w-md flex-1 items-center gap-2 sm:w-auto sm:min-w-64'>
       <StepMarker active={step === 1} done={step > 1}>
         1
       </StepMarker>
@@ -316,12 +315,14 @@ export function Process() {
 
   return (
     <div className='mx-auto w-full max-w-[75%]'>
-      <PageHeader
-        title='Register process'
-        description='Register a new process to monitor.'
-      />
+      <div className='mb-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-4'>
+        <div>
+          <h1 className='text-2xl font-semibold tracking-tight'>Register process</h1>
+          <p className='text-sm text-muted-foreground'>Register a new process to monitor.</p>
+        </div>
 
-      <Stepper step={step} />
+        <Stepper step={step} />
+      </div>
 
       {serversStatus === 'loading' && (
         <div className='flex items-center gap-2 py-6 text-sm text-muted-foreground'>
