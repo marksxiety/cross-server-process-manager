@@ -1,42 +1,46 @@
-import type { TemplateKey } from "@/types/template";
+import { isValueEmpty, PROCESS_FIELDS } from "@/lib/process-fields";
+import type { TemplateValues } from "@/types/template";
 
 /**
- * Assembles a PM2 `/start`-shaped payload from template keys by coercing each
- * value according to its `data_type`. Language-agnostic: it only knows the
- * generic value types, never a specific runtime.
+ * Assembles a sparse PM2 `/start`-shaped payload from template/form values by
+ * coercing each value according to the master field list. Language-agnostic: it
+ * only knows the generic value types, never a specific runtime.
  *
- * Rows with an empty key or an empty/null value are skipped, mirroring the
- * "drop unset fields" behavior of the register form.
+ * Only fields that carry a value are included — defaults and untouched fields
+ * are never sent, and the agent applies its own defaults. Durations are passed
+ * through as-is (number or "10s" string); the agent normalizes them.
  */
-export function buildTemplatePayload(keys: TemplateKey[]): Record<string, unknown> {
+export function buildTemplatePayload(values: TemplateValues): Record<string, unknown> {
     const payload: Record<string, unknown> = {};
 
-    for (const key of keys) {
-        if (key.property_key.trim() === "") continue;
+    for (const spec of PROCESS_FIELDS) {
+        const raw = values[spec.key];
+        if (isValueEmpty(raw)) continue;
 
-        const raw = key.property_value;
-        if (raw === null || raw.trim() === "") continue;
-
-        switch (key.data_type) {
+        switch (spec.type) {
             case "number": {
-                const value = Number(raw);
-                if (!Number.isNaN(value)) payload[key.property_key] = value;
+                if (spec.key === "instances" && raw === "max") {
+                    payload[spec.key] = "max";
+                    break;
+                }
+                const value = typeof raw === "number" ? raw : Number(raw);
+                if (Number.isFinite(value)) payload[spec.key] = value;
                 break;
             }
             case "boolean":
-                payload[key.property_key] = raw.trim() === "true";
+                payload[spec.key] = raw === true || raw === "true";
+                break;
+            case "duration":
+                payload[spec.key] = typeof raw === "number" ? raw : String(raw).trim();
                 break;
             case "array":
-            case "object": {
-                try {
-                    payload[key.property_key] = JSON.parse(raw);
-                } catch {
-                    payload[key.property_key] = raw;
-                }
+                payload[spec.key] = Array.isArray(raw) ? raw : [raw];
                 break;
-            }
+            case "object":
+                payload[spec.key] = raw;
+                break;
             default:
-                payload[key.property_key] = raw;
+                payload[spec.key] = typeof raw === "string" ? raw : String(raw);
         }
     }
 
