@@ -1,21 +1,13 @@
 import type { Client } from 'pg';
 
-type DataType = 'string' | 'boolean' | 'number' | 'array' | 'object';
-
-type TemplateKey = {
-  key: string;
-  value: string | null;
-  type: DataType;
-  required: boolean;
-  hidden: boolean;
-};
+type TemplateValues = Record<string, unknown>;
 
 type Template = {
   template_name: string;
   category: string;
   description: string;
   preview: string | null;
-  keys: TemplateKey[];
+  values: TemplateValues;
 };
 
 const templates: Template[] = [
@@ -24,113 +16,98 @@ const templates: Template[] = [
     category: 'Node / JavaScript',
     description: 'Run a .js/.mjs/.cjs entry file directly under node.exe.',
     preview: 'node --env-file=.env index.js --port 3000',
-    keys: [
-      { key: 'script', value: 'index.js', type: 'string', required: true, hidden: false },
-      { key: 'args', value: JSON.stringify(["--port", "3000"]), type: 'array', required: false, hidden: false },
-      { key: 'interpreter', value: 'C:\\Program Files\\nodejs\\node.exe', type: 'string', required: true, hidden: false },
-      { key: 'interpreter_args', value: JSON.stringify(["--env-file=.env"]), type: 'array', required: false, hidden: false },
-      { key: 'exec_mode', value: 'fork', type: 'string', required: false, hidden: false },
-      { key: 'instances', value: '1', type: 'number', required: false, hidden: false },
-      { key: 'autorestart', value: 'true', type: 'boolean', required: false, hidden: false },
-      { key: 'windowsHide', value: 'true', type: 'boolean', required: false, hidden: false },
-      { key: 'env', value: JSON.stringify({ NODE_ENV: "production", PORT: "3000" }), type: 'object', required: false, hidden: false },
-    ]
+    values: {
+      script: 'index.js',
+      args: ['--port', '3000'],
+      interpreter: 'C:\\Program Files\\nodejs\\node.exe',
+      interpreter_args: ['--env-file=.env'],
+      exec_mode: 'fork',
+      instances: 1,
+      autorestart: true,
+      windowsHide: true,
+      env: { NODE_ENV: 'production', PORT: '3000' },
+    },
   },
   {
     template_name: 'npm',
     category: 'Node / JavaScript',
     description: 'Run an npm script (npm run dev, npm start, ...) under PM2.',
     preview: 'npm run dev',
-    keys: [
-      { key: 'script', value: 'C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js', type: 'string', required: true, hidden: false },
-      { key: 'args', value: JSON.stringify(["run", "dev"]), type: 'array', required: true, hidden: false },
-      { key: 'interpreter', value: 'C:\\Program Files\\nodejs\\node.exe', type: 'string', required: true, hidden: false },
-      { key: 'exec_mode', value: null, type: 'string', required: false, hidden: true },
-      { key: 'instances', value: null, type: 'number', required: false, hidden: true },
-      { key: 'autorestart', value: 'true', type: 'boolean', required: false, hidden: false },
-      { key: 'windowsHide', value: 'true', type: 'boolean', required: false, hidden: false },
-    ]
+    values: {
+      script: 'C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js',
+      args: ['run', 'dev'],
+      interpreter: 'C:\\Program Files\\nodejs\\node.exe',
+      autorestart: true,
+      windowsHide: true,
+    },
   },
   {
     template_name: 'Python',
     category: 'Python',
     description: 'Run a .py entry file with a system Python.',
     preview: 'python -u app.py --port 5000',
-    keys: [
-      { key: 'script', value: 'app.py', type: 'string', required: true, hidden: false },
-      { key: 'args', value: JSON.stringify(["--port", "5000"]), type: 'array', required: false, hidden: false },
-      { key: 'interpreter', value: 'C:\\Python312\\python.exe', type: 'string', required: true, hidden: false },
-      { key: 'interpreter_args', value: JSON.stringify(["-u"]), type: 'array', required: false, hidden: false },
-      { key: 'exec_mode', value: null, type: 'string', required: false, hidden: true },
-      { key: 'instances', value: null, type: 'number', required: false, hidden: true },
-      { key: 'autorestart', value: 'true', type: 'boolean', required: false, hidden: false },
-      { key: 'windowsHide', value: 'true', type: 'boolean', required: false, hidden: false },
-    ]
+    values: {
+      script: 'app.py',
+      args: ['--port', '5000'],
+      interpreter: 'C:\\Python312\\python.exe',
+      interpreter_args: ['-u'],
+      autorestart: true,
+      windowsHide: true,
+    },
   },
   {
     template_name: 'Python (venv)',
     category: 'Python',
     description: 'Run a .py entry file pointing at the venv’s own python.exe.',
     preview: 'python app.py --port 5000',
-    keys: [
-      { key: 'script', value: 'app.py', type: 'string', required: true, hidden: false },
-      { key: 'args', value: JSON.stringify(["--port", "5000"]), type: 'array', required: false, hidden: false },
-      { key: 'interpreter', value: 'venv\\Scripts\\python.exe', type: 'string', required: true, hidden: false },
-      { key: 'exec_mode', value: null, type: 'string', required: false, hidden: true },
-      { key: 'instances', value: null, type: 'number', required: false, hidden: true },
-      { key: 'autorestart', value: 'true', type: 'boolean', required: false, hidden: false },
-      { key: 'max_restarts', value: '50', type: 'number', required: false, hidden: false },
-      { key: 'windowsHide', value: 'true', type: 'boolean', required: false, hidden: false },
-      { key: 'watch', value: 'false', type: 'boolean', required: false, hidden: false },
-    ]
+    values: {
+      script: 'app.py',
+      args: ['--port', '5000'],
+      interpreter: 'venv\\Scripts\\python.exe',
+      autorestart: true,
+      max_restarts: 50,
+      windowsHide: true,
+      watch: false,
+    },
   },
   {
     template_name: 'PHP',
     category: 'PHP',
     description: 'Run PHP’s built-in web server (php -S).',
     preview: 'php -S 127.0.0.1:8080 -t public',
-    keys: [
-      { key: 'script', value: 'C:\\php\\php.exe', type: 'string', required: true, hidden: false },
-      { key: 'args', value: JSON.stringify(["-S", "127.0.0.1:8080", "-t", "public"]), type: 'array', required: true, hidden: false },
-      { key: 'interpreter', value: 'none', type: 'string', required: true, hidden: false },
-      { key: 'interpreter_args', value: null, type: 'array', required: false, hidden: true },
-      { key: 'exec_mode', value: null, type: 'string', required: false, hidden: true },
-      { key: 'instances', value: null, type: 'number', required: false, hidden: true },
-      { key: 'autorestart', value: 'true', type: 'boolean', required: false, hidden: false },
-      { key: 'windowsHide', value: 'true', type: 'boolean', required: false, hidden: false },
-    ]
+    values: {
+      script: 'C:\\php\\php.exe',
+      args: ['-S', '127.0.0.1:8080', '-t', 'public'],
+      interpreter: 'none',
+      autorestart: true,
+      windowsHide: true,
+    },
   },
   {
     template_name: 'Laravel',
     category: 'PHP',
     description: 'Run a Laravel app through the Artisan CLI (php artisan serve).',
     preview: 'php artisan serve --host=127.0.0.1 --port=8080',
-    keys: [
-      { key: 'script', value: 'artisan', type: 'string', required: true, hidden: false },
-      { key: 'args', value: JSON.stringify(["serve", "--host=127.0.0.1", "--port=8080"]), type: 'array', required: true, hidden: false },
-      { key: 'interpreter', value: 'C:\\php\\php.exe', type: 'string', required: true, hidden: false },
-      { key: 'interpreter_args', value: null, type: 'array', required: false, hidden: true },
-      { key: 'exec_mode', value: null, type: 'string', required: false, hidden: true },
-      { key: 'instances', value: null, type: 'number', required: false, hidden: true },
-      { key: 'autorestart', value: 'true', type: 'boolean', required: false, hidden: false },
-      { key: 'windowsHide', value: 'true', type: 'boolean', required: false, hidden: false },
-    ]
+    values: {
+      script: 'artisan',
+      args: ['serve', '--host=127.0.0.1', '--port=8080'],
+      interpreter: 'C:\\php\\php.exe',
+      autorestart: true,
+      windowsHide: true,
+    },
   },
   {
     template_name: 'Go',
     category: 'Compiled Binaries',
     description: 'Run a compiled Go binary directly.',
     preview: 'my-go-app.exe --port 5000',
-    keys: [
-      { key: 'script', value: 'my-go-app.exe', type: 'string', required: true, hidden: false },
-      { key: 'args', value: JSON.stringify(["--port", "5000"]), type: 'array', required: false, hidden: false },
-      { key: 'interpreter', value: 'none', type: 'string', required: true, hidden: false },
-      { key: 'interpreter_args', value: null, type: 'array', required: false, hidden: true },
-      { key: 'exec_mode', value: null, type: 'string', required: false, hidden: true },
-      { key: 'instances', value: null, type: 'number', required: false, hidden: true },
-      { key: 'autorestart', value: 'true', type: 'boolean', required: false, hidden: false },
-      { key: 'windowsHide', value: 'false', type: 'boolean', required: false, hidden: false },
-    ]
+    values: {
+      script: 'my-go-app.exe',
+      args: ['--port', '5000'],
+      interpreter: 'none',
+      autorestart: true,
+      windowsHide: false,
+    },
   }
 ];
 
@@ -141,42 +118,22 @@ export default async function seed(client: Client): Promise<void> {
 
   for (const tpl of templates) {
     const result = await client.query<{ id: number }>(
-      `INSERT INTO templates (template_name, category, description, preview)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO templates (template_name, category, description, preview, values)
+       VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (template_name) DO UPDATE
        SET category = EXCLUDED.category,
            description = EXCLUDED.description,
            preview = EXCLUDED.preview,
+           values = EXCLUDED.values,
            updated_at = current_timestamp
        RETURNING id`,
-      [tpl.template_name, tpl.category, tpl.description, tpl.preview]
+      [tpl.template_name, tpl.category, tpl.description, tpl.preview, tpl.values]
     );
 
     const templateId = result.rows[0]?.id;
     if (templateId === undefined) {
       throw new Error(`Upsert of template "${tpl.template_name}" returned no id`);
     }
-
-    for (const k of tpl.keys) {
-      await client.query(
-        `INSERT INTO template_keys
-           (template_id, property_key, property_value, data_type, is_required, is_hidden)
-         VALUES ($1, $2, $3, $4, $5, $6)
-         ON CONFLICT (template_id, property_key) DO UPDATE
-         SET property_value = EXCLUDED.property_value,
-             data_type = EXCLUDED.data_type,
-             is_required = EXCLUDED.is_required,
-             is_hidden = EXCLUDED.is_hidden,
-             updated_at = current_timestamp`,
-        [templateId, k.key, k.value, k.type, k.required, k.hidden]
-      );
-    }
-
-    await client.query(
-      `DELETE FROM template_keys
-       WHERE template_id = $1 AND NOT (property_key = ANY($2::text[]))`,
-      [templateId, tpl.keys.map((k) => k.key)]
-    );
 
     console.log(`Seeded template: ${tpl.template_name} (ID: ${templateId})`);
   }
