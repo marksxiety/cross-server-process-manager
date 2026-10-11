@@ -1,9 +1,10 @@
 import type { z } from "zod";
-import type { processTemplateSchema, templateKeySchema } from "@/schemas/template.schema";
+import type { processTemplateSchema } from "@/schemas/template.schema";
 
-export type TemplateKey = z.infer<typeof templateKeySchema>;
+/** A sparse map of PM2 option keys to initial values. */
+export type TemplateValues = Record<string, unknown>;
+
 export type ProcessTemplate = z.infer<typeof processTemplateSchema>;
-export type TemplateDataType = TemplateKey["data_type"];
 
 /** Payload accepted by POST /templates. */
 export interface TemplateInput {
@@ -12,5 +13,5 @@ export interface TemplateInput {
   description: string | null;
   preview: string | null;
   is_active: boolean;
-  keys: TemplateKey[];
+  values: TemplateValues;
 }
