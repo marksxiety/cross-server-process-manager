@@ -1,25 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import {
+  ADVANCED_GROUPS,
   ALLOWED_FIELD_KEYS,
   PROCESS_FIELDS,
   REQUIRED_FIELD_KEYS,
-  buildCatalogFields,
+  advancedGroupFields,
+  basicFields,
   catalogField,
-  groupTemplateKeys,
-  mergeCatalogFields,
-  validateFields,
+  isFieldEnabled,
+  validateRegisterValues,
 } from '@/lib/process-fields'
-import type { TemplateKey } from '@/types/template'
-
-function key(partial: Partial<TemplateKey> & Pick<TemplateKey, 'property_key'>): TemplateKey {
-  return {
-    property_value: null,
-    data_type: 'string',
-    is_required: false,
-    is_hidden: false,
-    ...partial,
-  }
-}
 
 describe('process field catalog', () => {
   it('defines every key at most once', () => {
@@ -32,112 +22,82 @@ describe('process field catalog', () => {
     expect(ALLOWED_FIELD_KEYS.has('script')).toBe(true)
     expect(ALLOWED_FIELD_KEYS.has('kill_timeout')).toBe(true)
     expect(ALLOWED_FIELD_KEYS.has('targetOs')).toBe(false)
+    expect(ALLOWED_FIELD_KEYS.has('increment_var')).toBe(false)
   })
 
   it('marks the agent-required fields as required', () => {
     expect([...REQUIRED_FIELD_KEYS].sort()).toEqual(['cwd', 'interpreter', 'name', 'script'])
   })
 
-  it('pre-fills the advanced defaults for the None template', () => {
-    const fields = buildCatalogFields()
-    const value = (propertyKey: string) =>
-      fields.find((field) => field.property_key === propertyKey)?.property_value
+  it('places fields in the specified basic and advanced groups', () => {
+    expect(basicFields().map((field) => field.key)).toEqual([
+      'name',
+      'namespace',
+      'cwd',
+      'interpreter',
+      'script',
+      'args',
+      'env',
+    ])
 
-    expect(value('exec_mode')).toBe('fork')
-    expect(value('instances')).toBe('1')
-    expect(value('autorestart')).toBe('true')
-    expect(value('max_restarts')).toBe('15')
-    expect(value('min_uptime')).toBe('10s')
-    expect(value('restart_delay')).toBe('4000')
-    expect(value('kill_timeout')).toBe('5000')
-    expect(value('max_memory_restart')).toBeNull()
+    expect(ADVANCED_GROUPS.map((group) => group.id)).toEqual([
+      'restart',
+      'schedule',
+      'resources',
+      'watch',
+      'overrides',
+      'scaling',
+    ])
+
+    expect(advancedGroupFields('restart').map((field) => field.key)).toEqual([
+      'autorestart',
+      'max_restarts',
+      'min_uptime',
+      'restart_delay',
+    ])
+    expect(advancedGroupFields('scaling').map((field) => field.key)).toEqual([
+      'exec_mode',
+      'instances',
+    ])
+    expect(advancedGroupFields('overrides').map((field) => field.key)).toEqual([
+      'interpreter_args',
+      'windowsHide',
+    ])
   })
 
-  it('uses the catalog data types and required flags', () => {
-    expect(catalogField('env')?.dataType).toBe('object')
-    expect(catalogField('args')?.dataType).toBe('array')
-    expect(catalogField('autorestart')?.dataType).toBe('boolean')
-    expect(catalogField('script')?.isRequired).toBe(true)
+  it('uses neutral, language-agnostic placeholders', () => {
+    const fields = PROCESS_FIELDS.map((field) => `${field.placeholder ?? ''} ${field.hint ?? ''}`).join(' ')
+    expect(fields).not.toMatch(/NODE_ENV|--env-file|--port|node\.exe|index\.js/i)
+    expect(catalogField('interpreter')?.placeholder).toBe('C:/path/to/interpreter or none')
+  })
+
+  it('exposes the catalog types', () => {
+    expect(catalogField('env')?.type).toBe('object')
+    expect(catalogField('args')?.type).toBe('array')
+    expect(catalogField('autorestart')?.type).toBe('boolean')
+    expect(catalogField('min_uptime')?.type).toBe('duration')
+    expect(catalogField('kill_timeout')?.type).toBe('duration')
+    expect(catalogField('watch_delay')?.type).toBe('duration')
+    expect(catalogField('script')?.required).toBe(true)
     expect(catalogField('not-a-field')).toBeUndefined()
   })
-})
 
-describe('mergeCatalogFields', () => {
-  it('keeps template values and flags for keys the template defines', () => {
-    const merged = mergeCatalogFields([
-      key({
-        property_key: 'windowsHide',
-        property_value: 'false',
-        data_type: 'boolean',
-        is_required: true,
-        is_hidden: true,
-      }),
-    ])
+  it('dims dependent fields until their toggle is set', () => {
+    const ignoreWatch = catalogField('ignore_watch')!
+    const watchDelay = catalogField('watch_delay')!
+    const instances = catalogField('instances')!
 
-    expect(merged.find((field) => field.property_key === 'windowsHide')).toEqual({
-      property_key: 'windowsHide',
-      property_value: 'false',
-      data_type: 'boolean',
-      is_required: true,
-      is_hidden: true,
-    })
-  })
-
-  it('shows catalog keys the template omits as blank rows with catalog metadata', () => {
-    const merged = mergeCatalogFields([])
-
-    expect(merged.map((field) => field.property_key)).toEqual(
-      PROCESS_FIELDS.map((field) => field.key),
-    )
-    expect(merged.every((field) => field.property_value === null)).toBe(true)
-    expect(merged.find((field) => field.property_key === 'env')?.data_type).toBe('object')
-    expect(merged.find((field) => field.property_key === 'script')?.is_required).toBe(true)
-  })
-
-  it('keeps keys outside the catalog at the end', () => {
-    const merged = mergeCatalogFields([
-      key({ property_key: 'custom_flag', property_value: '1' }),
-    ])
-
-    expect(merged.at(-1)?.property_key).toBe('custom_flag')
-  })
-
-  it('does not mutate the input rows', () => {
-    const rows = [key({ property_key: 'windowsHide', property_value: 'true' })]
-
-    mergeCatalogFields(rows)
-
-    expect(rows[0].property_value).toBe('true')
+    expect(isFieldEnabled(ignoreWatch, {})).toBe(false)
+    expect(isFieldEnabled(ignoreWatch, { watch: true })).toBe(true)
+    expect(isFieldEnabled(watchDelay, { watch: true })).toBe(true)
+    expect(isFieldEnabled(instances, { exec_mode: 'fork' })).toBe(false)
+    expect(isFieldEnabled(instances, { exec_mode: 'cluster' })).toBe(true)
   })
 })
 
-describe('groupTemplateKeys', () => {
-  it('splits fields into the basic and advanced cards in catalog order', () => {
-    const { basic, advanced } = groupTemplateKeys([
-      key({ property_key: 'script' }),
-      key({ property_key: 'autorestart' }),
-      key({ property_key: 'name' }),
-    ])
-
-    expect(basic.map((field) => field.property_key)).toEqual(['name', 'script'])
-    expect(advanced.map((field) => field.property_key)).toEqual(['autorestart'])
-  })
-
-  it('falls back to advanced for keys outside the catalog', () => {
-    const { basic, advanced } = groupTemplateKeys([
-      key({ property_key: 'unknown_key' }),
-      key({ property_key: 'autorestart' }),
-    ])
-
-    expect(basic).toEqual([])
-    expect(advanced.map((field) => field.property_key)).toEqual(['autorestart', 'unknown_key'])
-  })
-})
-
-describe('validateFields', () => {
+describe('validateRegisterValues', () => {
   it('reports missing required fields', () => {
-    const errors = validateFields([key({ property_key: 'name', property_value: 'app' })])
-
+    const errors = validateRegisterValues({ name: 'app' })
     expect(errors).toMatchObject({
       cwd: 'This field is required',
       interpreter: 'This field is required',
@@ -146,76 +106,32 @@ describe('validateFields', () => {
   })
 
   it('accepts "max" for instances but rejects zero and non-numbers', () => {
-    const base = [
-      key({ property_key: 'name', property_value: 'app' }),
-      key({ property_key: 'cwd', property_value: 'C:/app' }),
-      key({ property_key: 'interpreter', property_value: 'none' }),
-      key({ property_key: 'script', property_value: 'app.exe' }),
-    ]
+    const base = { name: 'app', cwd: 'C:/app', interpreter: 'none', script: 'app.exe' }
 
-    expect(
-      validateFields([
-        ...base,
-        key({ property_key: 'instances', property_value: 'max', data_type: 'number' }),
-      ]),
-    ).toEqual({})
-
-    expect(
-      validateFields([
-        ...base,
-        key({ property_key: 'instances', property_value: '0', data_type: 'number' }),
-      ]).instances,
-    ).toBe('Must be a positive integer or "max"')
-
-    expect(
-      validateFields([
-        ...base,
-        key({ property_key: 'instances', property_value: 'many', data_type: 'number' }),
-      ]).instances,
-    ).toBe('Must be a number')
+    expect(validateRegisterValues({ ...base, instances: 'max' })).toEqual({})
+    expect(validateRegisterValues({ ...base, instances: '0' }).instances).toBe(
+      'Must be a positive integer or "max"',
+    )
+    expect(validateRegisterValues({ ...base, instances: 'many' }).instances).toBe('Must be a number')
   })
 
-  it('validates the new advanced fields by type', () => {
-    const base = [
-      key({ property_key: 'name', property_value: 'app' }),
-      key({ property_key: 'cwd', property_value: 'C:/app' }),
-      key({ property_key: 'interpreter', property_value: 'none' }),
-      key({ property_key: 'script', property_value: 'app.exe' }),
-    ]
-
-    expect(
-      validateFields([
-        ...base,
-        key({ property_key: 'restart_delay', property_value: 'soon', data_type: 'number' }),
-        key({ property_key: 'kill_timeout', property_value: '5000', data_type: 'number' }),
-        key({ property_key: 'min_uptime', property_value: '10s' }),
-        key({ property_key: 'cron_restart', property_value: '0 0 * * *' }),
-      ]),
-    ).toEqual({ restart_delay: 'Must be a number' })
+  it('accepts duration strings and milliseconds', () => {
+    const base = { name: 'app', cwd: 'C:/app', interpreter: 'none', script: 'app.exe' }
+    expect(validateRegisterValues({ ...base, min_uptime: '10s' })).toEqual({})
+    expect(validateRegisterValues({ ...base, kill_timeout: 5000 })).toEqual({})
+    expect(validateRegisterValues({ ...base, restart_delay: 'soon' }).restart_delay).toBe(
+      'Must be a number of milliseconds or a duration like 10s',
+    )
   })
 
-  it('rejects duplicate keys and non-string env values', () => {
-    const errors = validateFields([
-      key({ property_key: 'name', property_value: 'app' }),
-      key({ property_key: 'name', property_value: 'other' }),
-      key({
-        property_key: 'env',
-        data_type: 'object',
-        property_value: '{"PORT": 3000}',
-      }),
-    ])
-
-    expect(errors.name).toBe('Duplicate field "name"')
-    expect(errors.env).toBe('Every env value must be a string')
-  })
-
-  it('rejects malformed JSON array and object values', () => {
-    const errors = validateFields([
-      key({ property_key: 'args', data_type: 'array', property_value: 'not-json' }),
-      key({ property_key: 'env', data_type: 'object', property_value: '["a"]' }),
-    ])
-
-    expect(errors.args).toBe('Must be valid JSON')
-    expect(errors.env).toBe('Must be a JSON object')
+  it('rejects non-string env values', () => {
+    const errors = validateRegisterValues({
+      name: 'app',
+      cwd: 'C:/app',
+      interpreter: 'none',
+      script: 'app.exe',
+      env: { PORT: 3000 },
+    })
+    expect(errors.env).toBe('Every value must be a string')
   })
 })
