@@ -41,12 +41,11 @@ import { TemplateCard } from '@/components/custom/template-card'
 import { TemplatePreview } from '@/components/custom/template-preview'
 import { useTemplateStore } from '@/stores/template.store'
 import { errorCodeLabel, toApiError } from '@/lib/error-code'
-import { mergeCatalogFields } from '@/lib/process-fields'
-import { toSavableKeys } from '@/lib/template-keys'
+import { toSavableValues } from '@/lib/template-keys'
 import { buildTemplatePayload } from '@/lib/template-payload'
 import { copyText } from '@/lib/utils'
 import type { ApiResponse } from '@/types/api'
-import type { ProcessTemplate, TemplateInput, TemplateKey } from '@/types/template'
+import type { ProcessTemplate, TemplateInput, TemplateValues } from '@/types/template'
 
 type StatusFilter = 'all' | 'active' | 'inactive'
 
@@ -69,7 +68,7 @@ const EMPTY_DRAFT: TemplateDraft = {
 export function Template() {
   const [filter, setFilter] = useState<StatusFilter>('all')
   const [selected, setSelected] = useState<ProcessTemplate | null>(null)
-  const [keys, setKeys] = useState<TemplateKey[]>([])
+  const [values, setValues] = useState<TemplateValues>({})
   const [copied, setCopied] = useState(false)
   const [saving, setSaving] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -116,27 +115,24 @@ export function Template() {
     return [...groups.entries()]
   }, [filteredTemplates])
 
-  const payload = useMemo(
-    () => buildTemplatePayload(keys.filter((key) => !key.is_hidden)),
-    [keys],
-  )
+  const payload = useMemo(() => buildTemplatePayload(values), [values])
   const payloadJson = useMemo(() => JSON.stringify(payload, null, 2), [payload])
 
   const handleUse = (template: ProcessTemplate) => {
     void navigate(`/process?template=${template.id}`)
   }
 
-  // Seeds the editor with the full catalog: template values win, the rest show
-  // blank so a field that isn't needed can simply be marked Hidden.
+  // Seeds the editor with the template's stored values; every other field stays
+  // blank and editable. Templates are guides, so no field is hidden or locked.
   const openTemplate = (template: ProcessTemplate) => {
-    setKeys(mergeCatalogFields(template.keys))
+    setValues({ ...template.values })
     setSelected(template)
   }
 
   const openCreate = () => {
     setDraft(EMPTY_DRAFT)
     setNameError(false)
-    setKeys(mergeCatalogFields([]))
+    setValues({})
     setCreateOpen(true)
   }
 
@@ -144,20 +140,18 @@ export function Template() {
     setDraft((prev) => ({ ...prev, ...patch }))
   }
 
-  const handleSave = async (nextKeys: TemplateKey[]): Promise<ApiResponse<ProcessTemplate>> => {
+  const handleSave = async (nextValues: TemplateValues): Promise<ApiResponse<ProcessTemplate>> => {
     if (!selected) {
       return { success: false, message: 'No template selected', info: null, status: 0 }
     }
-    return save(selected.id, toSavableKeys(nextKeys))
+    return save(selected.id, toSavableValues(nextValues))
   }
 
   const handleDelete = (template: ProcessTemplate): Promise<ApiResponse<ProcessTemplate>> =>
     remove(template.id)
 
-  const updateKey = (propertyKey: string, patch: Partial<TemplateKey>) => {
-    setKeys((prev) =>
-      prev.map((key) => (key.property_key === propertyKey ? { ...key, ...patch } : key)),
-    )
+  const updateValue = (key: string, value: unknown) => {
+    setValues((prev) => ({ ...prev, [key]: value }))
   }
 
   const copyPayload = async () => {
@@ -177,7 +171,7 @@ export function Template() {
     if (saving || deleting) return
     setSaving(true)
     try {
-      const result = await handleSave(keys)
+      const result = await handleSave(values)
       if (result.success) {
         toast.add({ type: 'success', title: 'Template saved', description: result.message })
         return
@@ -210,13 +204,13 @@ export function Template() {
         description: draft.description.trim() || null,
         preview: draft.preview.trim() || null,
         is_active: draft.is_active,
-        keys: toSavableKeys(keys),
+        values: toSavableValues(values),
       }
       const result = await register(payload)
       if (result.success) {
         toast.add({ type: 'success', title: 'Template registered', description: result.message })
         setCreateOpen(false)
-        setKeys([])
+        setValues({})
         return
       }
       const error = toApiError(result)
@@ -357,15 +351,8 @@ export function Template() {
             </DialogHeader>
 
             <div className='grid min-h-0 flex-1 grid-cols-1 gap-6 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_320px] lg:overflow-hidden'>
-              <ScrollArea className='h-full min-h-0'>
-                <ProcessForm
-                  mode='template'
-                  fields={keys}
-                  onChange={(propertyKey, value) =>
-                    updateKey(propertyKey, { property_value: value })
-                  }
-                  onUpdate={updateKey}
-                />
+              <ScrollArea className='h-full min-h-0 p-4'>
+                <ProcessForm values={values} onChange={updateValue} />
               </ScrollArea>
 
               <div className='space-y-2'>
@@ -557,14 +544,7 @@ export function Template() {
                     />
                   </div>
 
-                  <ProcessForm
-                    mode='template'
-                    fields={keys}
-                    onChange={(propertyKey, value) =>
-                      updateKey(propertyKey, { property_value: value })
-                    }
-                    onUpdate={updateKey}
-                  />
+                  <ProcessForm values={values} onChange={updateValue} />
                 </div>
               </ScrollArea>
 
