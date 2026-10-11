@@ -1,208 +1,234 @@
-import type { TemplateDataType, TemplateKey } from "@/types/template";
-
 /**
  * Single source of truth for the PM2 fields the register form and the template
- * editor understand. Fields are grouped into the two cards the UI renders:
- * everyday settings (basic) and stability/scaling/recovery settings (advanced,
- * pre-filled with xpm defaults).
+ * editor understand. One typed array drives both: the two cards the UI renders
+ * (basic and advanced), the advanced sub-groups separated by rules, the value
+ * control used for each field, and the payload coercion.
  *
- * The agent accepts exactly these keys on POST /pm2/start; anything else is
- * silently stripped before it reaches PM2.
+ * Language-agnostic on purpose: nothing here mentions a specific runtime. Every
+ * placeholder is neutral; stack-specific starting points come only from
+ * templates, and templates are guides (initial values), never field states.
  */
 
+export type FieldType = "string" | "number" | "boolean" | "array" | "object" | "duration";
+
 export type FieldGroup = "basic" | "advanced";
+
+export type AdvancedGroupId =
+    | "restart"
+    | "schedule"
+    | "resources"
+    | "watch"
+    | "overrides"
+    | "scaling";
 
 export interface ProcessFieldSpec {
     key: string;
     group: FieldGroup;
-    dataType: TemplateDataType;
-    isRequired: boolean;
-    /** Pre-filled for the "None" template; null means the field starts empty. */
-    defaultValue: string | null;
-    /** When set, the form renders a select instead of a free-text input. */
+    advancedGroup?: AdvancedGroupId;
+    type: FieldType;
+    required?: boolean;
+    /** Free-text suggestions for a combobox (e.g. "none"). */
     options?: readonly string[];
+    /** Render a select instead of a free-text input; requires `options`. */
+    select?: boolean;
+    /** Render a combobox (free text + suggestions); requires `options`. */
+    combobox?: boolean;
+    /** Placeholder text, always language-agnostic. */
     placeholder?: string;
+    /** Short muted hint shown under the control. */
+    hint?: string;
+    /** Shown as the control's resting state when the field is empty; never sent. */
+    defaultValue?: string | number | boolean;
+    /** Enables the field only when another field holds one of these values. */
+    enabledWhen?: { key: string; oneOf: readonly (string | number | boolean)[] };
 }
+
+export const ADVANCED_GROUPS: readonly { id: AdvancedGroupId; label: string }[] = [
+    { id: "restart", label: "Restart policy" },
+    { id: "schedule", label: "Schedule" },
+    { id: "resources", label: "Resources & shutdown" },
+    { id: "watch", label: "Watch" },
+    { id: "overrides", label: "Overrides" },
+    { id: "scaling", label: "Scaling" },
+];
 
 export const PROCESS_FIELDS: readonly ProcessFieldSpec[] = [
     {
         key: "name",
         group: "basic",
-        dataType: "string",
-        isRequired: true,
-        defaultValue: null,
+        type: "string",
+        required: true,
         placeholder: "my-app",
     },
     {
         key: "namespace",
         group: "basic",
-        dataType: "string",
-        isRequired: false,
-        defaultValue: "default",
+        type: "string",
+        placeholder: "default",
     },
     {
         key: "cwd",
         group: "basic",
-        dataType: "string",
-        isRequired: true,
-        defaultValue: null,
+        type: "string",
+        required: true,
         placeholder: "C:/apps/my-service",
     },
     {
         key: "interpreter",
         group: "basic",
-        dataType: "string",
-        isRequired: true,
-        defaultValue: null,
-        placeholder: "C:/Program Files/nodejs/node.exe or none",
+        type: "string",
+        required: true,
+        options: ["none"],
+        combobox: true,
+        placeholder: "C:/path/to/interpreter or none",
+        hint: 'Use "none" to run the script directly with no interpreter.',
     },
     {
         key: "script",
         group: "basic",
-        dataType: "string",
-        isRequired: true,
-        defaultValue: null,
-        placeholder: "index.js",
+        type: "string",
+        required: true,
+        placeholder: "app.py",
     },
     {
         key: "args",
         group: "basic",
-        dataType: "array",
-        isRequired: false,
-        defaultValue: null,
-        placeholder: '["--port", "3000"]',
-    },
-    {
-        key: "interpreter_args",
-        group: "basic",
-        dataType: "array",
-        isRequired: false,
-        defaultValue: null,
-        placeholder: '["--env-file=.env"]',
-    },
-    {
-        key: "exec_mode",
-        group: "basic",
-        dataType: "string",
-        isRequired: false,
-        defaultValue: "fork",
-        options: ["fork", "cluster"],
-    },
-    {
-        key: "instances",
-        group: "basic",
-        dataType: "number",
-        isRequired: false,
-        defaultValue: "1",
-        placeholder: "1 or max",
+        type: "array",
+        placeholder: "value",
+        hint: "One argument per row. Press Enter to add.",
     },
     {
         key: "env",
         group: "basic",
-        dataType: "object",
-        isRequired: false,
-        defaultValue: null,
-        placeholder: '{ "NODE_ENV": "production" }',
+        type: "object",
     },
+
+    // Advanced — group 1: restart policy
     {
         key: "autorestart",
         group: "advanced",
-        dataType: "boolean",
-        isRequired: false,
-        defaultValue: "true",
+        advancedGroup: "restart",
+        type: "boolean",
+        defaultValue: true,
     },
     {
         key: "max_restarts",
         group: "advanced",
-        dataType: "number",
-        isRequired: false,
-        defaultValue: "15",
+        advancedGroup: "restart",
+        type: "number",
+        placeholder: "16",
     },
     {
         key: "min_uptime",
         group: "advanced",
-        dataType: "string",
-        isRequired: false,
-        defaultValue: "10s",
+        advancedGroup: "restart",
+        type: "duration",
         placeholder: "10s",
     },
     {
         key: "restart_delay",
         group: "advanced",
-        dataType: "number",
-        isRequired: false,
-        defaultValue: "4000",
+        advancedGroup: "restart",
+        type: "duration",
+        placeholder: "4000",
     },
-    {
-        key: "max_memory_restart",
-        group: "advanced",
-        dataType: "string",
-        isRequired: false,
-        defaultValue: null,
-        placeholder: "500M",
-    },
-    {
-        key: "increment_var",
-        group: "advanced",
-        dataType: "string",
-        isRequired: false,
-        defaultValue: null,
-        placeholder: "PORT",
-    },
+
+    // Advanced — group 2: schedule
     {
         key: "cron_restart",
         group: "advanced",
-        dataType: "string",
-        isRequired: false,
-        defaultValue: null,
-        placeholder: "0 0 * * *",
+        advancedGroup: "schedule",
+        type: "string",
+        placeholder: "*/5 * * * *",
+        hint: "With autorestart off, this runs the process as a scheduled job.",
+    },
+
+    // Advanced — group 3: resources & shutdown
+    {
+        key: "max_memory_restart",
+        group: "advanced",
+        advancedGroup: "resources",
+        type: "string",
+        placeholder: "500M",
     },
     {
         key: "kill_timeout",
         group: "advanced",
-        dataType: "number",
-        isRequired: false,
-        defaultValue: "5000",
+        advancedGroup: "resources",
+        type: "duration",
+        placeholder: "1600",
     },
-    {
-        key: "windowsHide",
-        group: "advanced",
-        dataType: "boolean",
-        isRequired: false,
-        defaultValue: null,
-    },
+
+    // Advanced — group 4: watch
     {
         key: "watch",
         group: "advanced",
-        dataType: "boolean",
-        isRequired: false,
-        defaultValue: null,
+        advancedGroup: "watch",
+        type: "boolean",
+        defaultValue: false,
     },
     {
         key: "ignore_watch",
         group: "advanced",
-        dataType: "array",
-        isRequired: false,
-        defaultValue: null,
-        placeholder: '["node_modules", "logs"]',
+        advancedGroup: "watch",
+        type: "array",
+        placeholder: "value",
+        enabledWhen: { key: "watch", oneOf: [true] },
+        hint: "Available when watch is on.",
     },
     {
         key: "watch_delay",
         group: "advanced",
-        dataType: "number",
-        isRequired: false,
-        defaultValue: null,
+        advancedGroup: "watch",
+        type: "duration",
+        placeholder: "1000",
+        enabledWhen: { key: "watch", oneOf: [true] },
+        hint: "Available when watch is on.",
+    },
+
+    // Advanced — group 5: overrides
+    {
+        key: "interpreter_args",
+        group: "advanced",
+        advancedGroup: "overrides",
+        type: "array",
+        placeholder: "value",
+    },
+    {
+        key: "windowsHide",
+        group: "advanced",
+        advancedGroup: "overrides",
+        type: "boolean",
+        defaultValue: true,
+    },
+
+    // Advanced — group 6: scaling
+    {
+        key: "exec_mode",
+        group: "advanced",
+        advancedGroup: "scaling",
+        type: "string",
+        options: ["fork", "cluster"],
+        select: true,
+        defaultValue: "fork",
+    },
+    {
+        key: "instances",
+        group: "advanced",
+        advancedGroup: "scaling",
+        type: "number",
+        placeholder: "1",
+        enabledWhen: { key: "exec_mode", oneOf: ["cluster"] },
+        hint: "Available when exec_mode is cluster.",
     },
 ];
 
 const FIELD_BY_KEY = new Map(PROCESS_FIELDS.map((field) => [field.key, field]));
 
-const FIELD_ORDER = new Map(PROCESS_FIELDS.map((field, index) => [field.key, index]));
-
 export const ALLOWED_FIELD_KEYS: ReadonlySet<string> = new Set(FIELD_BY_KEY.keys());
 
 export const REQUIRED_FIELD_KEYS: readonly string[] = PROCESS_FIELDS.filter(
-    (field) => field.isRequired,
+    (field) => field.required,
 ).map((field) => field.key);
 
 export function catalogField(key: string): ProcessFieldSpec | undefined {
@@ -213,149 +239,102 @@ export function isCatalogField(key: string): boolean {
     return FIELD_BY_KEY.has(key);
 }
 
-export function catalogFields(group: FieldGroup): ProcessFieldSpec[] {
-    return PROCESS_FIELDS.filter((field) => field.group === group);
+export function basicFields(): ProcessFieldSpec[] {
+    return PROCESS_FIELDS.filter((field) => field.group === "basic");
 }
 
-export function toTemplateKey(spec: ProcessFieldSpec): TemplateKey {
-    return {
-        property_key: spec.key,
-        property_value: spec.defaultValue,
-        data_type: spec.dataType,
-        is_required: spec.isRequired,
-        is_hidden: false,
-    };
+export function advancedFields(): ProcessFieldSpec[] {
+    return PROCESS_FIELDS.filter((field) => field.group === "advanced");
 }
 
-function toBlankTemplateKey(spec: ProcessFieldSpec): TemplateKey {
-    return {
-        property_key: spec.key,
-        property_value: null,
-        data_type: spec.dataType,
-        is_required: spec.isRequired,
-        is_hidden: false,
-    };
+/** Fields for an advanced sub-group, in catalog order. */
+export function advancedGroupFields(group: AdvancedGroupId): ProcessFieldSpec[] {
+    return PROCESS_FIELDS.filter(
+        (field) => field.group === "advanced" && field.advancedGroup === group,
+    );
 }
 
-/** Full catalog with xpm defaults; used when the "None" template is selected. */
-export function buildCatalogFields(): TemplateKey[] {
-    return PROCESS_FIELDS.map(toTemplateKey);
+/** A field outside the catalog (possible only via direct API writes). */
+export function isValueEmpty(value: unknown): boolean {
+    if (value === undefined || value === null) return true;
+    if (typeof value === "string") return value.trim() === "";
+    if (Array.isArray(value)) return value.length === 0;
+    if (typeof value === "object") return Object.keys(value as object).length === 0;
+    return false;
 }
 
 /**
- * Blends a template's stored keys into the full catalog so the editor and the
- * registration form always show every field. Template rows win (value and
- * flags kept), catalog keys the template does not define appear blank, and keys
- * outside the catalog are kept at the end.
+ * A field is enabled unless it declares a dependency on another field's value.
+ * Dependencies only dim; the field always stays visible.
  */
-export function mergeCatalogFields(templateKeys: readonly TemplateKey[]): TemplateKey[] {
-    const byKey = new Map(templateKeys.map((field) => [field.property_key, field]));
+export function isFieldEnabled(
+    spec: ProcessFieldSpec,
+    values: Record<string, unknown>,
+): boolean {
+    if (!spec.enabledWhen) return true;
+    const current = values[spec.enabledWhen.key];
+    return spec.enabledWhen.oneOf.some((allowed) => allowed === current);
+}
 
-    const catalogRows = PROCESS_FIELDS.map((spec) => {
-        const templateRow = byKey.get(spec.key);
-        return templateRow ? { ...templateRow } : toBlankTemplateKey(spec);
-    });
+const DURATION_PATTERN = /^(\d+(?:\.\d+)?)(ms|s|m|h)?$/i;
 
-    const extraRows = templateKeys
-        .filter((field) => !isCatalogField(field.property_key))
-        .map((field) => ({ ...field }));
-
-    return [...catalogRows, ...extraRows];
+/** True when a duration is a finite millisecond number or a `10s`-style string. */
+export function isValidDuration(value: unknown): boolean {
+    if (typeof value === "number") return Number.isFinite(value) && value >= 0;
+    if (typeof value === "string") return DURATION_PATTERN.test(value.trim());
+    return false;
 }
 
 /**
- * Splits template keys into the two cards. Keys outside the catalog (possible
- * only through direct API writes) fall back to advanced so they stay visible
- * and editable rather than silently disappearing. Rows are shown in catalog
- * order so base fields always lead their card, whatever order a template stores.
+ * Client-side mirror of the agent's required-field and type checks. Only used
+ * when registering a process; templates have no required-field rules.
  */
-export function groupTemplateKeys(fields: TemplateKey[]): {
-    basic: TemplateKey[];
-    advanced: TemplateKey[];
-} {
-    const basic: TemplateKey[] = [];
-    const advanced: TemplateKey[] = [];
-
-    for (const field of fields) {
-        const group = catalogField(field.property_key)?.group ?? "advanced";
-        (group === "basic" ? basic : advanced).push(field);
-    }
-
-    const byCatalogOrder = (a: TemplateKey, b: TemplateKey) =>
-        (FIELD_ORDER.get(a.property_key) ?? Number.MAX_SAFE_INTEGER) -
-        (FIELD_ORDER.get(b.property_key) ?? Number.MAX_SAFE_INTEGER);
-    basic.sort(byCatalogOrder);
-    advanced.sort(byCatalogOrder);
-
-    return { basic, advanced };
-}
-
-/**
- * Client-side mirror of the agent's schema + configuration guide, limited to
- * what a form can catch before the request is sent.
- */
-export function validateFields(fields: TemplateKey[]): Record<string, string> {
+export function validateRegisterValues(values: Record<string, unknown>): Record<string, string> {
     const errors: Record<string, string> = {};
-    const seen = new Set<string>();
 
-    for (const field of fields) {
-        const key = field.property_key.trim();
-        if (key === "") continue;
+    for (const spec of PROCESS_FIELDS) {
+        const value = values[spec.key];
 
-        if (seen.has(key)) {
-            errors[key] = `Duplicate field "${key}"`;
-            continue;
-        }
-        seen.add(key);
-
-        const value = (field.property_value ?? "").trim();
-        const isRequired = field.is_required || REQUIRED_FIELD_KEYS.includes(key);
-        if (isRequired && value === "") {
-            errors[key] = "This field is required";
-            continue;
-        }
-        if (value === "") continue;
-
-        if (field.data_type === "number") {
-            if (key === "instances" && value === "max") continue;
-            const numeric = Number(value);
-            if (!Number.isFinite(numeric)) {
-                errors[key] = "Must be a number";
-            } else if (key === "instances" && (!Number.isInteger(numeric) || numeric < 1)) {
-                errors[key] = 'Must be a positive integer or "max"';
-            }
+        if (spec.required && isValueEmpty(value)) {
+            errors[spec.key] = "This field is required";
             continue;
         }
 
-        if (field.data_type === "array" || field.data_type === "object") {
-            let parsed: unknown;
-            try {
-                parsed = JSON.parse(value);
-            } catch {
-                errors[key] = "Must be valid JSON";
-                continue;
-            }
+        if (isValueEmpty(value)) continue;
 
-            if (field.data_type === "array" && !Array.isArray(parsed)) {
-                errors[key] = "Must be a JSON array";
-            }
-
-            if (field.data_type === "object") {
-                if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-                    errors[key] = "Must be a JSON object";
-                } else if (
-                    key === "env" &&
-                    Object.values(parsed).some((entry) => typeof entry !== "string")
-                ) {
-                    errors[key] = "Every env value must be a string";
+        switch (spec.type) {
+            case "number": {
+                if (spec.key === "instances" && value === "max") break;
+                const numeric = typeof value === "number" ? value : Number(value);
+                if (!Number.isFinite(numeric)) {
+                    errors[spec.key] = "Must be a number";
+                } else if (spec.key === "instances" && (!Number.isInteger(numeric) || numeric < 1)) {
+                    errors[spec.key] = 'Must be a positive integer or "max"';
                 }
+                break;
             }
-        }
-    }
-
-    for (const key of REQUIRED_FIELD_KEYS) {
-        if (!seen.has(key) && errors[key] === undefined) {
-            errors[key] = "This field is required";
+            case "duration": {
+                if (!isValidDuration(value)) {
+                    errors[spec.key] = "Must be a number of milliseconds or a duration like 10s";
+                }
+                break;
+            }
+            case "array": {
+                if (!Array.isArray(value) || value.some((entry) => typeof entry !== "string")) {
+                    errors[spec.key] = "Must be a list of strings";
+                }
+                break;
+            }
+            case "object": {
+                if (typeof value !== "object" || value === null || Array.isArray(value)) {
+                    errors[spec.key] = "Must be a key/value object";
+                } else if (Object.values(value).some((entry) => typeof entry !== "string")) {
+                    errors[spec.key] = "Every value must be a string";
+                }
+                break;
+            }
+            default:
+                break;
         }
     }
 
