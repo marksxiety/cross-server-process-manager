@@ -1,5 +1,5 @@
 import { createConnection } from "@/api/connection";
-import type { ProcessTemplate, TemplateInput, TemplateKey } from "@/types/template";
+import type { ProcessTemplate, TemplateInput, TemplateValues } from "@/types/template";
 import type { ApiResponse } from "@/types/api";
 
 export function templateService() {
@@ -27,9 +27,9 @@ export function templateService() {
                 return { success: false, message: (cause as Error).message, info: null, status: 0 };
             }
         },
-        update: async (id: number, keys: TemplateKey[]): Promise<ApiResponse<ProcessTemplate>> => {
+        update: async (id: number, values: TemplateValues): Promise<ApiResponse<ProcessTemplate>> => {
             try {
-                return await api.put<ProcessTemplate>(`/templates/${id}`, { keys });
+                return await api.put<ProcessTemplate>(`/templates/${id}`, { values });
             } catch (cause) {
                 return { success: false, message: (cause as Error).message, info: null, status: 0 };
             }
