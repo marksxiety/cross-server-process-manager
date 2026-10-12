@@ -8,7 +8,7 @@ Everything needed to run the registry API (`xpm-server`), the dashboard (`xpm-we
 
 ## Prerequisites
 
-- **Node.js** and **PostgreSQL** — for the registry and dashboard.
+- **Node.js** and **SQL Server** (Express or Developer edition works) — for the registry and dashboard.
 - **[xpm-agent](https://github.com/marksxiety/xpm-agent)** — deploy it from its own repo on every server you want to monitor (it requires **Bun** and **PM2**; see the [agent setup guide](https://github.com/marksxiety/xpm-agent/blob/main/docs/SETUP.md)).
 
 ## 1. Install xpm-agent on each monitored server
@@ -38,8 +38,10 @@ Both `xpm-server` and the `xpm-web` build read the same root `.env`:
 | Variable | Purpose | Default |
 |---|---|---|
 | `SERVER_PORT` | Port the registry API binds. **Required** — the server refuses to boot without it. | `5638` |
-| `DB_USER` / `DB_PASSWORD` / `DB_HOST` / `DB_PORT` / `DB_NAME` | PostgreSQL connection for the registry. | `postgres` / — / `localhost` / `5432` / `XPM` |
-| `DB_MAINTENANCE_NAME` | Admin database used to run `CREATE DATABASE`. | `postgres` |
+| `DB_CONNECTION` | Database driver for the registry. Only `sqlsrv` is supported. | `sqlsrv` |
+| `DB_HOST` / `DB_PORT` / `DB_DATABASE` | SQL Server connection for the registry. | `127.0.0.1` / `1433` / `backend` |
+| `DB_USERNAME` / `DB_PASSWORD` | SQL login used by the registry. Create a login (e.g. `root`, or the built-in `sa`) with `dbcreator` rights so `db:setup` can create the database. | `root` / — |
+| `DB_ENCRYPT` / `DB_TRUST_SERVER_CERTIFICATE` | TLS options. Local dev with a self-signed certificate: `false` / `true`. Remote or Azure SQL: `true` / `false`. | `false` / `true` |
 | `VITE_WEB_PORT` | Port the dashboard is served on (Vite dev/preview and the PM2 serve process). | `3000` |
 | `VITE_SERVER_PROTOCOL` / `VITE_SERVER_HOST` / `VITE_SERVER_PORT` | Where the browser reaches the registry. `VITE_SERVER_PORT` must match `SERVER_PORT`. | `http` / `localhost` / `5638` |
 | `VITE_AGENT_AUTH_TOKEN` | Bearer token the dashboard sends with every agent request. Must match the `AUTH_TOKEN` configured on each agent. | empty |
@@ -51,6 +53,8 @@ Both `xpm-server` and the `xpm-web` build read the same root `.env`:
 ```bash
 npm run db:setup -w server
 ```
+
+This creates the `DB_DATABASE` database (via the `master` database), runs the migrations, and seeds the starter templates. For local SQL Server, make sure TCP/IP is enabled on `DB_PORT` (default `1433`) and SQL Server authentication is allowed.
 
 ## 5. Start the registry and the dashboard
 

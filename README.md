@@ -31,7 +31,7 @@ XPM is the control plane for [`xpm-agent`](https://github.com/marksxiety/xpm-age
 | Piece | Where | Role |
 |---|---|---|
 | **xpm-web** | this repo (`web/`) | The dashboard you open in the browser |
-| **xpm-server** | this repo (`server/`) | Registry API — stores your server list (PostgreSQL) |
+| **xpm-server** | this repo (`server/`) | Registry API — stores your server list (SQL Server) |
 | **xpm-agent** | separate repo — [`xpm-agent`](https://github.com/marksxiety/xpm-agent) | REST wrapper around PM2 — one per server, the only thing that touches PM2 |
 
 The dashboard reads your server list from **xpm-server**, then talks to each **xpm-agent** directly to pull live process data and send lifecycle commands. Agents are guarded by `AUTH_TOKEN`; give the dashboard the matching `VITE_AGENT_AUTH_TOKEN`.
