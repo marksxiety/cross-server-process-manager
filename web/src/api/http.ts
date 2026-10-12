@@ -8,6 +8,7 @@ interface HttpRequestOptions {
     method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
     body?: unknown;
     headers?: Record<string, string>;
+    signal?: AbortSignal;
 }
 
 export async function httpRequest<T = unknown>({
@@ -17,6 +18,7 @@ export async function httpRequest<T = unknown>({
     method = "GET",
     body,
     headers,
+    signal,
 }: HttpRequestOptions): Promise<ApiResponse<T>> {
     if (typeof url !== "string" || url.trim() === "") {
         throw new TypeError("httpRequest: url is required and must be a non-empty string");
@@ -48,6 +50,7 @@ export async function httpRequest<T = unknown>({
                 "Content-Type": "application/json",
                 ...headers,
             },
+            signal,
         });
     } catch (cause) {
         const err = cause as Error;
