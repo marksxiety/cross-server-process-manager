@@ -52,6 +52,7 @@ import { ErrorAlert } from '@/components/custom/error-alert'
 import { PageHeader } from '@/components/custom/page-header'
 import { ServerTable } from '@/components/custom/server-table'
 import { useServerStore } from '@/stores/server.store'
+import { probeAgent } from '@/api/services/agent.service'
 import { serverService } from '@/api/services/server.service'
 import {
   registerServerSchema,
@@ -130,10 +131,16 @@ export function Server() {
     const target = editingServer
     const isEditing = target !== null
 
+    // New registrations are gated on the target answering the agent's public
+    // root route, so an unreachable (or non-agent) host:port can't be added.
+    // Edits keep the old behavior — fixing a down server must stay possible.
     const request = (
       target
         ? serverService().update(target.id, values)
-        : serverService().register(values)
+        : probeAgent(values).then((probe) => {
+            if (!probe.success) throw new Error(probe.message)
+            return serverService().register(values)
+          })
     ).then((result) => {
       if (!result.success) throw new Error(result.message)
       return result
