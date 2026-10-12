@@ -7,59 +7,61 @@ const WEB_PORT = process.env.VITE_WEB_PORT || "3000";
 module.exports = {
   apps: [
     {
+      // Basic
       name: "xpm-server",
       namespace: "XPM",
       cwd: path.join(__dirname, "server"),
-      script: "./dist/index.js",
       interpreter: "node",
-      exec_mode: "fork",
-      instances: 1,
-
-      // Crash Recovery (Advanced)
-      autorestart: true,
-      max_restarts: 999999,
-      exp_backoff_restart_delay: 100,
-      min_uptime: "10s",
-
-      // Memory Leak Protection (Advanced)
-      max_memory_restart: "500M",
-
-      // Graceful Shutdown & Logs (Advanced)
-      kill_timeout: 5000,
-      time: true,
-
-      // Environment Configuration
+      script: "./dist/index.js",
       env: {
         NODE_ENV: "production"
-      }
+      },
+
+      // Advanced — Restart policy
+      autorestart: true,
+      max_restarts: 999999,
+      min_uptime: "10s",
+      restart_delay: 100,
+
+      // Advanced — Resources & shutdown
+      max_memory_restart: "500M",
+      kill_timeout: 5000,
+
+      // Advanced — Overrides
+      time: true, // PM2-only, not in the process form catalog
+
+      // Advanced — Scaling
+      exec_mode: "fork",
+      instances: 1
     },
     {
+      // Basic
       name: "xpm-web",
       namespace: "XPM",
       cwd: path.join(__dirname, "web"),
-      script: "../node_modules/serve/build/main.js",
-      args: `-s dist -l ${WEB_PORT}`,
       interpreter: "node",
-      exec_mode: "fork",
-      instances: 1,
-
-      // Crash Recovery (Advanced)
-      autorestart: true,
-      max_restarts: 999999,
-      exp_backoff_restart_delay: 100,
-      min_uptime: "10s",
-
-      // Memory Leak Protection (Advanced)
-      max_memory_restart: "250M",
-
-      // Graceful Shutdown & Logs (Advanced)
-      kill_timeout: 5000,
-      time: true,
-
-      // Environment Configuration
+      script: "../node_modules/serve/build/main.js",
+      args: ["-s", "dist", "-l", WEB_PORT],
       env: {
         NODE_ENV: "production"
-      }
+      },
+
+      // Advanced — Restart policy
+      autorestart: true,
+      max_restarts: 999999,
+      min_uptime: "10s",
+      restart_delay: 100,
+
+      // Advanced — Resources & shutdown
+      max_memory_restart: "250M",
+      kill_timeout: 5000,
+
+      // Advanced — Overrides
+      time: true, // PM2-only, not in the process form catalog
+
+      // Advanced — Scaling
+      exec_mode: "fork",
+      instances: 1
     }
   ]
 };
