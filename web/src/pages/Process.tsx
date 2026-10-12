@@ -99,22 +99,45 @@ function StepMarker({
   )
 }
 
-function Stepper({ step }: { step: 1 | 2 }) {
+function Stepper({
+  step,
+  canGoToStep2,
+  onStepChange,
+}: {
+  step: 1 | 2
+  canGoToStep2: boolean
+  onStepChange: (step: 1 | 2) => void
+}) {
   return (
     <div className='flex w-full max-w-md flex-1 items-center gap-2 sm:w-auto sm:min-w-64'>
-      <StepMarker active={step === 1} done={step > 1}>
-        1
-      </StepMarker>
-      <span className={cn('text-xs', step === 1 ? 'font-medium' : 'text-muted-foreground')}>
-        Server + template
-      </span>
+      <button
+        type='button'
+        onClick={() => onStepChange(1)}
+        aria-current={step === 1 ? 'step' : undefined}
+        className='flex cursor-pointer items-center gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring/30'
+      >
+        <StepMarker active={step === 1} done={step > 1}>
+          1
+        </StepMarker>
+        <span className={cn('text-xs', step === 1 ? 'font-medium' : 'text-muted-foreground')}>
+          Server + template
+        </span>
+      </button>
       <div className='h-px flex-1 bg-border' />
-      <StepMarker active={step === 2} done={false}>
-        2
-      </StepMarker>
-      <span className={cn('text-xs', step === 2 ? 'font-medium' : 'text-muted-foreground')}>
-        Configure
-      </span>
+      <button
+        type='button'
+        onClick={() => onStepChange(2)}
+        disabled={!canGoToStep2}
+        aria-current={step === 2 ? 'step' : undefined}
+        className='flex cursor-pointer items-center gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed'
+      >
+        <StepMarker active={step === 2} done={false}>
+          2
+        </StepMarker>
+        <span className={cn('text-xs', step === 2 ? 'font-medium' : 'text-muted-foreground')}>
+          Configure
+        </span>
+      </button>
     </div>
   )
 }
@@ -265,6 +288,10 @@ export function Process() {
 
   const payload = useMemo(() => buildProcessPayload(values), [values])
 
+  // Step 2 is only reachable with a server selected: free 1 ↔ 2 navigation
+  // then, otherwise only 2 → 1 (back) is allowed.
+  const canGoToStep2 = server !== null
+
   const issueMap = useMemo(() => mapIssues(issues), [issues])
   const errors: Record<string, string> = { ...clientErrors, ...issueMap }
 
@@ -329,7 +356,7 @@ export function Process() {
           <p className='text-sm text-muted-foreground'>Register a new process to monitor.</p>
         </div>
 
-        <Stepper step={step} />
+        <Stepper step={step} canGoToStep2={canGoToStep2} onStepChange={goToStep} />
       </div>
 
       {serversStatus === 'loading' && (
@@ -469,7 +496,7 @@ export function Process() {
           </Card>
 
           <div className='flex justify-end lg:col-span-2'>
-            <Button type='button' disabled={!server} onClick={() => goToStep(2)}>
+            <Button type='button' disabled={!canGoToStep2} onClick={() => goToStep(2)}>
               Next: configure
               <ArrowRight strokeWidth={2} />
             </Button>
