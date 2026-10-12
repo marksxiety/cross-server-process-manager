@@ -1,5 +1,6 @@
-import type { Client } from 'pg';
+import type { DbSession } from '../src/config/db';
 import { buildKeyInsert, type TemplateValues } from '../src/utils/templateValues';
+import { buildPlaceholders } from '../src/utils/sql';
 
 type Template = {
   template_name: string;
@@ -110,21 +111,25 @@ const templates: Template[] = [
   }
 ];
 
-export default async function seed(client: Client): Promise<void> {
+export default async function seed(session: DbSession): Promise<void> {
   if (templates.length === 0) {
     throw new Error('No templates defined — refusing to prune every template row');
   }
 
   for (const tpl of templates) {
-    const result = await client.query<{ id: number }>(
-      `INSERT INTO templates (template_name, category, description, preview)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (template_name) DO UPDATE
-       SET category = EXCLUDED.category,
-           description = EXCLUDED.description,
-           preview = EXCLUDED.preview,
-           updated_at = current_timestamp
-       RETURNING id`,
+    const result = await session.query<{ id: number }>(
+      `MERGE INTO templates AS target
+       USING (SELECT @p1 AS template_name, @p2 AS category, @p3 AS description, @p4 AS preview) AS source
+       ON target.template_name = source.template_name
+       WHEN MATCHED THEN
+           UPDATE SET category = source.category,
+                      description = source.description,
+                      preview = source.preview,
+                      updated_at = SYSDATETIME()
+       WHEN NOT MATCHED THEN
+           INSERT (template_name, category, description, preview)
+           VALUES (source.template_name, source.category, source.description, source.preview)
+       OUTPUT INSERTED.id;`,
       [tpl.template_name, tpl.category, tpl.description, tpl.preview]
     );
 
@@ -133,18 +138,18 @@ export default async function seed(client: Client): Promise<void> {
       throw new Error(`Upsert of template "${tpl.template_name}" returned no id`);
     }
 
-    await client.query('DELETE FROM template_keys WHERE template_id = $1', [templateId]);
+    await session.query('DELETE FROM template_keys WHERE template_id = @p1', [templateId]);
 
     const keyInsert = buildKeyInsert(templateId, tpl.values);
     if (keyInsert) {
-      await client.query(keyInsert.text, keyInsert.params);
+      await session.query(keyInsert.text, keyInsert.params);
     }
 
     console.log(`Seeded template: ${tpl.template_name} (ID: ${templateId})`);
   }
 
-  await client.query(
-    `DELETE FROM templates WHERE NOT (template_name = ANY($1::text[]))`,
-    [templates.map((t) => t.template_name)]
+  await session.query(
+    `DELETE FROM templates WHERE template_name NOT IN (${buildPlaceholders(templates.length)})`,
+    templates.map((t) => t.template_name)
   );
 }
