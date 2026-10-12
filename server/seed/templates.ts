@@ -1,6 +1,5 @@
 import type { Client } from 'pg';
-
-type TemplateValues = Record<string, unknown>;
+import { buildKeyInsert, type TemplateValues } from '../src/utils/templateValues';
 
 type Template = {
   template_name: string;
@@ -118,21 +117,27 @@ export default async function seed(client: Client): Promise<void> {
 
   for (const tpl of templates) {
     const result = await client.query<{ id: number }>(
-      `INSERT INTO templates (template_name, category, description, preview, values)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO templates (template_name, category, description, preview)
+       VALUES ($1, $2, $3, $4)
        ON CONFLICT (template_name) DO UPDATE
        SET category = EXCLUDED.category,
            description = EXCLUDED.description,
            preview = EXCLUDED.preview,
-           values = EXCLUDED.values,
            updated_at = current_timestamp
        RETURNING id`,
-      [tpl.template_name, tpl.category, tpl.description, tpl.preview, tpl.values]
+      [tpl.template_name, tpl.category, tpl.description, tpl.preview]
     );
 
     const templateId = result.rows[0]?.id;
     if (templateId === undefined) {
       throw new Error(`Upsert of template "${tpl.template_name}" returned no id`);
+    }
+
+    await client.query('DELETE FROM template_keys WHERE template_id = $1', [templateId]);
+
+    const keyInsert = buildKeyInsert(templateId, tpl.values);
+    if (keyInsert) {
+      await client.query(keyInsert.text, keyInsert.params);
     }
 
     console.log(`Seeded template: ${tpl.template_name} (ID: ${templateId})`);
