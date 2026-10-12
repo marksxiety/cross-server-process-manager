@@ -1,9 +1,9 @@
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { Client } from 'pg';
+import db, { type DbSession } from '../config/db';
 import '../config/env';
 
-type SeedFn = (client: Client) => Promise<void>;
+type SeedFn = (session: DbSession) => Promise<void>;
 
 // seed/index.ts must be imported dynamically: a static import would pull the
 // seed/ directory into the tsc program and violate rootDir "./src".
@@ -28,31 +28,21 @@ async function loadSeeders(): Promise<SeedFn[]> {
 // or none of them do.
 async function runSeeds(): Promise<void> {
     const seeders = await loadSeeders();
+    const session = await db.beginTransaction();
 
-    const client = new Client({
-        user: process.env.DB_USER,
-        host: process.env.DB_HOST,
-        database: process.env.DB_NAME,
-        password: process.env.DB_PASSWORD,
-        port: parseInt(process.env.DB_PORT || '5432', 10),
-    });
-
-    await client.connect();
     try {
-        await client.query('BEGIN');
-
         for (const [index, seed] of seeders.entries()) {
             console.log(`Running seeder ${index + 1}/${seeders.length}...`);
-            await seed(client);
+            await seed(session);
         }
 
-        await client.query('COMMIT');
+        await session.commit();
         console.log('Seeding completed successfully.');
     } catch (err) {
-        await client.query('ROLLBACK');
+        await session.rollback().catch(() => undefined);
         throw err;
     } finally {
-        await client.end();
+        await db.close();
     }
 }
 
