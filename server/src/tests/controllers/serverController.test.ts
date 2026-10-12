@@ -37,11 +37,14 @@ function responseBody(res: MockResponse): Record<string, unknown> {
     return res.json.mock.calls.at(-1)?.[0] as Record<string, unknown>;
 }
 
-function uniqueViolation(constraint: string): Error & { code: string; constraint: string } {
-    return Object.assign(new Error('duplicate key value violates unique constraint'), {
-        code: '23505',
-        constraint,
-    });
+function uniqueViolation(constraint: string): Error & { number: number } {
+    return Object.assign(
+        new Error(
+            `Violation of UNIQUE KEY constraint '${constraint}'. ` +
+                "Cannot insert duplicate key in object 'dbo.servers'."
+        ),
+        { number: 2627 }
+    );
 }
 
 const VALID_BODY = {
@@ -87,6 +90,7 @@ describe('serverController.register', () => {
         expect(query).toHaveBeenCalledTimes(1);
         const [sql, params] = query.mock.calls[0] as [string, unknown[]];
         expect(sql).toContain('INSERT INTO servers');
+        expect(sql).toContain('OUTPUT INSERTED.*');
         expect(params).toEqual(['app-1', 'http', '127.0.0.1', 4000, true]);
     });
 
@@ -242,8 +246,8 @@ describe('serverController.update', () => {
         });
         expect(query).toHaveBeenCalledTimes(2);
         const [sql, params] = query.mock.calls[1] as [string, unknown[]];
-        expect(sql).toContain('updated_at = current_timestamp');
-        expect(sql).toContain('COALESCE($5, is_active)');
+        expect(sql).toContain('updated_at = SYSDATETIME()');
+        expect(sql).toContain('COALESCE(CAST(@p5 AS BIT), is_active)');
         expect(params).toEqual(['app-1', 'http', '127.0.0.1', 4000, null, 1]);
     });
 
@@ -312,6 +316,7 @@ describe('serverController.remove', () => {
         });
         const [sql, params] = query.mock.calls[0] as [string, unknown[]];
         expect(sql).toContain('DELETE FROM servers');
+        expect(sql).toContain('OUTPUT DELETED.*');
         expect(params).toEqual([1]);
     });
 });
@@ -324,7 +329,7 @@ describe('serverController.index', () => {
         await index(createRequest({}), res);
 
         const [sql] = query.mock.calls[0] as [string];
-        expect(sql).toContain('WHERE is_active = TRUE');
+        expect(sql).toContain('WHERE is_active = 1');
         expect(responseBody(res)).toEqual({
             success: true,
             message: 'Servers retrieved successfully',

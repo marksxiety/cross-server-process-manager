@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import db from '../config/db';
 import { serverInputSchema } from '../schemas/serverSchema';
+import { describeDbError, isUniqueViolation } from '../utils/dbError';
 import { fail, ok } from '../utils/response';
 
 export interface ServerRecord {
@@ -15,10 +16,10 @@ export interface ServerRecord {
     updated_at: Date;
 }
 
-const DUPLICATE_KEY_CODE = '23505';
 const DUPLICATE_SERVER_CODE = 'DUPLICATE_SERVER';
 const DUPLICATE_HOST_CODE = 'DUPLICATE_HOST';
 const VALIDATION_FAILED_CODE = 'VALIDATION_FAILED';
+const INTERNAL_SERVER_ERROR_CODE = 'INTERNAL_SERVER_ERROR';
 const SERVER_UNIQUE_CONSTRAINT = 'servers_server_key';
 const HOST_UNIQUE_CONSTRAINT = 'servers_host_unique';
 const INVALID_ID_MESSAGE = 'Server id must be a positive integer';
@@ -65,14 +66,14 @@ export const index = async (req: Request, res: Response): Promise<void> => {
     const withInactive = req.query.with_inactive === 'true';
     const sql = withInactive
         ? 'SELECT * FROM servers ORDER BY id ASC'
-        : 'SELECT * FROM servers WHERE is_active = TRUE ORDER BY id ASC';
+        : 'SELECT * FROM servers WHERE is_active = 1 ORDER BY id ASC';
 
     try {
         const { rows } = await db.query<ServerRecord>(sql);
         ok(res, 'Servers retrieved successfully', rows);
     } catch (err) {
         console.error(err);
-        fail(res, 500, 'Failed to retrieve servers', 'INTERNAL_SERVER_ERROR');
+        fail(res, 500, 'Failed to retrieve servers', INTERNAL_SERVER_ERROR_CODE);
     }
 };
 
@@ -88,15 +89,17 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
     try {
         const { rows } = await db.query<ServerRecord>(
-            'INSERT INTO servers (server, protocol, host, port, is_active) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+            `INSERT INTO servers (server, protocol, host, port, is_active)
+             OUTPUT INSERTED.*
+             VALUES (@p1, @p2, @p3, @p4, @p5)`,
             [server, protocol, host, port, active]
         );
         ok(res, 'Server registered successfully', rows[0]);
     } catch (err) {
         console.error(err);
-        const dbError = err as { detail?: string; code?: string; constraint?: string; message?: string };
+        const dbError = describeDbError(err);
 
-        if (dbError.code === DUPLICATE_KEY_CODE) {
+        if (isUniqueViolation(dbError)) {
             const duplicate = duplicateResponse(dbError.constraint, { server, host }) ?? {
                 code: DUPLICATE_SERVER_CODE,
                 message: duplicateServerMessage(server),
@@ -108,8 +111,8 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         fail(
             res,
             500,
-            dbError.detail ?? dbError.message ?? 'Failed to register server',
-            dbError.code ?? 'INTERNAL_SERVER_ERROR'
+            dbError.message || 'Failed to register server',
+            dbError.number !== undefined ? String(dbError.number) : INTERNAL_SERVER_ERROR_CODE
         );
     }
 };
@@ -136,9 +139,9 @@ export const update = async (req: Request, res: Response): Promise<void> => {
             name_taken: boolean;
             host_taken: boolean;
         }>(
-            `SELECT EXISTS (SELECT 1 FROM servers WHERE id = $2) AS target_exists,
-                    EXISTS (SELECT 1 FROM servers WHERE server = $1 AND id <> $2) AS name_taken,
-                    EXISTS (SELECT 1 FROM servers WHERE host = $3 AND id <> $2) AS host_taken`,
+            `SELECT CAST(CASE WHEN EXISTS (SELECT 1 FROM servers WHERE id = @p2) THEN 1 ELSE 0 END AS BIT) AS target_exists,
+                    CAST(CASE WHEN EXISTS (SELECT 1 FROM servers WHERE server = @p1 AND id <> @p2) THEN 1 ELSE 0 END AS BIT) AS name_taken,
+                    CAST(CASE WHEN EXISTS (SELECT 1 FROM servers WHERE host = @p3 AND id <> @p2) THEN 1 ELSE 0 END AS BIT) AS host_taken`,
             [server, id, host]
         );
 
@@ -158,14 +161,14 @@ export const update = async (req: Request, res: Response): Promise<void> => {
 
         const { rows } = await db.query<ServerRecord>(
             `UPDATE servers
-             SET server = $1,
-                 protocol = $2,
-                 host = $3,
-                 port = $4,
-                 is_active = COALESCE($5, is_active),
-                 updated_at = current_timestamp
-             WHERE id = $6
-             RETURNING *`,
+             SET server = @p1,
+                 protocol = @p2,
+                 host = @p3,
+                 port = @p4,
+                 is_active = COALESCE(CAST(@p5 AS BIT), is_active),
+                 updated_at = SYSDATETIME()
+             OUTPUT INSERTED.*
+             WHERE id = @p6`,
             [server, protocol, host, port, active, id]
         );
 
@@ -178,9 +181,9 @@ export const update = async (req: Request, res: Response): Promise<void> => {
         ok(res, 'Server updated successfully', updated);
     } catch (err) {
         console.error(err);
-        const dbError = err as { detail?: string; code?: string; constraint?: string; message?: string };
+        const dbError = describeDbError(err);
 
-        if (dbError.code === DUPLICATE_KEY_CODE) {
+        if (isUniqueViolation(dbError)) {
             const duplicate = duplicateResponse(dbError.constraint, { server, host }) ?? {
                 code: DUPLICATE_SERVER_CODE,
                 message: duplicateServerMessage(server),
@@ -192,8 +195,8 @@ export const update = async (req: Request, res: Response): Promise<void> => {
         fail(
             res,
             500,
-            dbError.detail ?? dbError.message ?? 'Failed to update server',
-            dbError.code ?? 'INTERNAL_SERVER_ERROR'
+            dbError.message || 'Failed to update server',
+            dbError.number !== undefined ? String(dbError.number) : INTERNAL_SERVER_ERROR_CODE
         );
     }
 };
@@ -207,7 +210,9 @@ export const remove = async (req: Request, res: Response): Promise<void> => {
 
     try {
         const { rows } = await db.query<ServerRecord>(
-            'DELETE FROM servers WHERE id = $1 RETURNING *',
+            `DELETE FROM servers
+             OUTPUT DELETED.*
+             WHERE id = @p1`,
             [id]
         );
 
@@ -220,12 +225,12 @@ export const remove = async (req: Request, res: Response): Promise<void> => {
         ok(res, 'Server removed successfully', removed);
     } catch (err) {
         console.error(err);
-        const dbError = err as { detail?: string; code?: string; message?: string };
+        const dbError = describeDbError(err);
         fail(
             res,
             500,
-            dbError.detail ?? dbError.message ?? 'Failed to remove server',
-            dbError.code ?? 'INTERNAL_SERVER_ERROR'
+            dbError.message || 'Failed to remove server',
+            dbError.number !== undefined ? String(dbError.number) : INTERNAL_SERVER_ERROR_CODE
         );
     }
 };
