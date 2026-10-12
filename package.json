@@ -1,7 +1,7 @@
 {
   "name": "xpm",
   "private": true,
-  "version": "1.0.0",
+  "version": "v2.1.0-beta",
   "workspaces": [
     "web",
     "server"
