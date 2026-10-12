@@ -519,6 +519,10 @@ export function resolveFixture(endpoint: string, method: string): ApiResponse<un
     const agent = AGENTS[`${url.hostname}:${url.port}`];
     if (agent === undefined || method !== "GET") return null;
 
+    if (url.pathname === "/") {
+        return ok({ pid: agent.processes[0]?.pid ?? 0 }, "XPM agent is running");
+    }
+
     if (url.pathname === "/pm2/list") {
         return ok(
             { overview: agent.overview, processes: agent.processes },
