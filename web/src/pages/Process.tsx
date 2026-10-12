@@ -9,8 +9,14 @@ import {
   ServerOff,
   Terminal,
   TriangleAlert,
+  X,
 } from 'lucide-react'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import {
+  Alert,
+  AlertAction,
+  AlertDescription,
+  AlertTitle,
+} from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -42,6 +48,7 @@ import { Toggle } from '@/components/ui/toggle'
 import { toast } from '@/components/ui/toast'
 import { ErrorAlert } from '@/components/custom/error-alert'
 import { ProcessForm } from '@/components/custom/process-form'
+import { useDismissedFlag } from '@/hooks/use-dismissed-flag'
 import { errorCodeLabel, toApiError } from '@/lib/error-code'
 import { isCatalogField, validateRegisterValues } from '@/lib/process-fields'
 import { buildTemplatePayload } from '@/lib/template-payload'
@@ -213,6 +220,7 @@ export function Process() {
   const loadTemplates = useTemplateStore((state) => state.load)
 
   const [clientErrors, setClientErrors] = useState<Record<string, string>>({})
+  const { isDismissed, dismiss } = useDismissedFlag('process-tested-reminder')
 
   useEffect(() => {
     void loadServers()
@@ -472,9 +480,31 @@ export function Process() {
       {serversStatus === 'success' && activeServers.length > 0 && step === 2 && server && (
         <div className='grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]'>
           <div className='space-y-4'>
-            <ProcessForm values={values} errors={errors} onChange={setValue} />
+            {!isDismissed && (
+              <div className='flex items-center justify-between mx-2 mb-2'>
+                <Alert variant='destructive'>
+                  <TriangleAlert strokeWidth={2} />
+                  <AlertTitle>Test on the server first</AlertTitle>
+                  <AlertDescription>
+                    Verify the process runs in the server environment before registering. Confirm no
+                    conflicts with existing processes and that the required ports are free.
+                  </AlertDescription>
+                  <AlertAction>
+                    <Button
+                      variant='ghost'
+                      size='icon-sm'
+                      aria-label='Dismiss'
+                      onClick={dismiss}
+                    >
+                      <X strokeWidth={2} />
+                    </Button>
+                  </AlertAction>
+                </Alert>
+              </div>
+            )}
 
-            <div className='flex items-center justify-between'>
+            <ProcessForm values={values} errors={errors} onChange={setValue} />
+            <div className='flex items-center justify-between mx-2 mb-2'>
               <Button type='button' variant='outline' onClick={() => goToStep(1)}>
                 <ArrowLeft strokeWidth={2} />
                 Back
