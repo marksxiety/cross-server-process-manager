@@ -17,14 +17,16 @@ export function createConnection(target: ApiTarget) {
         ? { Authorization: `Bearer ${target.authToken}` }
         : undefined;
 
-    const request = <T = unknown>(path: string, method: Method, body?: unknown) =>
-        httpRequest<T>({ url: buildUrl(target, path), method, body, headers: authHeaders });
+    const request = <T = unknown>(path: string, method: Method, body?: unknown, signal?: AbortSignal) =>
+        httpRequest<T>({ url: buildUrl(target, path), method, body, headers: authHeaders, signal });
 
     return {
-        get: <T = unknown>(path: string) => request<T>(path, "GET"),
-        post: <T = unknown>(path: string, body?: unknown) => request<T>(path, "POST", body),
-        put: <T = unknown>(path: string, body?: unknown) => request<T>(path, "PUT", body),
-        del: <T = unknown>(path: string) => request<T>(path, "DELETE"),
+        get: <T = unknown>(path: string, signal?: AbortSignal) => request<T>(path, "GET", undefined, signal),
+        post: <T = unknown>(path: string, body?: unknown, signal?: AbortSignal) =>
+            request<T>(path, "POST", body, signal),
+        put: <T = unknown>(path: string, body?: unknown, signal?: AbortSignal) =>
+            request<T>(path, "PUT", body, signal),
+        del: <T = unknown>(path: string, signal?: AbortSignal) => request<T>(path, "DELETE", undefined, signal),
     };
 }
 
