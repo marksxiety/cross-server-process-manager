@@ -18,6 +18,9 @@
     "preview": "npm run preview --workspace=web",
     "run:built": "concurrently -n web,api -c cyan,magenta \"npm run preview --workspace=web\" \"npm run start --workspace=server\""
   },
+  "dependencies": {
+    "serve": "^14.2.5"
+  },
   "devDependencies": {
     "concurrently": "^10.0.5"
   }
