@@ -40,7 +40,7 @@ module.exports = {
       namespace: "XPM",
       cwd: path.join(__dirname, "web"),
       interpreter: "node",
-      script: "../node_modules/serve/build/main.js",
+      script: path.join(__dirname, "node_modules", "serve", "build", "main.js"),
       args: ["-s", "dist", "-l", WEB_PORT],
       env: {
         NODE_ENV: "production"
