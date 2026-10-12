@@ -41,6 +41,17 @@ const VALUES = {
     interpreter: 'C:\\Program Files\\nodejs\\node.exe',
 };
 
+const KEY_ROWS = [
+    { template_id: 1, property_key: 'script', property_value: 'index.js', data_type: 'string' },
+    { template_id: 1, property_key: 'args', property_value: '["--port","3000"]', data_type: 'array' },
+    {
+        template_id: 1,
+        property_key: 'interpreter',
+        property_value: 'C:\\Program Files\\nodejs\\node.exe',
+        data_type: 'string',
+    },
+];
+
 const TEMPLATE_ROW = {
     id: 1,
     template_name: 'Node',
@@ -48,8 +59,9 @@ const TEMPLATE_ROW = {
     description: 'Run a .js entry file.',
     preview: 'node index.js',
     is_active: true,
-    values: VALUES,
 };
+
+const TEMPLATE_RESPONSE = { ...TEMPLATE_ROW, values: VALUES };
 
 beforeEach(() => {
     query.mockReset();
@@ -62,8 +74,9 @@ afterEach(() => {
 });
 
 describe('templateController.index', () => {
-    it('returns the template rows with their values object', async () => {
+    it('returns template rows with values assembled from template_keys', async () => {
         query.mockResolvedValueOnce({ rows: [TEMPLATE_ROW] });
+        query.mockResolvedValueOnce({ rows: KEY_ROWS });
         const res = createResponse();
 
         await index(createRequest({}), res);
@@ -72,13 +85,23 @@ describe('templateController.index', () => {
         expect(responseBody(res)).toEqual({
             success: true,
             message: 'Templates retrieved successfully',
-            info: [TEMPLATE_ROW],
+            info: [TEMPLATE_RESPONSE],
         });
-        expect(query).toHaveBeenCalledTimes(1);
+        expect(query).toHaveBeenCalledTimes(2);
+
+        const [sql, params] = query.mock.calls[0] as [string, unknown[]];
+        expect(sql).toContain('FROM templates');
+        expect(sql).not.toContain('t.values');
+        expect(params).toEqual([false]);
+
+        const [keySql, keyParams] = query.mock.calls[1] as [string, unknown[]];
+        expect(keySql).toContain('FROM template_keys');
+        expect(keyParams).toEqual([[1]]);
     });
 
-    it('passes a null values through as an empty object from the db', async () => {
-        query.mockResolvedValueOnce({ rows: [{ ...TEMPLATE_ROW, values: {} }] });
+    it('defaults to an empty values object when a template has no key rows', async () => {
+        query.mockResolvedValueOnce({ rows: [TEMPLATE_ROW] });
+        query.mockResolvedValueOnce({ rows: [] });
         const res = createResponse();
 
         await index(createRequest({}), res);
@@ -89,6 +112,7 @@ describe('templateController.index', () => {
 
     it('lists only active templates by default', async () => {
         query.mockResolvedValueOnce({ rows: [TEMPLATE_ROW] });
+        query.mockResolvedValueOnce({ rows: KEY_ROWS });
         const res = createResponse();
 
         await index(createRequest({}), res);
@@ -100,6 +124,7 @@ describe('templateController.index', () => {
 
     it('lists all templates when with_inactive=true', async () => {
         query.mockResolvedValueOnce({ rows: [TEMPLATE_ROW] });
+        query.mockResolvedValueOnce({ rows: KEY_ROWS });
         const res = createResponse();
 
         await index(createRequest({ query: { with_inactive: 'true' } }), res);
@@ -121,14 +146,19 @@ describe('templateController.index', () => {
 
 type ClientStub = { query: Mock; release: Mock };
 
-function createClient(options: { rowCount?: number; rows?: unknown[] } = {}): ClientStub {
-    const { rowCount = 1, rows = [] } = options;
+function createClient(
+    options: { rowCount?: number; rows?: unknown[]; keyRows?: unknown[] } = {}
+): ClientStub {
+    const { rowCount = 1, rows = [], keyRows = [] } = options;
     const client: ClientStub = { query: vi.fn(), release: vi.fn() };
     client.query.mockImplementation((sql: unknown) => {
         const text = typeof sql === 'string' ? sql : '';
         if (text.includes('FOR UPDATE')) return Promise.resolve({ rows: [], rowCount });
         if (text.includes('INSERT INTO templates')) {
             return Promise.resolve({ rows: [{ id: 1 }], rowCount: 1 });
+        }
+        if (text.includes('FROM template_keys')) {
+            return Promise.resolve({ rows: keyRows, rowCount: keyRows.length });
         }
         if (text.includes('FROM templates')) {
             return Promise.resolve({ rows, rowCount: rows.length });
@@ -151,7 +181,7 @@ describe('templateController.create', () => {
         values: { script: 'main.ts', interpreter: 'none' },
     };
 
-    it('inserts the template with its values, commits, and returns it', async () => {
+    it('inserts the template and its keys, commits, and returns it', async () => {
         const client = createClient();
         connect.mockResolvedValueOnce(client);
         const res = createResponse();
@@ -186,12 +216,19 @@ describe('templateController.create', () => {
             'Run a Deno script.',
             'deno run --allow-net main.ts',
             true,
-            { script: 'main.ts', interpreter: 'none' },
+        ]);
+
+        const insertKeys = client.query.mock.calls.find((call) =>
+            String(call[0]).includes('INSERT INTO template_keys')
+        );
+        expect(insertKeys?.[1]).toEqual([
+            1, 'script', 'main.ts', 'string',
+            1, 'interpreter', 'none', 'string',
         ]);
         expect(client.release).toHaveBeenCalledTimes(1);
     });
 
-    it('defaults is_active to true, trims blank metadata, and defaults values to {}', async () => {
+    it('defaults is_active to true, trims blank metadata, and skips the key insert for empty values', async () => {
         const client = createClient();
         connect.mockResolvedValueOnce(client);
         const res = createResponse();
@@ -218,7 +255,31 @@ describe('templateController.create', () => {
         const insertTemplate = client.query.mock.calls.find((call) =>
             String(call[0]).includes('INSERT INTO templates')
         );
-        expect(insertTemplate?.[1]).toEqual(['Deno', null, null, null, true, {}]);
+        expect(insertTemplate?.[1]).toEqual(['Deno', null, null, null, true]);
+        expect(sqlCalls(client).some((text) => text.includes('INSERT INTO template_keys'))).toBe(
+            false
+        );
+    });
+
+    it('drops null values from the response to match what is stored', async () => {
+        const client = createClient();
+        connect.mockResolvedValueOnce(client);
+        const res = createResponse();
+
+        await create(
+            createRequest({
+                body: { template_name: 'Deno', values: { script: 'main.ts', note: null } },
+            }),
+            res
+        );
+
+        const info = responseBody(res).info as { values: unknown };
+        expect(info.values).toEqual({ script: 'main.ts' });
+
+        const insertKeys = client.query.mock.calls.find((call) =>
+            String(call[0]).includes('INSERT INTO template_keys')
+        );
+        expect(insertKeys?.[1]).toEqual([1, 'script', 'main.ts', 'string']);
     });
 
     it('rejects a blank template name before touching the database', async () => {
@@ -298,8 +359,13 @@ describe('templateController.create', () => {
 });
 
 describe('templateController.update', () => {
-    it('writes the submitted values and returns the stored template', async () => {
-        const client = createClient({ rows: [TEMPLATE_ROW] });
+    it('replaces the template keys and returns the stored template', async () => {
+        const client = createClient({
+            rows: [TEMPLATE_ROW],
+            keyRows: [
+                { template_id: 1, property_key: 'script', property_value: 'app.py', data_type: 'string' },
+            ],
+        });
         connect.mockResolvedValueOnce(client);
         const res = createResponse();
 
@@ -312,17 +378,27 @@ describe('templateController.update', () => {
         expect(responseBody(res)).toEqual({
             success: true,
             message: 'Template updated successfully',
-            info: TEMPLATE_ROW,
+            info: { ...TEMPLATE_ROW, values: { script: 'app.py' } },
         });
 
         const calls = sqlCalls(client);
         expect(calls[0]).toBe('BEGIN');
         expect(calls.at(-1)).toBe('COMMIT');
 
-        const insert = client.query.mock.calls.find((call) =>
+        const deleteKeys = client.query.mock.calls.find((call) =>
+            String(call[0]).includes('DELETE FROM template_keys')
+        );
+        expect(deleteKeys?.[1]).toEqual([1]);
+
+        const insertKeys = client.query.mock.calls.find((call) =>
+            String(call[0]).includes('INSERT INTO template_keys')
+        );
+        expect(insertKeys?.[1]).toEqual([1, 'script', 'app.py', 'string']);
+
+        const touchTemplate = client.query.mock.calls.find((call) =>
             String(call[0]).includes('UPDATE templates')
         );
-        expect(insert?.[1]).toEqual([1, { script: 'app.py' }]);
+        expect(touchTemplate?.[1]).toEqual([1]);
         expect(client.release).toHaveBeenCalledTimes(1);
     });
 
