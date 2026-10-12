@@ -1,8 +1,9 @@
 import type { Request, Response } from 'express';
-import type { PoolClient } from 'pg';
 import { z } from 'zod';
-import db from '../config/db';
+import db, { type DbSession } from '../config/db';
 import { templateInputSchema, templateValuesInputSchema } from '../schemas/templateSchema';
+import { describeDbError, isCheckViolation, isUniqueViolation } from '../utils/dbError';
+import { buildPlaceholders } from '../utils/sql';
 import {
     buildKeyInsert,
     fromStoredValues,
@@ -28,8 +29,7 @@ export type TemplateSummary = Omit<TemplateRecord, 'values'>;
 const INVALID_ID_MESSAGE = 'Template id must be a positive integer';
 const NOT_FOUND_MESSAGE = 'Template not found';
 const VALIDATION_FAILED_CODE = 'VALIDATION_FAILED';
-const CHECK_VIOLATION_CODE = '23514';
-const DUPLICATE_KEY_CODE = '23505';
+const INTERNAL_SERVER_ERROR_CODE = 'INTERNAL_SERVER_ERROR';
 const DUPLICATE_TEMPLATE_CODE = 'DUPLICATE_TEMPLATE';
 
 const TEMPLATE_COLUMNS = `id, template_name, category, description, preview, is_active`;
@@ -62,18 +62,22 @@ export const index = async (req: Request, res: Response): Promise<void> => {
                  FROM templates
                  GROUP BY category
              ) c ON t.category = c.category
-             WHERE ($1::boolean OR t.is_active = TRUE)
+             WHERE (@p1 = 1 OR t.is_active = 1)
              ORDER BY c.cat_count DESC, t.category ASC, t.template_name ASC`,
             [withInactive]
         );
 
-        const { rows: keyRows } = await db.query<TemplateKeyRow>(
-            `SELECT ${KEY_COLUMNS}
-             FROM template_keys
-             WHERE template_id = ANY($1::int[])
-             ORDER BY template_id, property_key`,
-            [rows.map((row) => row.id)]
-        );
+        let keyRows: TemplateKeyRow[] = [];
+        if (rows.length > 0) {
+            const result = await db.query<TemplateKeyRow>(
+                `SELECT ${KEY_COLUMNS}
+                 FROM template_keys
+                 WHERE template_id IN (${buildPlaceholders(rows.length)})
+                 ORDER BY template_id, property_key`,
+                rows.map((row) => row.id)
+            );
+            keyRows = result.rows;
+        }
 
         const valuesByTemplate = groupByTemplateId(keyRows);
         const templates = rows.map((row) => ({
@@ -84,7 +88,7 @@ export const index = async (req: Request, res: Response): Promise<void> => {
         ok(res, 'Templates retrieved successfully', templates);
     } catch (error) {
         console.error(error);
-        fail(res, 500, 'Failed to retrieve templates', 'INTERNAL_SERVER_ERROR');
+        fail(res, 500, 'Failed to retrieve templates', INTERNAL_SERVER_ERROR_CODE);
     }
 };
 
@@ -111,22 +115,20 @@ export const create = async (req: Request, res: Response): Promise<void> => {
         values: normalizeValues(values as TemplateValues),
     };
 
-    let client: PoolClient;
+    let session: DbSession;
     try {
-        client = await db.connect();
+        session = await db.beginTransaction();
     } catch (error) {
         console.error(error);
-        fail(res, 500, 'Failed to register template', 'INTERNAL_SERVER_ERROR');
+        fail(res, 500, 'Failed to register template', INTERNAL_SERVER_ERROR_CODE);
         return;
     }
 
     try {
-        await client.query('BEGIN');
-
-        const { rows } = await client.query<{ id: number }>(
+        const { rows } = await session.query<{ id: number }>(
             `INSERT INTO templates (template_name, category, description, preview, is_active)
-             VALUES ($1, $2, $3, $4, $5)
-             RETURNING id`,
+             OUTPUT INSERTED.id
+             VALUES (@p1, @p2, @p3, @p4, @p5)`,
             [
                 template.template_name,
                 template.category,
@@ -138,48 +140,41 @@ export const create = async (req: Request, res: Response): Promise<void> => {
 
         const id = rows[0]?.id;
         if (id === undefined) {
-            await client.query('ROLLBACK');
-            fail(res, 500, 'Failed to register template', 'INTERNAL_SERVER_ERROR');
+            await session.rollback().catch(() => undefined);
+            fail(res, 500, 'Failed to register template', INTERNAL_SERVER_ERROR_CODE);
             return;
         }
 
         const keyInsert = buildKeyInsert(id, template.values);
         if (keyInsert) {
-            await client.query(keyInsert.text, keyInsert.params);
+            await session.query(keyInsert.text, keyInsert.params);
         }
 
-        await client.query('COMMIT');
+        await session.commit();
 
         ok(res, 'Template registered successfully', { id, ...template });
     } catch (error) {
-        await client.query('ROLLBACK').catch(() => undefined);
+        await session.rollback().catch(() => undefined);
         console.error(error);
-        const dbError = error as {
-            detail?: string;
-            code?: string;
-            constraint?: string;
-            message?: string;
-        };
+        const dbError = describeDbError(error);
 
-        // template_name is the only unique column, so any 23505 is a name clash.
-        if (dbError.code === DUPLICATE_KEY_CODE) {
+        // template_name is the only unique column, so any unique violation is a name clash.
+        if (isUniqueViolation(dbError)) {
             fail(res, 409, duplicateTemplateMessage(template.template_name), DUPLICATE_TEMPLATE_CODE);
             return;
         }
 
-        if (dbError.code === CHECK_VIOLATION_CODE) {
-            fail(res, 400, dbError.detail ?? 'Invalid template key payload', VALIDATION_FAILED_CODE);
+        if (isCheckViolation(dbError)) {
+            fail(res, 400, dbError.message, VALIDATION_FAILED_CODE);
             return;
         }
 
         fail(
             res,
             500,
-            dbError.detail ?? dbError.message ?? 'Failed to register template',
-            dbError.code ?? 'INTERNAL_SERVER_ERROR'
+            dbError.message || 'Failed to register template',
+            dbError.number !== undefined ? String(dbError.number) : INTERNAL_SERVER_ERROR_CODE
         );
-    } finally {
-        client.release();
     }
 };
 
@@ -204,50 +199,49 @@ export const update = async (req: Request, res: Response): Promise<void> => {
 
     const { values } = parsed.data;
 
-    let client: PoolClient;
+    let session: DbSession;
     try {
-        client = await db.connect();
+        session = await db.beginTransaction();
     } catch (error) {
         console.error(error);
-        fail(res, 500, 'Failed to update template', 'INTERNAL_SERVER_ERROR');
+        fail(res, 500, 'Failed to update template', INTERNAL_SERVER_ERROR_CODE);
         return;
     }
 
     try {
-        await client.query('BEGIN');
-
-        const { rowCount } = await client.query(
-            'SELECT 1 FROM templates WHERE id = $1 FOR UPDATE',
+        const { rowCount } = await session.query(
+            'SELECT 1 FROM templates WITH (UPDLOCK) WHERE id = @p1',
             [id]
         );
         if (rowCount === 0) {
-            await client.query('ROLLBACK');
+            await session.rollback().catch(() => undefined);
             fail(res, 404, NOT_FOUND_MESSAGE, 'NOT_FOUND');
             return;
         }
 
-        await client.query('DELETE FROM template_keys WHERE template_id = $1', [id]);
+        await session.query('DELETE FROM template_keys WHERE template_id = @p1', [id]);
 
         const keyInsert = buildKeyInsert(id, values);
         if (keyInsert) {
-            await client.query(keyInsert.text, keyInsert.params);
+            await session.query(keyInsert.text, keyInsert.params);
         }
 
-        await client.query('UPDATE templates SET updated_at = current_timestamp WHERE id = $1', [
-            id,
-        ]);
-
-        const { rows } = await client.query<TemplateSummary>(
-            `SELECT ${TEMPLATE_COLUMNS} FROM templates WHERE id = $1`,
+        await session.query(
+            'UPDATE templates SET updated_at = SYSDATETIME() WHERE id = @p1',
             [id]
         );
 
-        const { rows: keyRows } = await client.query<TemplateKeyRow>(
-            `SELECT ${KEY_COLUMNS} FROM template_keys WHERE template_id = $1 ORDER BY property_key`,
+        const { rows } = await session.query<TemplateSummary>(
+            `SELECT ${TEMPLATE_COLUMNS} FROM templates WHERE id = @p1`,
             [id]
         );
 
-        await client.query('COMMIT');
+        const { rows: keyRows } = await session.query<TemplateKeyRow>(
+            `SELECT ${KEY_COLUMNS} FROM template_keys WHERE template_id = @p1 ORDER BY property_key`,
+            [id]
+        );
+
+        await session.commit();
 
         const template = rows[0];
         ok(
@@ -256,28 +250,21 @@ export const update = async (req: Request, res: Response): Promise<void> => {
             template ? { ...template, values: fromStoredValues(keyRows) } : null
         );
     } catch (error) {
-        await client.query('ROLLBACK').catch(() => undefined);
+        await session.rollback().catch(() => undefined);
         console.error(error);
-        const dbError = error as {
-            detail?: string;
-            code?: string;
-            constraint?: string;
-            message?: string;
-        };
+        const dbError = describeDbError(error);
 
-        if (dbError.code === CHECK_VIOLATION_CODE) {
-            fail(res, 400, dbError.detail ?? 'Invalid template key payload', VALIDATION_FAILED_CODE);
+        if (isCheckViolation(dbError)) {
+            fail(res, 400, dbError.message, VALIDATION_FAILED_CODE);
             return;
         }
 
         fail(
             res,
             500,
-            dbError.detail ?? dbError.message ?? 'Failed to update template',
-            dbError.code ?? 'INTERNAL_SERVER_ERROR'
+            dbError.message || 'Failed to update template',
+            dbError.number !== undefined ? String(dbError.number) : INTERNAL_SERVER_ERROR_CODE
         );
-    } finally {
-        client.release();
     }
 };
 
@@ -291,8 +278,9 @@ export const remove = async (req: Request, res: Response): Promise<void> => {
     try {
         const { rows } = await db.query<TemplateSummary>(
             `DELETE FROM templates
-             WHERE id = $1
-             RETURNING id, template_name, category, description, preview, is_active`,
+             OUTPUT DELETED.id, DELETED.template_name, DELETED.category,
+                    DELETED.description, DELETED.preview, DELETED.is_active
+             WHERE id = @p1`,
             [id]
         );
 
@@ -305,12 +293,12 @@ export const remove = async (req: Request, res: Response): Promise<void> => {
         ok(res, 'Template removed successfully', removed);
     } catch (error) {
         console.error(error);
-        const dbError = error as { detail?: string; code?: string; message?: string };
+        const dbError = describeDbError(error);
         fail(
             res,
             500,
-            dbError.detail ?? dbError.message ?? 'Failed to remove template',
-            dbError.code ?? 'INTERNAL_SERVER_ERROR'
+            dbError.message || 'Failed to remove template',
+            dbError.number !== undefined ? String(dbError.number) : INTERNAL_SERVER_ERROR_CODE
         );
     }
 };
