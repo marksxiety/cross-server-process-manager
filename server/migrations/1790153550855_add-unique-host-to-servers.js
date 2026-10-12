@@ -1,52 +1,36 @@
-exports.shorthands = undefined;
-
 /**
  * Enforces UNIQUE(host) on servers, matching the application contract
  * (serverController HOST_UNIQUE_CONSTRAINT = 'servers_host_unique' and the
  * host_taken check on update).
  *
- * addConstraint has no ifNotExists option in node-pg-migrate v9, so the
- * pg_constraint guard makes re-runs safe (e.g. after clearing
- * pgmigrations and replaying). Also drops the interim
- * servers_host_port_unique composite if present.
+ * The sys.key_constraints guard makes re-runs safe (e.g. after clearing
+ * migrations and replaying).
  *
- * @param pgm {import('node-pg-migrate').MigrationBuilder}
- * @returns {Promise<void> | void}
+ * @param {import('../src/scripts/migrate').MigrationContext} query
+ * @returns {Promise<void>}
  */
-exports.up = async (pgm) => {
-  const hasComposite = await pgm.db.query(
-    "SELECT 1 FROM pg_constraint WHERE conname = 'servers_host_port_unique'"
-  );
-  if (hasComposite.rowCount > 0) {
-    pgm.dropConstraint('servers', 'servers_host_port_unique', { ifExists: true });
-  }
+exports.up = async (query) => {
+  await query(`
+    IF NOT EXISTS (SELECT 1 FROM sys.key_constraints WHERE name = 'servers_host_unique')
+    BEGIN
+      IF EXISTS (SELECT host FROM dbo.servers GROUP BY host HAVING COUNT(*) > 1)
+      BEGIN
+        ;THROW 51000, N'Cannot add UNIQUE(host) to servers: duplicate hosts exist. Dedupe those rows first, then re-run migrate:up.', 1;
+      END
 
-  const hasUnique = await pgm.db.query(
-    "SELECT 1 FROM pg_constraint WHERE conname = 'servers_host_unique'"
-  );
-  if (hasUnique.rowCount > 0) {
-    return;
-  }
-
-  const dups = await pgm.db.query(
-    `SELECT host, COUNT(*) AS n FROM servers
-     GROUP BY host HAVING COUNT(*) > 1 LIMIT 5`
-  );
-  if (dups.rowCount > 0) {
-    const detail = dups.rows.map((r) => `${r.host} x${r.n}`).join(', ');
-    throw new Error(
-      `Cannot add UNIQUE(host) to servers: duplicate hosts exist (${detail}). ` +
-        `Dedupe those rows first, then re-run migrate:up.`
-    );
-  }
-
-  pgm.addConstraint('servers', 'servers_host_unique', { unique: 'host' });
+      ALTER TABLE dbo.servers
+        ADD CONSTRAINT servers_host_unique UNIQUE (host);
+    END
+  `);
 };
 
 /**
- * @param pgm {import('node-pg-migrate').MigrationBuilder}
- * @returns {Promise<void> | void}
+ * @param {import('../src/scripts/migrate').MigrationContext} query
+ * @returns {Promise<void>}
  */
-exports.down = (pgm) => {
-  pgm.dropConstraint('servers', 'servers_host_unique', { ifExists: true });
+exports.down = async (query) => {
+  await query(`
+    IF EXISTS (SELECT 1 FROM sys.key_constraints WHERE name = 'servers_host_unique')
+      ALTER TABLE dbo.servers DROP CONSTRAINT servers_host_unique;
+  `);
 };
