@@ -13,9 +13,9 @@
     "db:create": "tsx src/scripts/createDatabase.ts",
     "db:seed": "tsx src/scripts/seed.ts",
     "db:setup": "npm run db:create && npm run migrate:up && npm run db:seed",
-    "migrate:create": "node-pg-migrate --envPath ../.env -f .node-pg-migraterc.cjs create",
-    "migrate:up": "node-pg-migrate --envPath ../.env -f .node-pg-migraterc.cjs up",
-    "migrate:down": "node-pg-migrate --envPath ../.env -f .node-pg-migraterc.cjs down"
+    "migrate:create": "tsx src/scripts/migrate.ts create",
+    "migrate:up": "tsx src/scripts/migrate.ts up",
+    "migrate:down": "tsx src/scripts/migrate.ts down"
   },
   "keywords": [],
   "author": "",
@@ -25,15 +25,14 @@
     "cors": "^2.8.6",
     "dotenv": "^18.0.1",
     "express": "^5.2.1",
-    "node-pg-migrate": "^9.0.0",
-    "pg": "^8.23.0",
+    "mssql": "^12.7.4",
     "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
+    "@types/mssql": "^12.3.0",
     "@types/node": "^26.6.2",
-    "@types/pg": "^8.23.1",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.0.1"
