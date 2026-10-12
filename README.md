@@ -2,11 +2,7 @@
 
 <p align="center"><b>Every server. Every process. One dashboard.</b></p>
 
-<p align="center">
-  <b>Running your processes with PM2? This one's for you.</b><br/>
-  The control plane for <a href="https://github.com/marksxiety/xpm-agent">xpm-agent</a> —
-  watch and control every process from here.
-</p>
+<p align="center"><b>Running your processes with PM2? This one's for you.</b></p>
 
 <p align="center"><img src="web/src/assets/images/demo.png" width="100%" alt="XPM dashboard showing five servers and 28 processes across online, errored, stopped, scheduled, and degraded states" /></p>
 
@@ -30,7 +26,7 @@ PM2 is a process manager — the engine that keeps your apps alive in the backgr
 
 ## How it works
 
-XPM is two workspaces in this repo, plus the agent that runs on every monitored server:
+XPM is the control plane for [`xpm-agent`](https://github.com/marksxiety/xpm-agent) — watch and control every process from here. It's two workspaces in this repo, plus the agent that runs on every monitored server:
 
 | Piece | Where | Role |
 |---|---|---|
