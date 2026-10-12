@@ -1,26 +1,24 @@
 /**
- * @type {import('node-pg-migrate').ColumnDefinitions | undefined}
+ * Human-readable command the template represents (e.g. "npm run dev"),
+ * surfaced on the template card. Nullable — a template may omit it.
+ *
+ * @param {import('../src/scripts/migrate').MigrationContext} query
+ * @returns {Promise<void>}
  */
-export const shorthands = undefined;
-
-/**
- * @param pgm {import('node-pg-migrate').MigrationBuilder}
- * @param run {() => void | undefined}
- * @returns {Promise<void> | void}
- */
-export const up = (pgm) => {
-  // Human-readable command the template represents (e.g. "npm run dev"),
-  // surfaced on the template card. Nullable — a template may omit it.
-  pgm.addColumn('templates', {
-    preview: { type: 'varchar(255)', notNull: false },
-  }, { ifNotExists: true });
+exports.up = async (query) => {
+  await query(`
+    IF COL_LENGTH('dbo.templates', 'preview') IS NULL
+      ALTER TABLE dbo.templates ADD preview NVARCHAR(255) NULL;
+  `);
 };
 
 /**
- * @param pgm {import('node-pg-migrate').MigrationBuilder}
- * @param run {() => void | undefined}
- * @returns {Promise<void> | void}
+ * @param {import('../src/scripts/migrate').MigrationContext} query
+ * @returns {Promise<void>}
  */
-export const down = (pgm) => {
-  pgm.dropColumn('templates', 'preview', { ifExists: true });
+exports.down = async (query) => {
+  await query(`
+    IF COL_LENGTH('dbo.templates', 'preview') IS NOT NULL
+      ALTER TABLE dbo.templates DROP COLUMN preview;
+  `);
 };
