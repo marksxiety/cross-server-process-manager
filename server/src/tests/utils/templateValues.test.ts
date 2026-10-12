@@ -140,7 +140,7 @@ describe('buildKeyInsert', () => {
 
         expect(insert?.text).toBe(
             'INSERT INTO template_keys (template_id, property_key, property_value, data_type) ' +
-                'VALUES ($1, $2, $3, $4), ($5, $6, $7, $8)'
+                'VALUES (@p1, @p2, @p3, @p4), (@p5, @p6, @p7, @p8)'
         );
         expect(insert?.params).toEqual([
             7, 'script', 'app.py', 'string',

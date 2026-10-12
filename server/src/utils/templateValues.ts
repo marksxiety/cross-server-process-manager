@@ -101,7 +101,7 @@ export function buildKeyInsert(templateId: number, values: TemplateValues): KeyI
     const tuples = stored.map((row) => {
         const base = params.length;
         params.push(templateId, row.property_key, row.property_value, row.data_type);
-        return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4})`;
+        return `(@p${base + 1}, @p${base + 2}, @p${base + 3}, @p${base + 4})`;
     });
 
     return {
