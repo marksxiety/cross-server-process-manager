@@ -1,52 +1,28 @@
 /**
- * @type {import('node-pg-migrate').ColumnDefinitions | undefined}
+ * @param {import('../src/scripts/migrate').MigrationContext} query
+ * @returns {Promise<void>}
  */
-export const shorthands = undefined
+exports.up = async (query) => {
+  await query(`
+    IF OBJECT_ID('dbo.templates', 'U') IS NULL
+    BEGIN
+      CREATE TABLE dbo.templates (
+        id INT IDENTITY(1,1) NOT NULL CONSTRAINT templates_pkey PRIMARY KEY,
+        template_name NVARCHAR(100) NOT NULL CONSTRAINT templates_template_name_key UNIQUE,
+        description NVARCHAR(255) NULL,
+        category NVARCHAR(255) NULL,
+        is_active BIT NOT NULL CONSTRAINT templates_is_active_default DEFAULT 1,
+        created_at DATETIME2(3) NOT NULL CONSTRAINT templates_created_at_default DEFAULT SYSDATETIME(),
+        updated_at DATETIME2(3) NOT NULL CONSTRAINT templates_updated_at_default DEFAULT SYSDATETIME()
+      );
+    END
+  `);
+};
 
 /**
- * @param pgm {import('node-pg-migrate').MigrationBuilder}
- * @param run {() => void | undefined}
- * @returns {Promise<void> | void}
+ * @param {import('../src/scripts/migrate').MigrationContext} query
+ * @returns {Promise<void>}
  */
-export const up = (pgm) => {
-  pgm.createTable('templates', {
-    id: 'id',
-    template_name: {
-      type: 'varchar(100)',
-      notNull: true,
-      unique: true,
-    },
-    description: {
-      type: 'varchar(255)',
-      notNull: false,
-    },
-    category: {
-      type: 'varchar(255)',
-      notNull: false,
-    },
-    is_active: {
-      type: 'boolean',
-      notNull: true,
-      default: true,
-    },
-    created_at: {
-      type: 'timestamp',
-      notNull: true,
-      default: pgm.func('current_timestamp'),
-    },
-    updated_at: {
-      type: 'timestamp',
-      notNull: true,
-      default: pgm.func('current_timestamp'),
-    },
-  }, { ifNotExists: true })
-}
-
-/**
- * @param pgm {import('node-pg-migrate').MigrationBuilder}
- * @param run {() => void | undefined}
- * @returns {Promise<void> | void}
- */
-export const down = (pgm) => {
-  pgm.dropTable('templates', { ifExists: true })
-}
+exports.down = async (query) => {
+  await query(`IF OBJECT_ID('dbo.templates', 'U') IS NOT NULL DROP TABLE dbo.templates;`);
+};
