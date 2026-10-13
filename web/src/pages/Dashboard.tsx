@@ -19,6 +19,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import {
+  ArrowUpDown,
   Check,
   Circle,
   Pause,
@@ -33,6 +34,15 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+  DropdownMenuShortcut,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
   Empty,
   EmptyContent,
@@ -474,6 +484,8 @@ export function Dashboard() {
   const restartProcess = useDashboardStore((state) => state.restartProcess)
   const reloadProcess = useDashboardStore((state) => state.reloadProcess)
   const deleteProcess = useDashboardStore((state) => state.deleteProcess)
+  const sortOrder = useDashboardStore((state) => state.sortOrder)
+  const setSortOrder = useDashboardStore((state) => state.setSortOrder)
 
   const [selected, setSelected] = useState<{
     server: RegisteredServer
@@ -482,7 +494,6 @@ export function Dashboard() {
   const [pathsOpen, setPathsOpen] = useState(false)
   const [logsOpen, setLogsOpen] = useState(false)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
-  const [sortKey, setSortKey] = useState<ProcessSortKey>('memory')
   const [selectedServerName, setSelectedServerName] = useState<string | null>(null)
 
   // Applies the filter only while its server is still registered, so a reload
@@ -529,6 +540,14 @@ export function Dashboard() {
 
   const toggleServerFilter = (serverName: string) => {
     setSelectedServerName((prev) => (prev === serverName ? null : serverName))
+  }
+
+  const toggleSortKey = (key: ProcessSortKey) => {
+    setSortOrder(
+      sortOrder.includes(key)
+        ? sortOrder.filter((item) => item !== key)
+        : [...sortOrder, key],
+    )
   }
 
   const runAction = async (command: Exclude<ProcessCommand, 'delete'>) => {
@@ -612,9 +631,19 @@ export function Dashboard() {
   )
 
   const sortedProcessItems = useMemo(
-    () => sortProcesses(filteredProcessItems, sortKey),
-    [filteredProcessItems, sortKey],
+    () => sortProcesses(filteredProcessItems, sortOrder),
+    [filteredProcessItems, sortOrder],
   )
+
+  const sortSummary = useMemo(() => {
+    if (sortOrder.length === 0) return 'Default'
+
+    const labels = sortOrder.map(
+      (key) => SORT_OPTIONS.find((option) => option.value === key)?.label ?? key,
+    )
+    const visible = labels.slice(0, 2).join(', ')
+    return labels.length > 2 ? `${visible} +${labels.length - 2}` : visible
+  }, [sortOrder])
 
   const orderSignature = useMemo(
     () => sortedProcessItems.map(processItemKey).join('|'),
@@ -754,21 +783,35 @@ export function Dashboard() {
               <Separator className='flex-1' />
               <div className='flex shrink-0 items-center gap-2'>
                 <span className='text-xs text-muted-foreground'>Sort</span>
-                <Select
-                  value={sortKey}
-                  onValueChange={(value) => setSortKey(value as ProcessSortKey)}
-                >
-                  <SelectTrigger size='sm' className='w-32'>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SORT_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    render={<Button variant='outline' size='sm' className='max-w-64' />}
+                  >
+                    <ArrowUpDown strokeWidth={2} />
+                    <span className='truncate'>Sort by: {sortSummary}</span>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align='end' className='w-48'>
+                    <DropdownMenuGroup>
+                      <DropdownMenuLabel>Sort order</DropdownMenuLabel>
+                      {SORT_OPTIONS.map((option) => {
+                        const index = sortOrder.indexOf(option.value)
+                        return (
+                          <DropdownMenuCheckboxItem
+                            key={option.value}
+                            checked={index !== -1}
+                            closeOnClick={false}
+                            onCheckedChange={() => toggleSortKey(option.value)}
+                          >
+                            {option.label}
+                            {index !== -1 && (
+                              <DropdownMenuShortcut>{index + 1}</DropdownMenuShortcut>
+                            )}
+                          </DropdownMenuCheckboxItem>
+                        )
+                      })}
+                    </DropdownMenuGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
 
