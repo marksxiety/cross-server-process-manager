@@ -53,7 +53,30 @@ export function getSeverityRank(pm2_env: {
   }
 }
 
-const SORT_WATERFALL: ProcessSortKey[] = ['memory', 'cpu', 'namespace', 'host', 'pm_id']
+export const DEFAULT_SORT_ORDER: readonly ProcessSortKey[] = [
+  'memory',
+  'cpu',
+  'namespace',
+  'host',
+  'pm_id',
+]
+
+/** True when `value` is one of the keys the dashboard can sort by. */
+export function isProcessSortKey(value: unknown): value is ProcessSortKey {
+  return (
+    typeof value === 'string' &&
+    (DEFAULT_SORT_ORDER as readonly string[]).includes(value)
+  )
+}
+
+/**
+ * Sanitizes a persisted sort order: non-arrays become the default (empty) order
+ * and only known keys survive, deduplicated. Used when rehydrating the store.
+ */
+export function sanitizeSortOrder(value: unknown): ProcessSortKey[] {
+  if (!Array.isArray(value)) return []
+  return [...new Set(value.filter(isProcessSortKey))]
+}
 
 /** Stable identity for a process across servers; pm_id alone is only unique per server. */
 export function processItemKey(item: ProcessListItem): string {
@@ -70,16 +93,20 @@ const comparators: Record<ProcessSortKey, (a: ProcessListItem, b: ProcessListIte
 
 /**
  * Orders the flat dashboard list by severity rank (see `getSeverityRank`),
- * then the chosen key, then the remaining waterfall keys (memory, CPU,
- * namespace, host, pm_id). Port and server name close the remaining ties, since
- * hosts and pm_ids can repeat across servers, so the order never shuffles
- * between refreshes.
+ * then the criteria in the user's chosen order, then any remaining keys from
+ * `DEFAULT_SORT_ORDER` as tie-breakers. An empty order falls back to the
+ * default waterfall (memory first). Port and server name close the remaining
+ * ties, since hosts and pm_ids can repeat across servers, so the order never
+ * shuffles between refreshes.
  */
 export function sortProcesses(
   items: readonly ProcessListItem[],
-  primaryKey: ProcessSortKey = 'memory',
+  sortOrder: readonly ProcessSortKey[] = DEFAULT_SORT_ORDER,
 ): ProcessListItem[] {
-  const ordered = [primaryKey, ...SORT_WATERFALL.filter((key) => key !== primaryKey)]
+  const ordered = [
+    ...new Set(sortOrder),
+    ...DEFAULT_SORT_ORDER.filter((key) => !sortOrder.includes(key)),
+  ]
 
   return items.toSorted((a, b) => {
     const byStatus = getSeverityRank(a.process) - getSeverityRank(b.process)
