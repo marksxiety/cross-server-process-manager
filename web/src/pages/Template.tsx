@@ -41,6 +41,7 @@ import { TemplateCard } from '@/components/custom/template-card'
 import { TemplatePreview } from '@/components/custom/template-preview'
 import { useTemplateStore } from '@/stores/template.store'
 import { errorCodeLabel, toApiError } from '@/lib/error-code'
+import { clearDisabledValues } from '@/lib/process-fields'
 import { toSavableValues } from '@/lib/template-keys'
 import { buildTemplatePayload } from '@/lib/template-payload'
 import { copyText } from '@/lib/utils'
@@ -123,9 +124,10 @@ export function Template() {
   }
 
   // Seeds the editor with the template's stored values; every other field stays
-  // blank and editable. Templates are guides, so no field is hidden or locked.
+  // blank and editable. Templates are guides, so no field is hidden or locked,
+  // but values that contradict an enabling rule are dropped up front.
   const openTemplate = (template: ProcessTemplate) => {
-    setValues({ ...template.values })
+    setValues(clearDisabledValues({ ...template.values }))
     setSelected(template)
   }
 
@@ -151,7 +153,7 @@ export function Template() {
     remove(template.id)
 
   const updateValue = (key: string, value: unknown) => {
-    setValues((prev) => ({ ...prev, [key]: value }))
+    setValues((prev) => clearDisabledValues({ ...prev, [key]: value }))
   }
 
   const copyPayload = async () => {
