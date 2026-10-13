@@ -40,10 +40,10 @@ module.exports = {
       namespace: "XPM",
       cwd: path.join(__dirname, "web"),
       interpreter: "node",
-      script: path.join(__dirname, "node_modules", "serve", "build", "main.js"),
-      args: ["-s", "dist", "-l", WEB_PORT],
+      script: path.join(__dirname, "web", "preview.mjs"),
       env: {
-        NODE_ENV: "production"
+        NODE_ENV: "production",
+        VITE_WEB_PORT: WEB_PORT
       },
 
       // Advanced — Restart policy
