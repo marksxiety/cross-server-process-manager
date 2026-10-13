@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { getSeverityRank, processItemKey, sortProcesses } from '../../lib/sort-processes'
+import { getSeverityRank, processItemKey, sanitizeSortOrder, sortProcesses } from '../../lib/sort-processes'
 import type { ProcessListItem } from '../../lib/sort-processes'
 import type { ProcessSummary } from '../../types/process'
 import type { RegisteredServer } from '../../types/server'
@@ -115,35 +115,35 @@ describe('sortProcesses', () => {
     const heavyMemoryLowCpu = makeItem({}, { pm_id: 1, memory: 900, cpu: 5 })
     const lightMemoryHighCpu = makeItem({}, { pm_id: 2, memory: 100, cpu: 95 })
 
-    expect(pmIds(sortProcesses([heavyMemoryLowCpu, lightMemoryHighCpu], 'cpu'))).toEqual([2, 1])
+    expect(pmIds(sortProcesses([heavyMemoryLowCpu, lightMemoryHighCpu], ['cpu']))).toEqual([2, 1])
   })
 
   test('sorts by host ascending when host is the primary key', () => {
     const laterHost = makeItem({ host: '10.0.0.2' }, { pm_id: 1, memory: 900 })
     const earlierHost = makeItem({ host: '10.0.0.1' }, { pm_id: 2, memory: 100 })
 
-    expect(pmIds(sortProcesses([laterHost, earlierHost], 'host'))).toEqual([2, 1])
+    expect(pmIds(sortProcesses([laterHost, earlierHost], ['host']))).toEqual([2, 1])
   })
 
   test('sorts by namespace ascending when namespace is the primary key', () => {
     const prod = makeItem({}, { pm_id: 1, memory: 900, namespace: 'prod' })
     const dev = makeItem({}, { pm_id: 2, memory: 100, namespace: 'dev' })
 
-    expect(pmIds(sortProcesses([prod, dev], 'namespace'))).toEqual([2, 1])
+    expect(pmIds(sortProcesses([prod, dev], ['namespace']))).toEqual([2, 1])
   })
 
   test('sorts by pm_id ascending when pm_id is the primary key', () => {
     const second = makeItem({}, { pm_id: 2, memory: 900 })
     const first = makeItem({}, { pm_id: 1, memory: 100 })
 
-    expect(pmIds(sortProcesses([second, first], 'pm_id'))).toEqual([1, 2])
+    expect(pmIds(sortProcesses([second, first], ['pm_id']))).toEqual([1, 2])
   })
 
   test('falls through the waterfall when the primary key is equal', () => {
     const heavy = makeItem({ host: '10.0.0.9' }, { pm_id: 1, cpu: 50, memory: 900 })
     const light = makeItem({ host: '10.0.0.1' }, { pm_id: 2, cpu: 50, memory: 100 })
 
-    expect(pmIds(sortProcesses([light, heavy], 'cpu'))).toEqual([1, 2])
+    expect(pmIds(sortProcesses([light, heavy], ['cpu']))).toEqual([1, 2])
   })
 
   test('ranks non-online statuses by severity before any metric', () => {
@@ -161,7 +161,7 @@ describe('sortProcesses', () => {
     const heavyOnline = makeItem({}, { pm_id: 1, status: 'online', memory: 900 })
     const lightStopped = makeItem({}, { pm_id: 2, status: 'stopped', memory: 100 })
 
-    expect(pmIds(sortProcesses([heavyOnline, lightStopped], 'memory'))).toEqual([2, 1])
+    expect(pmIds(sortProcesses([heavyOnline, lightStopped], ['memory']))).toEqual([2, 1])
   })
 
   test('applies the primary key within the same status group', () => {
@@ -169,7 +169,7 @@ describe('sortProcesses', () => {
     const onlineHighCpu = makeItem({}, { pm_id: 2, status: 'online', cpu: 95 })
     const stoppedBig = makeItem({}, { pm_id: 3, status: 'stopped', cpu: 80 })
 
-    expect(pmIds(sortProcesses([stoppedSmall, onlineHighCpu, stoppedBig], 'cpu'))).toEqual([
+    expect(pmIds(sortProcesses([stoppedSmall, onlineHighCpu, stoppedBig], ['cpu']))).toEqual([
       3, 1, 2,
     ])
   })
@@ -179,6 +179,55 @@ describe('sortProcesses', () => {
     const earlierNamespace = makeItem({ host: '10.0.0.9' }, { pm_id: 2, namespace: 'dev' })
 
     expect(pmIds(sortProcesses([laterNamespace, earlierNamespace]))).toEqual([2, 1])
+  })
+
+  test('applies multiple keys in the order they were chosen', () => {
+    const highCpuProd = makeItem({}, { pm_id: 1, cpu: 90, namespace: 'prod', memory: 100 })
+    const lowCpuDev = makeItem({}, { pm_id: 2, cpu: 10, namespace: 'dev', memory: 100 })
+
+    expect(pmIds(sortProcesses([highCpuProd, lowCpuDev], ['cpu', 'namespace']))).toEqual([1, 2])
+    expect(pmIds(sortProcesses([highCpuProd, lowCpuDev], ['namespace', 'cpu']))).toEqual([2, 1])
+  })
+
+  test('appends unchecked keys as tie-breakers after the chosen order', () => {
+    const light = makeItem({}, { pm_id: 1, namespace: 'prod', memory: 100 })
+    const heavy = makeItem({}, { pm_id: 2, namespace: 'prod', memory: 900 })
+
+    expect(pmIds(sortProcesses([light, heavy], ['namespace']))).toEqual([2, 1])
+  })
+
+  test('falls back to the default order when no key is chosen', () => {
+    const low = makeItem({}, { pm_id: 1, memory: 100 })
+    const high = makeItem({}, { pm_id: 2, memory: 900 })
+
+    expect(pmIds(sortProcesses([low, high], []))).toEqual([2, 1])
+  })
+
+  test('deduplicates repeated keys', () => {
+    const lowCpu = makeItem({}, { pm_id: 1, cpu: 5, memory: 900 })
+    const highCpu = makeItem({}, { pm_id: 2, cpu: 95, memory: 100 })
+
+    expect(pmIds(sortProcesses([lowCpu, highCpu], ['cpu', 'cpu']))).toEqual([2, 1])
+  })
+})
+
+describe('sanitizeSortOrder', () => {
+  test('keeps a valid order as-is', () => {
+    expect(sanitizeSortOrder(['cpu', 'namespace'])).toEqual(['cpu', 'namespace'])
+  })
+
+  test('drops unknown keys and preserves the remaining order', () => {
+    expect(sanitizeSortOrder(['cpu', 'bogus', 'host'])).toEqual(['cpu', 'host'])
+  })
+
+  test('removes duplicates', () => {
+    expect(sanitizeSortOrder(['cpu', 'host', 'cpu'])).toEqual(['cpu', 'host'])
+  })
+
+  test('returns an empty order for non-array values', () => {
+    expect(sanitizeSortOrder('cpu')).toEqual([])
+    expect(sanitizeSortOrder(null)).toEqual([])
+    expect(sanitizeSortOrder({ 0: 'cpu' })).toEqual([])
   })
 })
 
