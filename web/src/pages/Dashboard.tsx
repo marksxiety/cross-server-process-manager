@@ -483,6 +483,17 @@ export function Dashboard() {
   const [logsOpen, setLogsOpen] = useState(false)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const [sortKey, setSortKey] = useState<ProcessSortKey>('memory')
+  const [selectedServerName, setSelectedServerName] = useState<string | null>(null)
+
+  // Applies the filter only while its server is still registered, so a reload
+  // that drops the server falls back to the full process list.
+  const activeServerName = useMemo(
+    () =>
+      servers.some((server) => server.server === selectedServerName)
+        ? selectedServerName
+        : null,
+    [servers, selectedServerName],
+  )
 
   const describe = useProcessDescribe(
     selected?.server ?? null,
@@ -515,6 +526,10 @@ export function Dashboard() {
 
   const showReload =
     selectedProcess !== null && canRunProcessCommand(selectedProcess, 'reload')
+
+  const toggleServerFilter = (serverName: string) => {
+    setSelectedServerName((prev) => (prev === serverName ? null : serverName))
+  }
 
   const runAction = async (command: Exclude<ProcessCommand, 'delete'>) => {
     if (!selected || !selectedProcess) return
@@ -587,9 +602,18 @@ export function Dashboard() {
     [servers, processesByServer],
   )
 
+  // When a server filter is active, only that server's processes are shown.
+  const filteredProcessItems = useMemo(
+    () =>
+      activeServerName === null
+        ? processItems
+        : processItems.filter((item) => item.server.server === activeServerName),
+    [processItems, activeServerName],
+  )
+
   const sortedProcessItems = useMemo(
-    () => sortProcesses(processItems, sortKey),
-    [processItems, sortKey],
+    () => sortProcesses(filteredProcessItems, sortKey),
+    [filteredProcessItems, sortKey],
   )
 
   const orderSignature = useMemo(
@@ -597,9 +621,11 @@ export function Dashboard() {
     [sortedProcessItems],
   )
 
-  const isLoadingProcesses = servers.some(
-    (server) => processesByServer[server.server]?.status === 'loading',
-  )
+  const isLoadingProcesses = servers
+    .filter(
+      (server) => activeServerName === null || server.server === activeServerName,
+    )
+    .some((server) => processesByServer[server.server]?.status === 'loading')
 
   const processGridRef = useRef<HTMLDivElement | null>(null)
   useFlipReorder({ containerRef: processGridRef, orderSignature })
@@ -679,22 +705,51 @@ export function Dashboard() {
         {serversStatus === 'success' && servers.length > 0 && (
           <>
             <div className='mt-4 flex flex-wrap gap-3'>
-              {servers.map((server) => (
-                <Card
-                  key={server.server}
-                  className='@container/server min-w-48 grow basis-[calc(20%_-_0.625rem)]'
-                >
-                  <ServerHeader
-                    server={server}
-                    entry={processesByServer[server.server]}
-                  />
-                </Card>
-              ))}
+              {servers.map((server) => {
+                const entry = processesByServer[server.server]
+                const isSelectable = entry?.status === 'success'
+                const isSelected = activeServerName === server.server
+
+                return (
+                  <Card
+                    key={server.server}
+                    role={isSelectable ? 'button' : undefined}
+                    tabIndex={isSelectable ? 0 : undefined}
+                    aria-pressed={isSelectable ? isSelected : undefined}
+                    aria-label={
+                      isSelectable ? `Filter processes on ${server.server}` : undefined
+                    }
+                    onClick={
+                      isSelectable ? () => toggleServerFilter(server.server) : undefined
+                    }
+                    onKeyDown={
+                      isSelectable
+                        ? (event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault()
+                              toggleServerFilter(server.server)
+                            }
+                          }
+                        : undefined
+                    }
+                    className={cn(
+                      '@container/server min-w-48 grow basis-[calc(20%-0.625rem)]',
+                      isSelectable &&
+                        'cursor-pointer transition-shadow hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring',
+                      isSelected && 'ring-2 ring-primary',
+                    )}
+                  >
+                    <ServerHeader server={server} entry={entry} />
+                  </Card>
+                )
+              })}
             </div>
 
             <div className='mt-6 flex items-center gap-3'>
               <p className='shrink-0 text-xs font-medium text-muted-foreground'>
-                Processes ({sortedProcessItems.length})
+                {`Processes (${sortedProcessItems.length}${
+                  activeServerName ? `/${processItems.length}` : ''
+                })`}
               </p>
               <Separator className='flex-1' />
               <div className='flex shrink-0 items-center gap-2'>
@@ -755,7 +810,9 @@ export function Dashboard() {
                   </EmptyMedia>
                   <EmptyTitle>No processes</EmptyTitle>
                   <EmptyDescription>
-                    None of the registered servers are reporting processes.
+                    {activeServerName
+                      ? `${activeServerName} is not reporting any processes.`
+                      : 'None of the registered servers are reporting processes.'}
                   </EmptyDescription>
                 </EmptyHeader>
               </Empty>
