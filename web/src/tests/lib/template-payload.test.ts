@@ -5,6 +5,7 @@ describe('buildTemplatePayload', () => {
   it('coerces each value according to the master field list', () => {
     const payload = buildTemplatePayload({
       script: 'index.js',
+      exec_mode: 'cluster',
       instances: '2',
       autorestart: true,
       windowsHide: false,
@@ -15,6 +16,7 @@ describe('buildTemplatePayload', () => {
 
     expect(payload).toEqual({
       script: 'index.js',
+      exec_mode: 'cluster',
       instances: 2,
       autorestart: true,
       windowsHide: false,
@@ -30,7 +32,10 @@ describe('buildTemplatePayload', () => {
   })
 
   it('preserves the "max" instances sentinel', () => {
-    expect(buildTemplatePayload({ instances: 'max' })).toEqual({ instances: 'max' })
+    expect(buildTemplatePayload({ exec_mode: 'cluster', instances: 'max' })).toEqual({
+      exec_mode: 'cluster',
+      instances: 'max',
+    })
   })
 
   it('drops empty values and unknown keys', () => {
@@ -44,7 +49,23 @@ describe('buildTemplatePayload', () => {
   })
 
   it('drops numbers that do not parse', () => {
-    expect(buildTemplatePayload({ instances: 'many' })).toEqual({})
+    expect(buildTemplatePayload({ exec_mode: 'cluster', instances: 'many' })).toEqual({
+      exec_mode: 'cluster',
+    })
+  })
+
+  it('skips fields disabled by their enabling rule', () => {
+    expect(
+      buildTemplatePayload({
+        autorestart: true,
+        max_restarts: 5,
+        cron_restart: '*/5 * * * *',
+      }),
+    ).toEqual({ autorestart: true, max_restarts: 5 })
+
+    expect(buildTemplatePayload({ exec_mode: 'fork', instances: 4 })).toEqual({
+      exec_mode: 'fork',
+    })
   })
 
   it('keeps durations as-is for the agent to normalize', () => {
