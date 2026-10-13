@@ -1,4 +1,4 @@
-import { isValueEmpty, PROCESS_FIELDS } from "@/lib/process-fields";
+import { isFieldEnabled, isValueEmpty, PROCESS_FIELDS } from "@/lib/process-fields";
 import type { TemplateValues } from "@/types/template";
 
 /**
@@ -7,13 +7,17 @@ import type { TemplateValues } from "@/types/template";
  * only knows the generic value types, never a specific runtime.
  *
  * Only fields that carry a value are included — defaults and untouched fields
- * are never sent, and the agent applies its own defaults. Durations are passed
- * through as-is (number or "10s" string); the agent normalizes them.
+ * are never sent, and the agent applies its own defaults. Fields disabled by
+ * their enabling rule are skipped as a final guard, even if a stale value
+ * remains in the form state. Durations are passed through as-is (number or
+ * "10s" string); the agent normalizes them.
  */
 export function buildTemplatePayload(values: TemplateValues): Record<string, unknown> {
     const payload: Record<string, unknown> = {};
 
     for (const spec of PROCESS_FIELDS) {
+        if (!isFieldEnabled(spec, values)) continue;
+
         const raw = values[spec.key];
         if (isValueEmpty(raw)) continue;
 
