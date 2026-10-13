@@ -7,6 +7,7 @@ import {
   advancedGroupFields,
   basicFields,
   catalogField,
+  clearDisabledValues,
   isFieldEnabled,
   validateRegisterValues,
 } from '@/lib/process-fields'
@@ -93,6 +94,51 @@ describe('process field catalog', () => {
     expect(isFieldEnabled(instances, { exec_mode: 'fork' })).toBe(false)
     expect(isFieldEnabled(instances, { exec_mode: 'cluster' })).toBe(true)
   })
+
+  it('falls back to the toggle default while the user has not touched it', () => {
+    const maxRestarts = catalogField('max_restarts')!
+    const minUptime = catalogField('min_uptime')!
+    const restartDelay = catalogField('restart_delay')!
+    const cronRestart = catalogField('cron_restart')!
+
+    // autorestart defaults to on: restart tuning is enabled, cron is not.
+    expect(isFieldEnabled(maxRestarts, {})).toBe(true)
+    expect(isFieldEnabled(minUptime, {})).toBe(true)
+    expect(isFieldEnabled(restartDelay, {})).toBe(true)
+    expect(isFieldEnabled(cronRestart, {})).toBe(false)
+
+    expect(isFieldEnabled(maxRestarts, { autorestart: false })).toBe(false)
+    expect(isFieldEnabled(minUptime, { autorestart: false })).toBe(false)
+    expect(isFieldEnabled(restartDelay, { autorestart: false })).toBe(false)
+    expect(isFieldEnabled(cronRestart, { autorestart: false })).toBe(true)
+  })
+})
+
+describe('clearDisabledValues', () => {
+  it('drops values whose enabling condition is not met', () => {
+    expect(
+      clearDisabledValues({ autorestart: false, max_restarts: 5, cron_restart: '*/5 * * * *' }),
+    ).toEqual({ autorestart: false, cron_restart: '*/5 * * * *' })
+  })
+
+  it('treats an untouched toggle as its default', () => {
+    expect(clearDisabledValues({ max_restarts: 5 })).toEqual({ max_restarts: 5 })
+    expect(clearDisabledValues({ cron_restart: '*/5 * * * *' })).toEqual({})
+  })
+
+  it('keeps enabled values and unknown keys', () => {
+    expect(clearDisabledValues({ custom_flag: '1', autorestart: true, max_restarts: 5 })).toEqual({
+      custom_flag: '1',
+      autorestart: true,
+      max_restarts: 5,
+    })
+  })
+
+  it('does not mutate its input', () => {
+    const values = { autorestart: false, max_restarts: 5 }
+    clearDisabledValues(values)
+    expect(values).toEqual({ autorestart: false, max_restarts: 5 })
+  })
 })
 
 describe('validateRegisterValues', () => {
@@ -106,13 +152,32 @@ describe('validateRegisterValues', () => {
   })
 
   it('accepts "max" for instances but rejects zero and non-numbers', () => {
-    const base = { name: 'app', cwd: 'C:/app', interpreter: 'none', script: 'app.exe' }
+    const base = {
+      name: 'app',
+      cwd: 'C:/app',
+      interpreter: 'none',
+      script: 'app.exe',
+      exec_mode: 'cluster',
+    }
 
     expect(validateRegisterValues({ ...base, instances: 'max' })).toEqual({})
     expect(validateRegisterValues({ ...base, instances: '0' }).instances).toBe(
       'Must be a positive integer or "max"',
     )
     expect(validateRegisterValues({ ...base, instances: 'many' }).instances).toBe('Must be a number')
+  })
+
+  it('skips fields disabled by their enabling rule', () => {
+    const base = { name: 'app', cwd: 'C:/app', interpreter: 'none', script: 'app.exe' }
+
+    // autorestart defaults to on, so an invalid restart delay is reported...
+    expect(validateRegisterValues({ ...base, restart_delay: 'soon' }).restart_delay).toBe(
+      'Must be a number of milliseconds or a duration like 10s',
+    )
+    // ...and ignored once autorestart is switched off.
+    expect(
+      validateRegisterValues({ ...base, autorestart: false, restart_delay: 'soon' }),
+    ).toEqual({})
   })
 
   it('accepts duration strings and milliseconds', () => {
