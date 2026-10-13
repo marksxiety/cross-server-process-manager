@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { processService } from "@/api/services/process.service";
 import { toApiError, toUnreachableError } from "@/lib/error-code";
+import { clearDisabledValues } from "@/lib/process-fields";
 import { useDashboardStore } from "@/stores/dashboard.store";
 import type { ApiError, ApiResponse } from "@/types/api";
 import type { LoadStatus } from "@/types/dashboard";
@@ -36,6 +37,25 @@ function applyTemplate(
     }
 
     return next;
+}
+
+/**
+ * Enforces the catalog's enabling rules on a values map and forgets the dirty
+ * marks of every key the clear dropped: a value the system discarded is no
+ * longer the user's to protect, so a later template may prefill it again.
+ */
+function clearDisabledState(
+    values: TemplateValues,
+    dirtyKeys: Set<string>,
+): { values: TemplateValues; dirtyKeys: Set<string> } {
+    const cleared = clearDisabledValues(values);
+    const nextDirty = new Set(dirtyKeys);
+
+    for (const key of Object.keys(values)) {
+        if (!(key in cleared)) nextDirty.delete(key);
+    }
+
+    return { values: cleared, dirtyKeys: nextDirty };
 }
 
 interface ProcessState {
@@ -75,7 +95,10 @@ export const useProcessStore = create<ProcessState>()((set, get) => ({
     selectTemplate: (template) =>
         set((state) => ({
             template,
-            values: applyTemplate(template, state.values, state.dirtyKeys),
+            ...clearDisabledState(
+                applyTemplate(template, state.values, state.dirtyKeys),
+                state.dirtyKeys,
+            ),
             status: "idle",
             requestError: null,
             issues: [],
@@ -84,14 +107,14 @@ export const useProcessStore = create<ProcessState>()((set, get) => ({
 
     setValue: (key, value) =>
         set((state) => {
-            const values = { ...state.values };
-            if (value === undefined) delete values[key];
-            else values[key] = value;
+            const draft = { ...state.values };
+            if (value === undefined) delete draft[key];
+            else draft[key] = value;
 
             const dirtyKeys = new Set(state.dirtyKeys);
             dirtyKeys.add(key);
 
-            return { values, dirtyKeys };
+            return clearDisabledState(draft, dirtyKeys);
         }),
 
     // Submits a payload the page already validated and built. On success the
@@ -138,7 +161,7 @@ export const useProcessStore = create<ProcessState>()((set, get) => ({
     // choices so another process can be registered right away.
     reset: () =>
         set((state) => ({
-            values: templateValues(state.template),
+            values: clearDisabledValues(templateValues(state.template)),
             dirtyKeys: new Set<string>(),
             status: "idle",
             requestError: null,
