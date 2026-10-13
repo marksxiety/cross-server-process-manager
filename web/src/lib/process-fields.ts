@@ -131,6 +131,7 @@ export const PROCESS_FIELDS: readonly ProcessFieldSpec[] = [
         type: "number",
         placeholder: "16",
         hint: "Maximum number of unstable restarts. Once reached, the process will no longer be restarted.",
+        enabledWhen: { key: "autorestart", oneOf: [true] },
     },
     {
         key: "min_uptime",
@@ -139,6 +140,7 @@ export const PROCESS_FIELDS: readonly ProcessFieldSpec[] = [
         advancedGroup: "restart",
         type: "duration",
         placeholder: "10s",
+        enabledWhen: { key: "autorestart", oneOf: [true] },
     },
     {
         key: "restart_delay",
@@ -147,6 +149,7 @@ export const PROCESS_FIELDS: readonly ProcessFieldSpec[] = [
         advancedGroup: "restart",
         type: "duration",
         placeholder: "4000",
+        enabledWhen: { key: "autorestart", oneOf: [true] },
     },
 
     // Advanced — group 2: schedule
@@ -158,6 +161,7 @@ export const PROCESS_FIELDS: readonly ProcessFieldSpec[] = [
         type: "string",
         placeholder: "*/5 * * * *",
         hint: "With autorestart off, this runs the process as a scheduled job.",
+        enabledWhen: { key: "autorestart", oneOf: [false] },
     },
 
     // Advanced — group 3: resources & shutdown
@@ -290,6 +294,8 @@ export function isValueEmpty(value: unknown): boolean {
 
 /**
  * A field is enabled unless it declares a dependency on another field's value.
+ * An unset dependency falls back to that field's resting default, matching what
+ * its control shows, so conditions hold before the user touches anything.
  * Dependencies only dim; the field always stays visible.
  */
 export function isFieldEnabled(
@@ -297,8 +303,31 @@ export function isFieldEnabled(
     values: Record<string, unknown>,
 ): boolean {
     if (!spec.enabledWhen) return true;
-    const current = values[spec.enabledWhen.key];
-    return spec.enabledWhen.oneOf.some((allowed) => allowed === current);
+    const { key, oneOf } = spec.enabledWhen;
+    const raw = values[key];
+    const current = raw === undefined ? catalogField(key)?.defaultValue : raw;
+    return oneOf.some((allowed) => allowed === current);
+}
+
+/**
+ * Drops values for fields whose enabling condition is not met. Disabled fields
+ * must never carry data: a value left behind by a template or a since-changed
+ * dependency would otherwise be displayed, submitted, and re-saved. Iterates
+ * until stable because dropping one field's value can disable another.
+ * Unknown keys are preserved.
+ */
+export function clearDisabledValues(values: Record<string, unknown>): Record<string, unknown> {
+    let current = values;
+    for (;;) {
+        const next: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(current)) {
+            const spec = catalogField(key);
+            if (spec && !isFieldEnabled(spec, current)) continue;
+            next[key] = value;
+        }
+        if (Object.keys(next).length === Object.keys(current).length) return next;
+        current = next;
+    }
 }
 
 const DURATION_PATTERN = /^(\d+(?:\.\d+)?)(ms|s|m|h)?$/i;
@@ -318,6 +347,8 @@ export function validateRegisterValues(values: Record<string, unknown>): Record<
     const errors: Record<string, string> = {};
 
     for (const spec of PROCESS_FIELDS) {
+        if (!isFieldEnabled(spec, values)) continue;
+
         const value = values[spec.key];
 
         if (spec.required && isValueEmpty(value)) {
