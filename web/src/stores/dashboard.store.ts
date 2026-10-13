@@ -6,6 +6,8 @@ import { isDemoMode } from "@/lib/demo-mode";
 import { PROCESS_STATE_CONFLICT_CODE, toApiError, toUnreachableError } from "@/lib/error-code";
 import { canRunProcessCommand } from "@/lib/process-runtime";
 import { withRetry } from "@/lib/retry";
+import { sanitizeSortOrder } from "@/lib/sort-processes";
+import type { ProcessSortKey } from "@/lib/sort-processes";
 import { isCacheFresh } from "@/lib/swr";
 import { toSystemOverview } from "@/lib/system-overview";
 import type { ApiError, ApiResponse } from "@/types/api";
@@ -27,6 +29,7 @@ interface DashboardState {
     serversStatus: LoadStatus;
     requestError: ApiError | null;
     processesByServer: Record<string, ServerProcesses>;
+    sortOrder: ProcessSortKey[];
     isRefreshing: boolean;
     isStarting: boolean;
     isStopping: boolean;
@@ -37,6 +40,7 @@ interface DashboardState {
     refresh: () => Promise<void>;
     refreshServer: (server: RegisteredServer) => Promise<void>;
     reload: () => Promise<void>;
+    setSortOrder: (order: ProcessSortKey[]) => void;
     startProcess: (server: RegisteredServer, process: ProcessCommandTarget) => Promise<ApiResponse<ProcessSummary[]>>;
     stopProcess: (server: RegisteredServer, process: ProcessCommandTarget) => Promise<ApiResponse<ProcessSummary[]>>;
     restartProcess: (server: RegisteredServer, process: ProcessCommandTarget) => Promise<ApiResponse<ProcessSummary[]>>;
@@ -267,6 +271,7 @@ export const useDashboardStore = create<DashboardState>()(
                 serversStatus: "idle",
                 requestError: null,
                 processesByServer: {},
+                sortOrder: [],
                 isRefreshing: false,
                 isStarting: false,
                 isStopping: false,
@@ -337,6 +342,10 @@ export const useDashboardStore = create<DashboardState>()(
                     }
                 },
 
+                // Stores the dashboard's sort criteria. Persisted so the chosen
+                // order survives reloads. Called by Dashboard.tsx.
+                setSortOrder: (order) => set({ sortOrder: order }),
+
                 // Lifecycle commands. Each sets its own pending flag (read by the
                 // dashboard to disable/spin the matching button) and is guarded by
                 // runCommand before any request reaches the agent.
@@ -368,13 +377,16 @@ export const useDashboardStore = create<DashboardState>()(
         },
         {
             name: isDemoMode() ? "servers-cache-demo" : "servers-cache",
-            // Only the server list and its fetch timestamp are cached; process data is volatile.
+            // Only the server list, its fetch timestamp and the sort preference are
+            // cached; process data is volatile.
             partialize: (state) => ({
                 servers: state.servers,
                 serversFetchedAt: state.serversFetchedAt,
+                sortOrder: state.sortOrder,
             }),
             // Sanitizes the persisted slice after hydration so corrupt data can never put
-            // a non-array into servers; invalid caches fall through to runLoad's refetch.
+            // a non-array into servers or an unknown key into the sort order; invalid
+            // caches fall through to runLoad's refetch and the default sort.
             merge: (persistedState, currentState) => {
                 const persisted = persistedState as Partial<DashboardState> | null;
                 return {
@@ -382,6 +394,7 @@ export const useDashboardStore = create<DashboardState>()(
                     servers: Array.isArray(persisted?.servers) ? persisted.servers : [],
                     serversFetchedAt:
                         typeof persisted?.serversFetchedAt === "number" ? persisted.serversFetchedAt : null,
+                    sortOrder: sanitizeSortOrder(persisted?.sortOrder),
                 };
             },
             // Reports hydration failures (corrupt JSON, storage unavailable).
