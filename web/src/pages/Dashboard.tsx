@@ -635,16 +635,6 @@ export function Dashboard() {
     [filteredProcessItems, sortOrder],
   )
 
-  const sortSummary = useMemo(() => {
-    if (sortOrder.length === 0) return 'Default'
-
-    const labels = sortOrder.map(
-      (key) => SORT_OPTIONS.find((option) => option.value === key)?.label ?? key,
-    )
-    const visible = labels.slice(0, 2).join(', ')
-    return labels.length > 2 ? `${visible} +${labels.length - 2}` : visible
-  }, [sortOrder])
-
   const orderSignature = useMemo(
     () => sortedProcessItems.map(processItemKey).join('|'),
     [sortedProcessItems],
@@ -785,10 +775,21 @@ export function Dashboard() {
                 <span className='text-xs text-muted-foreground'>Sort</span>
                 <DropdownMenu>
                   <DropdownMenuTrigger
-                    render={<Button variant='outline' size='sm' className='max-w-64' />}
+                    render={
+                      <Button
+                        variant='outline'
+                        size='sm'
+                        aria-label={`Sort by, ${sortOrder.length} active`}
+                      />
+                    }
                   >
                     <ArrowUpDown strokeWidth={2} />
-                    <span className='truncate'>Sort by: {sortSummary}</span>
+                    Sort By
+                    {sortOrder.length > 0 && (
+                      <Badge variant='secondary' className='px-1.5 tabular-nums'>
+                        {sortOrder.length}
+                      </Badge>
+                    )}
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align='end' className='w-48'>
                     <DropdownMenuGroup>
