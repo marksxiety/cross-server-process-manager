@@ -78,10 +78,10 @@ Open the dashboard, go to **Servers**, and register each host running `xpm-agent
 Build both workspaces, then start them under PM2:
 
 ```bash
-npm install serve        # static file server used by the xpm-web PM2 entry
+npm install
 npm run build
 pm2 start ecosystem.config.js
 pm2 save
 ```
 
-`ecosystem.config.js` loads the root `.env` and runs `xpm-server` (Node) and `xpm-web` (static `serve` on `VITE_WEB_PORT`). Rebuild the dashboard whenever `VITE_*` values change.
+`ecosystem.config.js` loads the root `.env` and runs `xpm-server` (Node) and `xpm-web` (`vite preview` on `VITE_WEB_PORT`). Install with devDependencies on the host — the `xpm-web` process runs Vite. Rebuild the dashboard whenever `VITE_*` values change.
