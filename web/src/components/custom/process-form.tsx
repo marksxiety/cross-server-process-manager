@@ -71,6 +71,8 @@ function TagInput({
 }) {
   const tags = Array.isArray(value) ? (value as string[]) : []
   const [draft, setDraft] = useState('')
+  const [editingIndex, setEditingIndex] = useState<number | null>(null)
+  const [editDraft, setEditDraft] = useState('')
 
   const commit = () => {
     const next = draft.trim()
@@ -80,6 +82,28 @@ function TagInput({
   }
 
   const removeAt = (index: number) => onChange(tags.filter((_, i) => i !== index))
+
+  const startEdit = (index: number) => {
+    setEditingIndex(index)
+    setEditDraft(tags[index])
+  }
+
+  const commitEdit = () => {
+    if (editingIndex === null) return
+    const next = editDraft.trim()
+    onChange(
+      next === ''
+        ? tags.filter((_, i) => i !== editingIndex)
+        : tags.map((tag, i) => (i === editingIndex ? next : tag)),
+    )
+    setEditingIndex(null)
+    setEditDraft('')
+  }
+
+  const cancelEdit = () => {
+    setEditingIndex(null)
+    setEditDraft('')
+  }
 
   return (
     <div className={cn(disabled && 'opacity-60')}>
@@ -113,23 +137,58 @@ function TagInput({
       </div>
       {tags.length > 0 && (
         <div className='mt-2 flex flex-wrap gap-1.5'>
-          {tags.map((tag, index) => (
-            <span
-              key={`${tag}-${index}`}
-              className='inline-flex items-center gap-1 rounded-md border bg-muted/40 py-0.5 pr-1 pl-2 font-mono text-[11px]'
-            >
-              {tag}
-              <button
-                type='button'
-                disabled={disabled}
-                aria-label={`Remove ${tag}`}
-                className='rounded-sm p-0.5 text-muted-foreground transition-colors hover:text-foreground disabled:pointer-events-none'
-                onClick={() => removeAt(index)}
+          {tags.map((tag, index) =>
+            index === editingIndex ? (
+              <Input
+                key={`edit-${index}`}
+                className='h-6 w-32 px-1.5 font-mono text-[11px]'
+                value={editDraft}
+                aria-label={`Edit ${spec.key} value`}
+                ref={(element) => {
+                  if (element) {
+                    element.focus()
+                    element.select()
+                  }
+                }}
+                onChange={(event) => setEditDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    commitEdit()
+                  } else if (event.key === 'Escape') {
+                    event.preventDefault()
+                    cancelEdit()
+                  }
+                }}
+                onBlur={commitEdit}
+              />
+            ) : (
+              <span
+                key={`${tag}-${index}`}
+                className='inline-flex items-center gap-1 rounded-md border bg-muted/40 py-0.5 pr-1 pl-2 font-mono text-[11px]'
               >
-                <X className='size-3' strokeWidth={2} />
-              </button>
-            </span>
-          ))}
+                <button
+                  type='button'
+                  disabled={disabled}
+                  aria-label={`Edit ${tag}`}
+                  title='Click to edit'
+                  className='rounded-sm transition-colors hover:text-foreground disabled:pointer-events-none'
+                  onClick={() => startEdit(index)}
+                >
+                  {tag}
+                </button>
+                <button
+                  type='button'
+                  disabled={disabled}
+                  aria-label={`Remove ${tag}`}
+                  className='rounded-sm p-0.5 text-muted-foreground transition-colors hover:text-foreground disabled:pointer-events-none'
+                  onClick={() => removeAt(index)}
+                >
+                  <X className='size-3' strokeWidth={2} />
+                </button>
+              </span>
+            ),
+          )}
         </div>
       )}
     </div>
