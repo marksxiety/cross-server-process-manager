@@ -105,7 +105,7 @@ export const PROCESS_FIELDS: readonly ProcessFieldSpec[] = [
         group: "basic",
         type: "array",
         placeholder: "value",
-        hint: "One argument per row, in the exact order the script expects. Press Enter to add.",
+        hint: "One argument per row, in the exact order the script expects. Press Enter to add, click an argument to edit it.",
     },
     {
         key: "env",
@@ -220,6 +220,7 @@ export const PROCESS_FIELDS: readonly ProcessFieldSpec[] = [
         advancedGroup: "overrides",
         type: "array",
         placeholder: "value",
+        hint: "One argument per row, in the exact order the interpreter expects. Press Enter to add, click an argument to edit it.",
     },
     {
         key: "windowsHide",
