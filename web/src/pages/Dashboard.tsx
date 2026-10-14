@@ -27,6 +27,7 @@ import {
   RefreshCw,
   RotateCcw,
   RotateCw,
+  Search,
   ServerOff,
   Trash2,
   X,
@@ -51,6 +52,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@/components/ui/empty'
+import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Select,
@@ -495,6 +497,7 @@ export function Dashboard() {
   const [logsOpen, setLogsOpen] = useState(false)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const [selectedServerName, setSelectedServerName] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
 
   // Applies the filter only while its server is still registered, so a reload
   // that drops the server falls back to the full process list.
@@ -621,14 +624,22 @@ export function Dashboard() {
     [servers, processesByServer],
   )
 
-  // When a server filter is active, only that server's processes are shown.
-  const filteredProcessItems = useMemo(
-    () =>
+  const query = searchQuery.trim().toLowerCase()
+
+  // Applies the active server filter and the name/namespace search. An empty
+  // query leaves the list untouched so refreshing never shuffles results.
+  const filteredProcessItems = useMemo(() => {
+    const byServer =
       activeServerName === null
         ? processItems
-        : processItems.filter((item) => item.server.server === activeServerName),
-    [processItems, activeServerName],
-  )
+        : processItems.filter((item) => item.server.server === activeServerName)
+    if (query === '') return byServer
+    return byServer.filter(
+      (item) =>
+        item.process.name.toLowerCase().includes(query) ||
+        item.process.namespace.toLowerCase().includes(query),
+    )
+  }, [processItems, activeServerName, query])
 
   const sortedProcessItems = useMemo(
     () => sortProcesses(filteredProcessItems, sortOrder),
@@ -764,10 +775,40 @@ export function Dashboard() {
               })}
             </div>
 
-            <div className='mt-6 flex items-center gap-3'>
+            <div className='mt-6 flex flex-wrap items-center gap-3'>
+              <div className='relative w-full max-w-56 shrink-0'>
+                <Search
+                  className='pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground'
+                  strokeWidth={2}
+                />
+                <Input
+                  size='xs'
+                  className='pl-7'
+                  value={searchQuery}
+                  placeholder='Search name or namespace…'
+                  aria-label='Search processes by name or namespace'
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape') setSearchQuery('')
+                  }}
+                />
+                {searchQuery !== '' && (
+                  <button
+                    type='button'
+                    aria-label='Clear search'
+                    title='Clear search'
+                    className='absolute top-1/2 right-2 -translate-y-1/2 rounded-sm text-muted-foreground transition-colors hover:text-foreground'
+                    onClick={() => setSearchQuery('')}
+                  >
+                    <X className='size-3.5' strokeWidth={2} />
+                  </button>
+                )}
+              </div>
               <p className='shrink-0 text-xs font-medium text-muted-foreground'>
                 {`Processes (${sortedProcessItems.length}${
-                  activeServerName ? `/${processItems.length}` : ''
+                  activeServerName !== null || query !== ''
+                    ? `/${processItems.length}`
+                    : ''
                 })`}
               </p>
               <Separator className='flex-1' />
@@ -846,6 +887,23 @@ export function Dashboard() {
                 <Spinner className='size-4' />
                 Loading processes…
               </div>
+            ) : query !== '' ? (
+              <Empty className='mt-4'>
+                <EmptyHeader>
+                  <EmptyMedia variant='icon'>
+                    <Search strokeWidth={2} />
+                  </EmptyMedia>
+                  <EmptyTitle>No matching processes</EmptyTitle>
+                  <EmptyDescription>
+                    {`No process name or namespace matches “${searchQuery.trim()}”.`}
+                  </EmptyDescription>
+                </EmptyHeader>
+                <EmptyContent>
+                  <Button variant='outline' onClick={() => setSearchQuery('')}>
+                    Clear search
+                  </Button>
+                </EmptyContent>
+              </Empty>
             ) : (
               <Empty className='mt-4'>
                 <EmptyHeader>
