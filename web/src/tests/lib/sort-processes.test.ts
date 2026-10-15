@@ -146,22 +146,50 @@ describe('sortProcesses', () => {
     expect(pmIds(sortProcesses([light, heavy], ['cpu']))).toEqual([1, 2])
   })
 
-  test('ranks non-online statuses by severity before any metric', () => {
+  test('sorts by name ascending when name is the primary key', () => {
+    const zeta = makeItem({}, { pm_id: 1, name: 'zeta', memory: 900 })
+    const alpha = makeItem({}, { pm_id: 2, name: 'alpha', memory: 100 })
+
+    expect(pmIds(sortProcesses([zeta, alpha], ['name']))).toEqual([2, 1])
+  })
+
+  test('sorts by restart count descending when restarts is the primary key', () => {
+    const stable = makeItem({}, { pm_id: 1, restarts: 0, memory: 900 })
+    const flaky = makeItem({}, { pm_id: 2, restarts: 42, memory: 100 })
+
+    expect(pmIds(sortProcesses([stable, flaky], ['restarts']))).toEqual([2, 1])
+  })
+
+  test('sorts by uptime descending when uptime is the primary key', () => {
+    const fresh = makeItem({}, { pm_id: 1, uptime: 1000, memory: 900 })
+    const veteran = makeItem({}, { pm_id: 2, uptime: 9_000_000, memory: 100 })
+
+    expect(pmIds(sortProcesses([fresh, veteran], ['uptime']))).toEqual([2, 1])
+  })
+
+  test('groups unhealthy statuses first when status is selected', () => {
     const online = makeItem({}, { pm_id: 1, status: 'online', memory: 900 })
     const launching = makeItem({}, { pm_id: 2, status: 'launching', memory: 800 })
     const stopped = makeItem({}, { pm_id: 3, status: 'stopped', memory: 700 })
     const errored = makeItem({}, { pm_id: 4, status: 'errored', memory: 600 })
 
-    expect(pmIds(sortProcesses([online, launching, stopped, errored]))).toEqual([
+    expect(pmIds(sortProcesses([online, launching, stopped, errored], ['status']))).toEqual([
       4, 3, 2, 1,
     ])
   })
 
-  test('keeps status above the selected primary key', () => {
+  test('pins status first even when it is listed after another key', () => {
     const heavyOnline = makeItem({}, { pm_id: 1, status: 'online', memory: 900 })
     const lightStopped = makeItem({}, { pm_id: 2, status: 'stopped', memory: 100 })
 
-    expect(pmIds(sortProcesses([heavyOnline, lightStopped], ['memory']))).toEqual([2, 1])
+    expect(pmIds(sortProcesses([heavyOnline, lightStopped], ['memory', 'status']))).toEqual([2, 1])
+  })
+
+  test('does not group by status when it is unchecked', () => {
+    const heavyOnline = makeItem({}, { pm_id: 1, status: 'online', memory: 900 })
+    const lightStopped = makeItem({}, { pm_id: 2, status: 'stopped', memory: 100 })
+
+    expect(pmIds(sortProcesses([heavyOnline, lightStopped], ['memory']))).toEqual([1, 2])
   })
 
   test('applies the primary key within the same status group', () => {
@@ -169,7 +197,7 @@ describe('sortProcesses', () => {
     const onlineHighCpu = makeItem({}, { pm_id: 2, status: 'online', cpu: 95 })
     const stoppedBig = makeItem({}, { pm_id: 3, status: 'stopped', cpu: 80 })
 
-    expect(pmIds(sortProcesses([stoppedSmall, onlineHighCpu, stoppedBig], ['cpu']))).toEqual([
+    expect(pmIds(sortProcesses([stoppedSmall, onlineHighCpu, stoppedBig], ['status', 'cpu']))).toEqual([
       3, 1, 2,
     ])
   })
@@ -214,6 +242,15 @@ describe('sortProcesses', () => {
 describe('sanitizeSortOrder', () => {
   test('keeps a valid order as-is', () => {
     expect(sanitizeSortOrder(['cpu', 'namespace'])).toEqual(['cpu', 'namespace'])
+  })
+
+  test('keeps every selectable key, including the pinned status', () => {
+    expect(sanitizeSortOrder(['status', 'name', 'restarts', 'uptime'])).toEqual([
+      'status',
+      'name',
+      'restarts',
+      'uptime',
+    ])
   })
 
   test('drops unknown keys and preserves the remaining order', () => {
