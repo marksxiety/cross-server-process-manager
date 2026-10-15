@@ -48,6 +48,12 @@ interface DashboardState {
     deleteProcess: (server: RegisteredServer, process: ProcessCommandTarget) => Promise<ApiResponse<ProcessSummary[]>>;
 }
 
+/** The slice kept in localStorage (see `partialize`). */
+type PersistedDashboardState = Pick<
+    DashboardState,
+    "servers" | "serversFetchedAt" | "sortOrder"
+>;
+
 export const useDashboardStore = create<DashboardState>()(
     persist(
         (set, get) => {
@@ -271,7 +277,9 @@ export const useDashboardStore = create<DashboardState>()(
                 serversStatus: "idle",
                 requestError: null,
                 processesByServer: {},
-                sortOrder: [],
+                // Status (severity grouping) is on by default, pinned to the
+                // front of the order, but the user can uncheck and recheck it.
+                sortOrder: ["status"],
                 isRefreshing: false,
                 isStarting: false,
                 isStopping: false,
@@ -377,6 +385,19 @@ export const useDashboardStore = create<DashboardState>()(
         },
         {
             name: isDemoMode() ? "servers-cache-demo" : "servers-cache",
+            version: 1,
+            // `status` only became a selectable key in v1: orders persisted
+            // before that relied on the implicit severity grouping, so prepend
+            // it to preserve the previous ordering and surface it in the menu.
+            migrate: (persistedState, version) => {
+                const persisted = (persistedState ?? {}) as PersistedDashboardState;
+                if (version >= 1) return persisted;
+                const previous = sanitizeSortOrder(persisted.sortOrder);
+                return {
+                    ...persisted,
+                    sortOrder: ["status", ...previous.filter((key) => key !== "status")],
+                };
+            },
             // Only the server list, its fetch timestamp and the sort preference are
             // cached; process data is volatile.
             partialize: (state) => ({
