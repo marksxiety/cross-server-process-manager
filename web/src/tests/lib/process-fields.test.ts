@@ -8,6 +8,7 @@ import {
   basicFields,
   catalogField,
   clearDisabledValues,
+  createDefaultValues,
   isFieldEnabled,
   validateRegisterValues,
 } from '@/lib/process-fields'
@@ -114,6 +115,24 @@ describe('process field catalog', () => {
   })
 })
 
+describe('createDefaultValues', () => {
+  it('seeds every real default so the form, preview and PM2 agree', () => {
+    expect(createDefaultValues()).toEqual({
+      autorestart: true,
+      // Deliberately 5; PM2's own runtime default is 16.
+      max_restarts: 5,
+      min_uptime: 1000,
+      restart_delay: 0,
+      kill_timeout: 1600,
+      watch: false,
+      watch_delay: 0,
+      windowsHide: true,
+      exec_mode: 'fork',
+      instances: 1,
+    })
+  })
+})
+
 describe('clearDisabledValues', () => {
   it('drops values whose enabling condition is not met', () => {
     expect(
@@ -167,6 +186,17 @@ describe('validateRegisterValues', () => {
     expect(validateRegisterValues({ ...base, instances: 'many' }).instances).toBe('Must be a number')
   })
 
+  it('requires max_restarts to be an integer of at least 1', () => {
+    const base = { name: 'app', cwd: 'C:/app', interpreter: 'none', script: 'app.exe' }
+    const message = 'Must be an integer of at least 1'
+
+    expect(validateRegisterValues({ ...base, max_restarts: 0 }).max_restarts).toBe(message)
+    expect(validateRegisterValues({ ...base, max_restarts: -2 }).max_restarts).toBe(message)
+    expect(validateRegisterValues({ ...base, max_restarts: 2.5 }).max_restarts).toBe(message)
+    expect(validateRegisterValues({ ...base, max_restarts: 5 })).toEqual({})
+    expect(validateRegisterValues({ ...base, max_restarts: 'many' }).max_restarts).toBe('Must be a number')
+  })
+
   it('skips fields disabled by their enabling rule', () => {
     const base = { name: 'app', cwd: 'C:/app', interpreter: 'none', script: 'app.exe' }
 
@@ -187,6 +217,33 @@ describe('validateRegisterValues', () => {
     expect(validateRegisterValues({ ...base, restart_delay: 'soon' }).restart_delay).toBe(
       'Must be a number of milliseconds or a duration like 10s',
     )
+  })
+
+  it('rejects an unrecognized cron expression when the schedule field is enabled', () => {
+    const base = {
+      name: 'app',
+      cwd: 'C:/app',
+      interpreter: 'none',
+      script: 'app.exe',
+      autorestart: false,
+    }
+
+    expect(validateRegisterValues({ ...base, cron_restart: '*/5 * * * *' })).toEqual({})
+    expect(validateRegisterValues({ ...base, cron_restart: 'not-a-cron' }).cron_restart).toBe(
+      'Unrecognized cron expression',
+    )
+    // Empty is allowed, and the field is skipped while autorestart disables it.
+    expect(validateRegisterValues({ ...base })).toEqual({})
+    expect(
+      validateRegisterValues({
+        name: 'app',
+        cwd: 'C:/app',
+        interpreter: 'none',
+        script: 'app.exe',
+        autorestart: true,
+        cron_restart: 'not-a-cron',
+      }),
+    ).toEqual({})
   })
 
   it('rejects non-string env values', () => {
