@@ -1,7 +1,21 @@
 import { describe, expect, it } from 'vitest'
+import { createDefaultValues } from '@/lib/process-fields'
 import { buildTemplatePayload } from '@/lib/template-payload'
 
 describe('buildTemplatePayload', () => {
+  it('turns the seeded defaults into the full payload the form shows', () => {
+    expect(buildTemplatePayload(createDefaultValues())).toEqual({
+      autorestart: true,
+      max_restarts: 5,
+      min_uptime: 1000,
+      restart_delay: 0,
+      kill_timeout: 1600,
+      watch: false,
+      windowsHide: true,
+      exec_mode: 'fork',
+    })
+  })
+
   it('coerces each value according to the master field list', () => {
     const payload = buildTemplatePayload({
       script: 'index.js',
