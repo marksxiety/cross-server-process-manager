@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
+import { describeCron } from '@/lib/cron-description'
 import {
   ADVANCED_GROUPS,
   advancedFields,
@@ -42,7 +43,7 @@ interface ProcessFormProps {
   onChange: (key: string, value: unknown) => void
 }
 
-const WIDE_FIELD_KEYS = new Set(['cwd', 'interpreter', 'script'])
+const WIDE_FIELD_KEYS = new Set(['cwd', 'interpreter', 'script', 'cron_restart'])
 
 function isWideField(spec: ProcessFieldSpec): boolean {
   return spec.type === 'array' || spec.type === 'object' || WIDE_FIELD_KEYS.has(spec.key)
@@ -412,6 +413,9 @@ function ProcessField({
   const disabled = !isFieldEnabled(spec, values)
   const showHint = spec.hint !== undefined && (spec.enabledWhen === undefined || disabled)
   const invalid = !!error
+  // Cron expressions get an inline translation beside the input ("Every 5
+  // minutes", "At 10:00 AM, only on Sunday and Saturday").
+  const cron = spec.key === 'cron_restart' ? describeCron(value) : null
 
   return (
     <Field data-disabled={disabled}>
@@ -424,13 +428,39 @@ function ProcessField({
           {typeTag(spec)}
         </span>
       </div>
-      <FieldControl
-        spec={spec}
-        value={value}
-        disabled={disabled}
-        invalid={invalid}
-        onChange={onChange}
-      />
+      {cron ? (
+        // The field spans both grid columns: the input and its translation
+        // each take one column (same gap as the surrounding form grid).
+        <div className='flex items-center gap-4'>
+          <div className='min-w-0 flex-1'>
+            <FieldControl
+              spec={spec}
+              value={value}
+              disabled={disabled}
+              invalid={invalid}
+              onChange={onChange}
+            />
+          </div>
+          {cron.status !== 'empty' && (
+            <p
+              className={cn(
+                'min-w-0 flex-1 break-words text-[11px]',
+                cron.status === 'invalid' ? 'text-destructive' : 'text-muted-foreground',
+              )}
+            >
+              {cron.status === 'valid' ? cron.text : 'Unrecognized cron expression'}
+            </p>
+          )}
+        </div>
+      ) : (
+        <FieldControl
+          spec={spec}
+          value={value}
+          disabled={disabled}
+          invalid={invalid}
+          onChange={onChange}
+        />
+      )}
       {showHint && <p className='text-[11px] text-muted-foreground'>{spec.hint}</p>}
       <FieldError errors={[error ? { message: error } : undefined]} />
     </Field>
