@@ -51,3 +51,10 @@ export function isUniqueViolation(error: DbErrorInfo): boolean {
 export function isCheckViolation(error: DbErrorInfo): boolean {
     return error.number === CHECK_VIOLATION_NUMBER;
 }
+
+const DATABASE_ALREADY_EXISTS_NUMBER = 1801;
+
+/** True when CREATE DATABASE lost a race and the database now exists. */
+export function isDatabaseAlreadyExistsError(error: unknown): boolean {
+    return describeDbError(error).number === DATABASE_ALREADY_EXISTS_NUMBER;
+}
