@@ -9,6 +9,8 @@
  * templates, and templates are guides (initial values), never field states.
  */
 
+import { describeCron } from "./cron-description";
+
 export type FieldType = "string" | "number" | "boolean" | "array" | "object" | "duration";
 
 export type FieldGroup = "basic" | "advanced";
@@ -40,7 +42,7 @@ export interface ProcessFieldSpec {
     format?: "uppercase";
     /** Short muted hint shown under the control. */
     hint?: string;
-    /** Shown as the control's resting state when the field is empty; never sent. */
+    /** Real initial value seeded into the form and payload; mirrors the PM2 runtime default unless noted. */
     defaultValue?: string | number | boolean;
     /** Enables the field only when another field holds one of these values. */
     enabledWhen?: { key: string; oneOf: readonly (string | number | boolean)[] };
@@ -129,8 +131,10 @@ export const PROCESS_FIELDS: readonly ProcessFieldSpec[] = [
         group: "advanced",
         advancedGroup: "restart",
         type: "number",
-        placeholder: "16",
+        placeholder: "5",
         hint: "Maximum number of unstable restarts. Once reached, the process will no longer be restarted.",
+        // Deliberately 5 (project default); PM2's own runtime default is 16.
+        defaultValue: 5,
         enabledWhen: { key: "autorestart", oneOf: [true] },
     },
     {
@@ -139,7 +143,8 @@ export const PROCESS_FIELDS: readonly ProcessFieldSpec[] = [
         group: "advanced",
         advancedGroup: "restart",
         type: "duration",
-        placeholder: "10s",
+        placeholder: "1000",
+        defaultValue: 1000,
         enabledWhen: { key: "autorestart", oneOf: [true] },
     },
     {
@@ -148,7 +153,8 @@ export const PROCESS_FIELDS: readonly ProcessFieldSpec[] = [
         group: "advanced",
         advancedGroup: "restart",
         type: "duration",
-        placeholder: "4000",
+        placeholder: "0",
+        defaultValue: 0,
         enabledWhen: { key: "autorestart", oneOf: [true] },
     },
 
@@ -180,6 +186,7 @@ export const PROCESS_FIELDS: readonly ProcessFieldSpec[] = [
         advancedGroup: "resources",
         type: "duration",
         placeholder: "1600",
+        defaultValue: 1600,
     },
 
     // Advanced — group 4: watch
@@ -207,7 +214,8 @@ export const PROCESS_FIELDS: readonly ProcessFieldSpec[] = [
         group: "advanced",
         advancedGroup: "watch",
         type: "duration",
-        placeholder: "1000",
+        placeholder: "0",
+        defaultValue: 0,
         enabledWhen: { key: "watch", oneOf: [true] },
         hint: "Available when watch is on.",
     },
@@ -249,6 +257,7 @@ export const PROCESS_FIELDS: readonly ProcessFieldSpec[] = [
         advancedGroup: "scaling",
         type: "number",
         placeholder: "1",
+        defaultValue: 1,
         enabledWhen: { key: "exec_mode", oneOf: ["cluster"] },
         hint: "Available when execution mode is cluster.",
     },
@@ -282,6 +291,19 @@ export function advancedGroupFields(group: AdvancedGroupId): ProcessFieldSpec[] 
     return PROCESS_FIELDS.filter(
         (field) => field.group === "advanced" && field.advancedGroup === group,
     );
+}
+
+/**
+ * Real, sendable starting values: every catalog field that carries a PM2
+ * default. The form seeds these so the controls, the payload preview and what
+ * PM2 actually applies all show the same values.
+ */
+export function createDefaultValues(): Record<string, unknown> {
+    const defaults: Record<string, unknown> = {};
+    for (const field of PROCESS_FIELDS) {
+        if (field.defaultValue !== undefined) defaults[field.key] = field.defaultValue;
+    }
+    return defaults;
 }
 
 /** A field outside the catalog (possible only via direct API writes). */
@@ -367,6 +389,10 @@ export function validateRegisterValues(values: Record<string, unknown>): Record<
                     errors[spec.key] = "Must be a number";
                 } else if (spec.key === "instances" && (!Number.isInteger(numeric) || numeric < 1)) {
                     errors[spec.key] = 'Must be a positive integer or "max"';
+                } else if (spec.key === "max_restarts" && (!Number.isInteger(numeric) || numeric < 1)) {
+                    // 0 would make the agent silently disable autorestart,
+                    // contradicting what the form shows.
+                    errors[spec.key] = "Must be an integer of at least 1";
                 }
                 break;
             }
@@ -387,6 +413,14 @@ export function validateRegisterValues(values: Record<string, unknown>): Record<
                     errors[spec.key] = "Must be a key/value object";
                 } else if (Object.values(value).some((entry) => typeof entry !== "string")) {
                     errors[spec.key] = "Every value must be a string";
+                }
+                break;
+            }
+            case "string": {
+                // PM2 throws on unparseable patterns at start; block them here
+                // so the submit failure is caught before it reaches the agent.
+                if (spec.key === "cron_restart" && describeCron(value).status === "invalid") {
+                    errors[spec.key] = "Unrecognized cron expression";
                 }
                 break;
             }
