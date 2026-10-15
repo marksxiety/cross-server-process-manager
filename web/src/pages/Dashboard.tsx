@@ -776,34 +776,6 @@ export function Dashboard() {
             </div>
 
             <div className='mt-6 flex flex-wrap items-center gap-3'>
-              <div className='relative w-full max-w-56 shrink-0'>
-                <Search
-                  className='pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground'
-                  strokeWidth={2}
-                />
-                <Input
-                  size='xs'
-                  className='pl-7'
-                  value={searchQuery}
-                  placeholder='Search name or namespace…'
-                  aria-label='Search processes by name or namespace'
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Escape') setSearchQuery('')
-                  }}
-                />
-                {searchQuery !== '' && (
-                  <button
-                    type='button'
-                    aria-label='Clear search'
-                    title='Clear search'
-                    className='absolute top-1/2 right-2 -translate-y-1/2 rounded-sm text-muted-foreground transition-colors hover:text-foreground'
-                    onClick={() => setSearchQuery('')}
-                  >
-                    <X className='size-3.5' strokeWidth={2} />
-                  </button>
-                )}
-              </div>
               <p className='shrink-0 text-xs font-medium text-muted-foreground'>
                 {`Processes (${sortedProcessItems.length}${
                   activeServerName !== null || query !== ''
@@ -813,7 +785,6 @@ export function Dashboard() {
               </p>
               <Separator className='flex-1' />
               <div className='flex shrink-0 items-center gap-2'>
-                <span className='text-xs text-muted-foreground'>Sort</span>
                 <DropdownMenu>
                   <DropdownMenuTrigger
                     render={
@@ -854,6 +825,34 @@ export function Dashboard() {
                     </DropdownMenuGroup>
                   </DropdownMenuContent>
                 </DropdownMenu>
+              </div>
+              <div className='relative w-full max-w-56 shrink-0'>
+                <Search
+                  className='pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground'
+                  strokeWidth={2}
+                />
+                <Input
+                  size='xs'
+                  className='pl-7'
+                  value={searchQuery}
+                  placeholder='Search name or namespace…'
+                  aria-label='Search processes by name or namespace'
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape') setSearchQuery('')
+                  }}
+                />
+                {searchQuery !== '' && (
+                  <button
+                    type='button'
+                    aria-label='Clear search'
+                    title='Clear search'
+                    className='absolute top-1/2 right-2 -translate-y-1/2 rounded-sm text-muted-foreground transition-colors hover:text-foreground'
+                    onClick={() => setSearchQuery('')}
+                  >
+                    <X className='size-3.5' strokeWidth={2} />
+                  </button>
+                )}
               </div>
             </div>
 
