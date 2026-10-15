@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { processService } from "@/api/services/process.service";
 import { toApiError, toUnreachableError } from "@/lib/error-code";
-import { clearDisabledValues } from "@/lib/process-fields";
+import { clearDisabledValues, createDefaultValues } from "@/lib/process-fields";
 import { useDashboardStore } from "@/stores/dashboard.store";
 import type { ApiError, ApiResponse } from "@/types/api";
 import type { LoadStatus } from "@/types/dashboard";
@@ -16,16 +16,26 @@ function templateValues(template: TemplateChoice): TemplateValues {
 }
 
 /**
- * Applies a template's values as starting points without discarding fields the
- * user already edited by hand: a key the user touched keeps its value, every
- * other key is replaced by the template's (or cleared when choosing "none").
+ * Layers a values map over the catalog's PM2 defaults. Absent keys fall back to
+ * their default so re-enabling a toggle brings its dependent values back;
+ * values the user cleared stay cleared because they are present ('' / []).
+ */
+function seedDefaults(values: TemplateValues): TemplateValues {
+    return { ...createDefaultValues(), ...values };
+}
+
+/**
+ * Applies a template's values as starting points over the PM2 defaults without
+ * discarding fields the user already edited by hand: a key the user touched
+ * keeps its value, every other key is replaced by the template's (or reset to
+ * its default when choosing "none").
  */
 function applyTemplate(
     template: TemplateChoice,
     current: TemplateValues,
     dirtyKeys: Set<string>,
 ): TemplateValues {
-    const next: TemplateValues = {};
+    const next: TemplateValues = createDefaultValues();
 
     for (const key of dirtyKeys) {
         if (current[key] !== undefined) next[key] = current[key];
@@ -81,7 +91,9 @@ export const useProcessStore = create<ProcessState>()((set, get) => ({
     step: 1,
     server: null,
     template: "none",
-    values: {},
+    // Seeded with the PM2 defaults, minus fields a rule dims at rest (e.g.
+    // instances under fork mode); those return when their toggle enables them.
+    values: clearDisabledValues(createDefaultValues()),
     dirtyKeys: new Set<string>(),
     status: "idle",
     requestError: null,
@@ -114,7 +126,7 @@ export const useProcessStore = create<ProcessState>()((set, get) => ({
             const dirtyKeys = new Set(state.dirtyKeys);
             dirtyKeys.add(key);
 
-            return clearDisabledState(draft, dirtyKeys);
+            return clearDisabledState(seedDefaults(draft), dirtyKeys);
         }),
 
     // Submits a payload the page already validated and built. On success the
@@ -157,11 +169,12 @@ export const useProcessStore = create<ProcessState>()((set, get) => ({
         return result;
     },
 
-    // Restores the selected template's values, keeping the server and template
-    // choices so another process can be registered right away.
+    // Restores the selected template's values over the PM2 defaults, keeping
+    // the server and template choices so another process can be registered
+    // right away.
     reset: () =>
         set((state) => ({
-            values: clearDisabledValues(templateValues(state.template)),
+            values: clearDisabledValues(seedDefaults(templateValues(state.template))),
             dirtyKeys: new Set<string>(),
             status: "idle",
             requestError: null,
