@@ -459,12 +459,17 @@ const COMMAND_LABELS: Record<ProcessCommand, { loading: string; success: string 
   delete: { loading: 'Deleting process…', success: 'Process deleted' },
 }
 
+// Status is always rendered first and, when checked, always ranks first
+// (see sortProcesses); every option stays checkable/uncheckable.
 const SORT_OPTIONS: { value: ProcessSortKey; label: string }[] = [
+  { value: 'status', label: 'Status' },
+  { value: 'name', label: 'Name' },
+  { value: 'restarts', label: 'Restart Count' },
   { value: 'memory', label: 'Memory' },
   { value: 'cpu', label: 'CPU' },
-  { value: 'host', label: 'Host' },
+  { value: 'uptime', label: 'Uptime' },
+  { value: 'host', label: 'Host (Server Name)' },
   { value: 'namespace', label: 'Namespace' },
-  { value: 'pm_id', label: 'PM ID' },
 ]
 
 export function Dashboard() {
@@ -546,11 +551,12 @@ export function Dashboard() {
   }
 
   const toggleSortKey = (key: ProcessSortKey) => {
-    setSortOrder(
-      sortOrder.includes(key)
-        ? sortOrder.filter((item) => item !== key)
-        : [...sortOrder, key],
-    )
+    if (sortOrder.includes(key)) {
+      setSortOrder(sortOrder.filter((item) => item !== key))
+      return
+    }
+    // Re-checking status keeps it first so the menu numbering matches the sort.
+    setSortOrder(key === 'status' ? [key, ...sortOrder] : [...sortOrder, key])
   }
 
   const runAction = async (command: Exclude<ProcessCommand, 'delete'>) => {
