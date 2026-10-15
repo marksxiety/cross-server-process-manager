@@ -48,13 +48,47 @@ export interface ProcessFieldSpec {
     enabledWhen?: { key: string; oneOf: readonly (string | number | boolean)[] };
 }
 
-export const ADVANCED_GROUPS: readonly { id: AdvancedGroupId; label: string }[] = [
-    { id: "restart", label: "Restart policy" },
-    { id: "schedule", label: "Schedule" },
-    { id: "resources", label: "Resources & shutdown" },
-    { id: "watch", label: "Watch" },
-    { id: "overrides", label: "Overrides" },
-    { id: "scaling", label: "Scaling" },
+export const ADVANCED_GROUPS: readonly {
+    id: AdvancedGroupId;
+    label: string;
+    description: string;
+}[] = [
+    {
+        id: "restart",
+        label: "Restart policy",
+        description:
+            "Controls how the process recovers when it crashes or exits unexpectedly. Set whether it restarts automatically, how many retries are allowed, and how long to wait between attempts, so a brief failure doesn't leave the service down.",
+    },
+    {
+        id: "schedule",
+        label: "Schedule",
+        description:
+            "Runs the process at set times instead of keeping it running all the time. Times are set with a cron expression (for example, every day at 2:00 AM). Used for recurring jobs like reports, backups, and data syncs.",
+    },
+    {
+        id: "resources",
+        label: "Resources & shutdown",
+        description:
+            "Restarts the process when its memory use passes a limit you set, which guards against a slow memory leak building up over days. Also sets how long the process has to finish its current work and close cleanly before it is force-stopped.",
+    },
+    {
+        id: "watch",
+        label: "Watch",
+        description:
+            "Restarts the process whenever its files change, so updates take effect without a manual restart. Choose paths to ignore (such as logs or temp files) and a delay after each change, so a burst of saves causes one restart instead of many.",
+    },
+    {
+        id: "overrides",
+        label: "Overrides",
+        description:
+            "Adjusts how the process is launched. Add extra interpreter flags (for example, options passed to Node or Python) or hide the console window that would otherwise appear when it starts on Windows.",
+    },
+    {
+        id: "scaling",
+        label: "Scaling",
+        description:
+            "Runs several copies of the same process side by side (PM2 cluster mode) and shares the workload between them, so the app can use multiple CPU cores and handle more requests at once.",
+    },
 ];
 export const PROCESS_FIELDS: readonly ProcessFieldSpec[] = [
     {
