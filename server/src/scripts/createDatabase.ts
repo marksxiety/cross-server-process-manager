@@ -1,12 +1,9 @@
 import { ConnectionPool } from 'mssql';
 import { buildConfig } from '../config/databaseConfig';
 import '../config/env';
+import { ensureDatabaseExists } from '../utils/ensureDatabase';
 
 const MAINTENANCE_DATABASE = 'master';
-
-function quoteIdentifier(name: string): string {
-    return `[${name.replace(/]/g, ']]')}]`;
-}
 
 // Idempotently creates the application database by connecting to the
 // maintenance database first. Mirrors Laravel's separate DB-creation step:
@@ -20,17 +17,13 @@ async function createDatabase(): Promise<void> {
     const pool = new ConnectionPool(buildConfig({ database: MAINTENANCE_DATABASE }));
     await pool.connect();
     try {
-        const existing = await pool
-            .request()
-            .input('name', database)
-            .query<{ name: string }>('SELECT name FROM sys.databases WHERE name = @name');
+        const result = await ensureDatabaseExists(pool, database);
 
-        if (existing.recordset.length > 0) {
-            console.log(`Database "${database}" already exists`);
+        if (result === 'existed') {
+            console.log(`Database "${database}" already exists — skipping creation`);
             return;
         }
 
-        await pool.request().query(`CREATE DATABASE ${quoteIdentifier(database)}`);
         console.log(`Database "${database}" created`);
     } finally {
         await pool.close();
