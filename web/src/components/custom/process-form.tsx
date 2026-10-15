@@ -541,11 +541,14 @@ export function ProcessForm({ values, errors = {}, onChange }: ProcessFormProps)
             <CardContent className='space-y-6'>
               {ADVANCED_GROUPS.map((group) => (
                 <div key={group.id}>
-                  <div className='mb-3 flex items-center gap-3'>
-                    <span className='text-[10px] font-medium tracking-wide text-muted-foreground uppercase'>
-                      {group.label}
-                    </span>
-                    <Separator className='flex-1' />
+                  <div className='mb-3 space-y-1.5'>
+                    <div className='flex items-center gap-3'>
+                      <span className='text-[10px] font-medium tracking-wide text-muted-foreground uppercase'>
+                        {group.label}
+                      </span>
+                      <Separator className='flex-1' />
+                    </div>
+                    <p className='text-xs text-muted-foreground'>{group.description}</p>
                   </div>
                   <div className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
                     {advancedGroupFields(group.id).map(renderField)}
