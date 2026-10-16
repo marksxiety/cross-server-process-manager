@@ -4,7 +4,9 @@ import {
   formatBytes,
   formatLogTimestamp,
   formatMetricValue,
+  formatPercent,
   formatUptime,
+  memorySharePercent,
 } from '../../lib/format'
 
 const SECOND = 1000
@@ -97,6 +99,51 @@ describe('formatBytes', () => {
   test('honours the precision argument', () => {
     expect(formatBytes(38805504, 0)).toBe('37mb')
     expect(formatBytes(38805504, 2)).toBe('37.01mb')
+  })
+})
+
+describe('memorySharePercent', () => {
+  test('returns the share of the total in percent', () => {
+    expect(memorySharePercent(512 * 1024 * 1024, 16 * 1024 * 1024 * 1024)).toBe(3.125)
+    expect(memorySharePercent(52428800, 52428800)).toBe(100)
+  })
+
+  test('returns a tiny share for small processes', () => {
+    const percent = memorySharePercent(30736384, 17179869184)
+    expect(percent).not.toBeNull()
+    expect(percent?.toFixed(2)).toBe('0.18')
+  })
+
+  test('returns null when the total is missing or unusable', () => {
+    expect(memorySharePercent(1000, null)).toBeNull()
+    expect(memorySharePercent(1000, undefined)).toBeNull()
+    expect(memorySharePercent(1000, 0)).toBeNull()
+    expect(memorySharePercent(1000, -1)).toBeNull()
+    expect(memorySharePercent(1000, Number.NaN)).toBeNull()
+  })
+
+  test('returns null when the used value is unusable', () => {
+    expect(memorySharePercent(null, 1000)).toBeNull()
+    expect(memorySharePercent(undefined, 1000)).toBeNull()
+    expect(memorySharePercent(Number.NaN, 1000)).toBeNull()
+  })
+})
+
+describe('formatPercent', () => {
+  test('formats with two decimals by default', () => {
+    expect(formatPercent(2.514)).toBe('2.51%')
+    expect(formatPercent(0)).toBe('0.00%')
+  })
+
+  test('honours the decimals argument', () => {
+    expect(formatPercent(2.514, 0)).toBe('3%')
+  })
+
+  test('returns an em dash for missing and non-finite values', () => {
+    expect(formatPercent(null)).toBe('—')
+    expect(formatPercent(undefined)).toBe('—')
+    expect(formatPercent(Number.NaN)).toBe('—')
+    expect(formatPercent(Number.POSITIVE_INFINITY)).toBe('—')
   })
 })
 
