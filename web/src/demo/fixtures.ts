@@ -491,6 +491,13 @@ function describeFor(summary: ProcessSummary): ProcessDescribe {
         node_env: "production",
         created_at: "2026-03-14T09:12:33.000Z",
         max_memory_restart: "512M",
+        max_restarts: 5,
+        min_uptime: 1000,
+        restart_delay: 0,
+        kill_timeout: 1600,
+        ignore_watch: ["logs", "tmp"],
+        watch_delay: 100,
+        windowsHide: true,
         ...(summary.cron_restart ? { cron_restart: summary.cron_restart } : {}),
     };
     return {
