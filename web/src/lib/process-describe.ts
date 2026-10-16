@@ -46,10 +46,31 @@ function toStringArray(value: unknown): string[] | null {
   return value.filter((item): item is string => typeof item === 'string')
 }
 
+function toOptionalString(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined
+}
+
+function toOptionalNumber(value: unknown): number | undefined {
+  return typeof value === 'number' ? value : undefined
+}
+
+function toOptionalBoolean(value: unknown): boolean | undefined {
+  return typeof value === 'boolean' ? value : undefined
+}
+
+function toOptionalDuration(value: unknown): number | string | undefined {
+  return typeof value === 'number' || typeof value === 'string' ? value : undefined
+}
+
+function toOptionalStringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  return value.filter((item): item is string => typeof item === 'string')
+}
+
 function toDescribeDetails(value: unknown): ProcessDescribeDetails {
   if (!isRecord(value)) return emptyDescribe()
 
-  return {
+  const details: ProcessDescribeDetails = {
     version: toNullableString(value.version),
     script_path: toNullableString(value.script_path),
     script_args:
@@ -63,17 +84,30 @@ function toDescribeDetails(value: unknown): ProcessDescribeDetails {
     node_version: toNullableString(value.node_version),
     node_env: toNullableString(value.node_env),
     created_at: toNullableString(value.created_at),
-    ...(typeof value.entire_log_path === 'string'
-      ? { entire_log_path: value.entire_log_path }
-      : {}),
-    ...(typeof value.cron_restart === 'string'
-      ? { cron_restart: value.cron_restart }
-      : {}),
-    ...(typeof value.max_memory_restart === 'number' ||
-    typeof value.max_memory_restart === 'string'
-      ? { max_memory_restart: value.max_memory_restart }
-      : {}),
   }
+
+  const entireLogPath = toOptionalString(value.entire_log_path)
+  if (entireLogPath !== undefined) details.entire_log_path = entireLogPath
+  const cronRestart = toOptionalString(value.cron_restart)
+  if (cronRestart !== undefined) details.cron_restart = cronRestart
+  const maxMemoryRestart = toOptionalDuration(value.max_memory_restart)
+  if (maxMemoryRestart !== undefined) details.max_memory_restart = maxMemoryRestart
+  const maxRestarts = toOptionalNumber(value.max_restarts)
+  if (maxRestarts !== undefined) details.max_restarts = maxRestarts
+  const minUptime = toOptionalDuration(value.min_uptime)
+  if (minUptime !== undefined) details.min_uptime = minUptime
+  const restartDelay = toOptionalDuration(value.restart_delay)
+  if (restartDelay !== undefined) details.restart_delay = restartDelay
+  const killTimeout = toOptionalDuration(value.kill_timeout)
+  if (killTimeout !== undefined) details.kill_timeout = killTimeout
+  const ignoreWatch = toOptionalStringArray(value.ignore_watch)
+  if (ignoreWatch !== undefined) details.ignore_watch = ignoreWatch
+  const watchDelay = toOptionalDuration(value.watch_delay)
+  if (watchDelay !== undefined) details.watch_delay = watchDelay
+  const windowsHide = toOptionalBoolean(value.windowsHide)
+  if (windowsHide !== undefined) details.windowsHide = windowsHide
+
+  return details
 }
 
 function toMetrics(value: unknown): Record<string, ProcessMetric> {
