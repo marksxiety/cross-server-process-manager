@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Spinner } from '@/components/ui/spinner'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ErrorAlert } from '@/components/custom/error-alert'
 import {
   formatBytes,
@@ -27,7 +28,14 @@ import {
   formatUptime,
   memorySharePercent,
 } from '@/lib/format'
-import { ADVANCED_GROUPS } from '@/lib/process-fields'
+import {
+  ADVANCED_GROUPS,
+  catalogField,
+  isFieldEnabled,
+  isValueEmpty,
+  isWideField,
+  type ProcessFieldSpec,
+} from '@/lib/process-fields'
 import {
   advancedRegistrationFields,
   basicRegistrationFields,
@@ -47,6 +55,11 @@ import type { LoadStatus } from '@/types/dashboard'
 import type { ProcessDescribe, ProcessSummary } from '@/types/process'
 import type { RegisteredServer } from '@/types/server'
 
+type TabValue = 'overview' | 'config' | 'logs'
+
+const DEFAULT_OVERVIEW_OPEN = ['paths']
+const DEFAULT_CONFIG_OPEN = ['identity', 'execution', 'restart']
+
 // ---------------------------------------------------------------------------
 // Formatting helpers
 // ---------------------------------------------------------------------------
@@ -59,11 +72,19 @@ function orDash(value: string | number | null | undefined): string {
   return String(value)
 }
 
-function truncatePath(path: string | null | undefined, segments = 2): string {
-  if (!path || path.trim() === '') return '—'
-  const parts = path.split(/[\\/]/).filter(Boolean)
-  if (parts.length <= segments) return path
-  return `…\\${parts.slice(-segments).join('\\')}`
+function formatDuration(value: unknown): string {
+  return typeof value === 'number' ? `${value} ms` : String(value)
+}
+
+/** "Needs Auto Restart off" — why a dependent field has no value to show. */
+function conditionText(spec: ProcessFieldSpec): string {
+  const condition = spec.enabledWhen
+  if (!condition) return 'Not applicable'
+  const dependency = catalogField(condition.key)?.label ?? condition.key
+  const states = condition.oneOf
+    .map((state) => (state === true ? 'on' : state === false ? 'off' : String(state)))
+    .join(' or ')
+  return `Needs ${dependency} ${states}`
 }
 
 // ---------------------------------------------------------------------------
@@ -91,18 +112,38 @@ function statLabelClasses(tone: Tone): string {
 function StatTile({
   label,
   value,
+  sub,
+  progress,
   tone = 'default',
 }: {
   label: string
   value: string
+  /** Quiet qualifier beside the value, e.g. "0 unstable" or "3.1%". */
+  sub?: string
+  /** 0–100; draws a thin bar under the value. */
+  progress?: number | null
   tone?: Tone
 }) {
   return (
     <div className={cn('rounded-lg p-3', statToneClasses(tone))}>
       <p className={cn('text-xs', statLabelClasses(tone))}>{label}</p>
-      <p className={cn('mt-0.5 text-base font-medium', tone !== 'default' && statLabelClasses(tone))}>
+      <p
+        className={cn(
+          'mt-0.5 flex items-baseline gap-1.5 text-base font-medium',
+          tone !== 'default' && statLabelClasses(tone),
+        )}
+      >
         {value}
+        {sub && <span className='text-xs font-normal opacity-80'>{sub}</span>}
       </p>
+      {progress !== null && progress !== undefined && (
+        <div className='mt-2 h-0.5 overflow-hidden rounded-full bg-foreground/10'>
+          <div
+            className='h-full rounded-full bg-foreground/40'
+            style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
+          />
+        </div>
+      )}
     </div>
   )
 }
@@ -131,20 +172,11 @@ function KeyValueRow({
   value: string | number | null | undefined
 }) {
   return (
-    <div className='flex items-center justify-between py-0.5 text-sm'>
+    <div className='flex items-center justify-between gap-3 py-0.5 text-sm'>
       <span className='text-muted-foreground'>{label}</span>
-      <span className='min-w-0 truncate text-right'>{orDash(value)}</span>
+      <span className='min-w-0 truncate text-right font-mono text-xs'>{orDash(value)}</span>
     </div>
   )
-}
-
-/** Renders a registration value; arrays join with commas, booleans as words. */
-function formatRegistrationValue(value: unknown): string {
-  if (value === undefined || value === null) return '—'
-  if (typeof value === 'boolean') return value ? 'true' : 'false'
-  if (Array.isArray(value)) return value.length > 0 ? value.join(', ') : '—'
-  if (typeof value === 'string' && value.trim() === '') return '—'
-  return String(value)
 }
 
 function DefaultBadge() {
@@ -158,302 +190,444 @@ function DefaultBadge() {
   )
 }
 
-function RegistrationRow({ field }: { field: RegistrationField }) {
-  const value = formatRegistrationValue(field.value)
-
-  return (
-    <div className='flex items-center justify-between gap-3 py-0.5 text-sm'>
-      <span className='flex min-w-0 items-center gap-1.5 text-muted-foreground'>
-        <span className='truncate'>{field.spec.label}</span>
-        {field.isDefault && <DefaultBadge />}
-      </span>
-      <span
-        className='min-w-0 truncate text-right font-mono text-xs text-foreground/80'
-        title={value === '—' ? undefined : value}
-      >
-        {value}
-      </span>
-    </div>
-  )
-}
-
-function PathRow({
-  label,
-  value,
-}: {
-  label: string
-  value: string | null | undefined
-}) {
-  return (
-    <div className='flex items-start justify-between gap-3 py-0.5 font-mono text-xs'>
-      <span className='shrink-0 text-muted-foreground'>{label}</span>
-      <span className='min-w-0 break-all text-right text-foreground/80'>
-        {value && value.trim() !== '' ? value : '—'}
-      </span>
-    </div>
-  )
-}
-
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return <p className='mb-2.5 text-xs font-medium text-muted-foreground'>{children}</p>
 }
 
+/** A value in a bordered box that wraps instead of truncating. */
+function ValueBox({
+  children,
+  muted,
+  dashed,
+}: {
+  children: React.ReactNode
+  muted?: boolean
+  dashed?: boolean
+}) {
+  return (
+    <div
+      className={cn(
+        'rounded-md border bg-muted/30 px-2.5 py-1.5 font-mono text-xs leading-relaxed break-all',
+        muted && 'text-muted-foreground',
+        dashed && 'border-dashed bg-transparent',
+      )}
+    >
+      {children}
+    </div>
+  )
+}
+
+function TagChip({ children }: { children: React.ReactNode }) {
+  return (
+    <span className='inline-flex items-center gap-1 rounded-md border bg-muted/40 px-2 py-0.5 font-mono text-[11px] break-all'>
+      {children}
+    </span>
+  )
+}
+
+/** Label above a full-width value — used for paths, where length is the point. */
+function StackedField({ label, value }: { label: string; value: string | null | undefined }) {
+  const empty = !value || value.trim() === ''
+  return (
+    <div className='min-w-0'>
+      <p className='mb-1 text-xs text-muted-foreground'>{label}</p>
+      <ValueBox muted={empty}>{empty ? '—' : value}</ValueBox>
+    </div>
+  )
+}
+
+/** Accordion row: group name on the left, a quiet count on the right. */
+function GroupTrigger({ label, count }: { label: string; count?: string | number }) {
+  return (
+    <AccordionTrigger className='py-3 hover:no-underline'>
+      <span className='flex min-w-0 flex-1 items-center justify-between gap-2 pr-2'>
+        <span className='text-sm font-medium'>{label}</span>
+        {count !== undefined && (
+          <span className='text-xs font-normal text-muted-foreground'>{count}</span>
+        )}
+      </span>
+    </AccordionTrigger>
+  )
+}
+
+const accordionRootClass = 'rounded-none border-0'
+const accordionItemClass = 'border-0 border-t first:border-t-0 data-open:bg-transparent'
+
 // ---------------------------------------------------------------------------
-// Detail body — rendered once the describe payload is available
+// Config — read-only view of the registration, grouped like the form
 // ---------------------------------------------------------------------------
 
-function ProcessDetailsBody({
+const IDENTITY_KEYS = new Set(['name', 'namespace'])
+
+type ConfigGroup = {
+  id: string
+  label: string
+  fields: RegistrationField[]
+}
+
+function buildConfigGroups(data: ProcessDescribe): ConfigGroup[] {
+  const basic = basicRegistrationFields(data)
+  const identity = basic.filter((field) => IDENTITY_KEYS.has(field.spec.key))
+  const execution = basic.filter((field) => !IDENTITY_KEYS.has(field.spec.key))
+  const advanced = ADVANCED_GROUPS.map((group) => ({
+    id: group.id,
+    label: group.label,
+    fields: advancedRegistrationFields(group.id, data),
+  }))
+
+  return [
+    { id: 'identity', label: 'Identity', fields: identity },
+    { id: 'execution', label: 'Execution', fields: execution },
+    ...advanced,
+  ].filter((group) => group.fields.length > 0)
+}
+
+function FieldValue({ spec, value }: { spec: ProcessFieldSpec; value: unknown }) {
+  if (spec.type === 'boolean') {
+    const active = value === undefined ? spec.defaultValue === true : value === true || value === 'true'
+    return (
+      <TagChip>
+        {active ? (
+          <Check className={cn('size-3', getStatusVisual('online').text)} strokeWidth={2.5} />
+        ) : (
+          <X className='size-3 text-muted-foreground' strokeWidth={2.5} />
+        )}
+        {active ? 'true' : 'false'}
+      </TagChip>
+    )
+  }
+
+  if (isValueEmpty(value)) return <ValueBox muted>Not set</ValueBox>
+
+  if (spec.type === 'array' && Array.isArray(value)) {
+    return (
+      <div className='flex flex-wrap gap-1.5'>
+        {value.map((entry, index) => (
+          <TagChip key={`${String(entry)}-${index}`}>{String(entry)}</TagChip>
+        ))}
+      </div>
+    )
+  }
+
+  if (spec.type === 'object' && typeof value === 'object' && value !== null) {
+    return (
+      <div className='overflow-hidden rounded-md border font-mono text-xs'>
+        {Object.entries(value as Record<string, unknown>).map(([key, entry]) => (
+          <div
+            key={key}
+            className='grid grid-cols-[38%_1fr] gap-2.5 border-t px-2.5 py-1.5 first:border-t-0'
+          >
+            <span className='break-all text-muted-foreground'>{key}</span>
+            <span className='break-all'>{String(entry ?? '')}</span>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  if (spec.type === 'duration') return <ValueBox>{formatDuration(value)}</ValueBox>
+
+  return <ValueBox>{String(value)}</ValueBox>
+}
+
+function ConfigField({
+  field,
+  enabled,
+}: {
+  field: RegistrationField
+  enabled: boolean
+}) {
+  const { spec, value, isDefault } = field
+
+  return (
+    <div className={cn('min-w-0', isWideField(spec) && 'col-span-2')}>
+      <div className='mb-1 flex items-center gap-1.5 text-xs text-muted-foreground'>
+        <span>{spec.label}</span>
+        {enabled && isDefault && <DefaultBadge />}
+      </div>
+      {enabled ? (
+        <FieldValue spec={spec} value={value} />
+      ) : (
+        <ValueBox muted dashed>
+          {conditionText(spec)}
+        </ValueBox>
+      )}
+    </div>
+  )
+}
+
+function ConfigTab({
   data,
-  server,
-  totalMemoryBytes,
-  pathsOpen,
-  onPathsOpenChange,
-  logsOpen,
-  onLogsOpenChange,
-  logs,
+  open,
+  onOpenChange,
 }: {
   data: ProcessDescribe
-  server: RegisteredServer
-  /** Total RAM of the host, when known; enables the memory share %. */
+  open: string[]
+  onOpenChange: (open: string[]) => void
+}) {
+  const groups = buildConfigGroups(data)
+  // Dependencies resolve against every field's value, like the form does.
+  const values = Object.fromEntries(
+    groups.flatMap((group) => group.fields).map((field) => [field.spec.key, field.value]),
+  )
+
+  return (
+    <Accordion value={open} onValueChange={onOpenChange} className={accordionRootClass}>
+      {groups.map((group) => (
+        <AccordionItem key={group.id} value={group.id} className={accordionItemClass}>
+          <GroupTrigger label={group.label} count={group.fields.length} />
+          <AccordionContent className='pb-4'>
+            <div className='grid grid-cols-2 gap-3'>
+              {group.fields.map((field) => (
+                <ConfigField
+                  key={field.spec.key}
+                  field={field}
+                  enabled={isFieldEnabled(field.spec, values)}
+                />
+              ))}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      ))}
+    </Accordion>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Overview — live state, quick to scan
+// ---------------------------------------------------------------------------
+
+function OverviewTab({
+  data,
+  totalMemoryBytes,
+  open,
+  onOpenChange,
+}: {
+  data: ProcessDescribe
   totalMemoryBytes: number | null
-  pathsOpen: boolean
-  onPathsOpenChange: (open: boolean) => void
-  logsOpen: boolean
-  onLogsOpenChange: (open: boolean) => void
-  logs: LogsEntry | undefined
+  open: string[]
+  onOpenChange: (open: string[]) => void
 }) {
   const { summary, describe, metrics } = data
   const metricEntries = Object.entries(metrics)
-  const pmId = summary.pm_id
-  const tail = logs?.tail ?? LOGS_DEFAULT_TAIL
-  const setTail = useProcessLogsStore((state) => state.setTail)
-  const refreshLogs = useProcessLogsStore((state) => state.refresh)
   const memoryShare = memorySharePercent(summary.memory, totalMemoryBytes)
+
+  const restarts = summary.restarts ?? 0
+  const unstable = summary.unstable_restarts ?? 0
+  const restartTone: Tone = unstable > 0 ? 'danger' : restarts > 0 ? 'warning' : 'default'
+  const cpuKnown = Number.isFinite(summary.cpu)
 
   return (
     <div className='space-y-5'>
-      {/* Live status — what the process is doing right now */}
+      <div className='grid grid-cols-2 gap-3'>
+        <StatTile label='Uptime' value={formatUptime(summary.uptime)} />
+        <StatTile
+          label='Restarts'
+          value={orDash(summary.restarts)}
+          sub={
+            summary.unstable_restarts !== null && summary.unstable_restarts !== undefined
+              ? `${summary.unstable_restarts} unstable`
+              : undefined
+          }
+          tone={restartTone}
+        />
+        <StatTile
+          label='CPU'
+          value={cpuKnown ? `${summary.cpu}%` : '—'}
+          progress={cpuKnown ? summary.cpu : null}
+        />
+        <StatTile
+          label='Memory'
+          value={formatBytes(summary.memory)}
+          sub={memoryShare === null ? undefined : formatPercent(memoryShare)}
+          progress={memoryShare}
+        />
+      </div>
+
       <section>
-        <div className='mb-2.5 flex items-center justify-between'>
-          <SectionLabel>Live status</SectionLabel>
-          <div className='flex gap-1.5'>
-            <FlagBadge label='autorestart' active={summary.autorestart ?? false} />
-            <FlagBadge label='watch' active={summary.watch} />
-          </div>
-        </div>
-        <div className='grid grid-cols-3 gap-3'>
-          <StatTile label='Uptime' value={formatUptime(summary.uptime)} />
-          <StatTile label='Restarts' value={orDash(summary.restarts)} />
-          <StatTile
-            label='Unstable restarts'
-            value={orDash(summary.unstable_restarts)}
-          />
-        </div>
-        <div className='mt-3 grid grid-cols-2 gap-3'>
-          <StatTile label='CPU' value={Number.isFinite(summary.cpu) ? `${summary.cpu}%` : '—'} />
-          <StatTile
-            label='Memory'
-            value={
-              memoryShare === null
-                ? formatBytes(summary.memory)
-                : `${formatBytes(summary.memory)} · ${formatPercent(memoryShare)}`
-            }
-          />
+        <SectionLabel>Behavior</SectionLabel>
+        <div className='flex gap-1.5'>
+          <FlagBadge label='autorestart' active={summary.autorestart ?? false} />
+          <FlagBadge label='watch' active={summary.watch} />
         </div>
       </section>
 
-      <Separator />
-
-      {/* Registration — Basic */}
-      <section>
-        <SectionLabel>Registration — Basic</SectionLabel>
-        <div className='space-y-0.5'>
-          {basicRegistrationFields(data).map((field) => (
-            <RegistrationRow key={field.spec.key} field={field} />
-          ))}
-        </div>
-      </section>
-
-      <Separator />
-
-      {/* Registration — Advanced: every catalog setting, grouped as in the form */}
-      <section>
-        <SectionLabel>Registration — Advanced</SectionLabel>
-        <div className='space-y-4'>
-          {ADVANCED_GROUPS.map((group) => (
-            <div key={group.id}>
-              <p className='mb-1 text-xs font-medium text-muted-foreground'>
-                {group.label}
-              </p>
-              <div className='space-y-0.5'>
-                {advancedRegistrationFields(group.id, data).map((field) => (
-                  <RegistrationRow key={field.spec.key} field={field} />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <Separator />
-
-      {/* Runtime — values with no registration field */}
       <section>
         <SectionLabel>Runtime</SectionLabel>
-        <div className='grid grid-cols-2 gap-x-6'>
-          {describe.node_version !== null && (
-            <KeyValueRow label='Node version' value={describe.node_version} />
-          )}
-          {describe.node_env !== null && (
-            <KeyValueRow label='Node env' value={describe.node_env} />
-          )}
-          {describe.version !== null && (
-            <KeyValueRow label='App version' value={describe.version} />
-          )}
-          <KeyValueRow label='IP address' value={summary.ip_address} />
-        </div>
+        {describe.node_version !== null && (
+          <KeyValueRow label='Node version' value={describe.node_version} />
+        )}
+        {describe.node_env !== null && <KeyValueRow label='Node env' value={describe.node_env} />}
+        {describe.version !== null && <KeyValueRow label='App version' value={describe.version} />}
+        <KeyValueRow label='IP address' value={summary.ip_address} />
         <KeyValueRow label='Created' value={describe.created_at} />
       </section>
 
-      <Separator />
-
-      {/* Custom metrics — raw pmx probes, mirroring pm2 describe/monit */}
-      <section>
-        <SectionLabel>Custom metrics</SectionLabel>
-        {metricEntries.length > 0 ? (
-          <div className='grid grid-cols-2 gap-x-6'>
-            {metricEntries.map(([key, metric]) => (
-              <KeyValueRow key={key} label={key} value={formatMetricValue(metric)} />
-            ))}
-          </div>
-        ) : (
-          <p className='text-sm text-muted-foreground'>No custom metrics</p>
-        )}
-      </section>
-
-      <Separator />
-
-      {/* Paths and logs — collapsed by default, low priority during triage */}
-      <Accordion
-        value={pathsOpen ? ['paths-and-logs'] : []}
-        onValueChange={(value) => onPathsOpenChange(value.includes('paths-and-logs'))}
-        className='rounded-none border-0'
-      >
-        <AccordionItem
-          value='paths-and-logs'
-          className='border-0 data-open:bg-transparent'
-        >
-          <AccordionTrigger className='p-0 hover:no-underline'>
-            <SectionLabel>Paths and Commands</SectionLabel>
-          </AccordionTrigger>
-          <AccordionContent className='-mx-2 space-y-1 pt-1 pb-0'>
-            <PathRow label='out log' value={truncatePath(describe.out_log_path)} />
-            <PathRow label='error log' value={truncatePath(describe.error_log_path)} />
-            <PathRow label='pid file' value={truncatePath(describe.pid_path)} />
-            {describe.entire_log_path && (
-              <PathRow label='entire log path' value={truncatePath(describe.entire_log_path)} />
-            )}
-          </AccordionContent>
-        </AccordionItem>
-      </Accordion>
-
-      {/* Logs — merged out/error timeline, collapsed by default */}
-      <Accordion
-        value={logsOpen ? ['logs'] : []}
-        onValueChange={(value) => onLogsOpenChange(value.includes('logs'))}
-        className='rounded-none border-0'
-      >
-        <AccordionItem value='logs' className='border-0 data-open:bg-transparent'>
-          <AccordionTrigger className='p-0 hover:no-underline'>
-            <SectionLabel>Logs</SectionLabel>
-          </AccordionTrigger>
-          <AccordionContent className='-mx-2 pt-1 pb-0'>
-            <div className='mb-2 flex items-center justify-between gap-2'>
-              <div className='flex items-center gap-2'>
-                <span className='text-xs text-muted-foreground'>Rows</span>
-                <Select
-                  value={String(tail)}
-                  onValueChange={(value) => void setTail(server, pmId, Number(value))}
-                >
-                  <SelectTrigger size='sm' className='w-20'>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {LOGS_TAIL_OPTIONS.map((option) => (
-                      <SelectItem key={option} value={String(option)}>
-                        {option}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+      <Accordion value={open} onValueChange={onOpenChange} className={accordionRootClass}>
+        <AccordionItem value='metrics' className={accordionItemClass}>
+          <GroupTrigger
+            label='Custom metrics'
+            count={metricEntries.length > 0 ? metricEntries.length : 'none'}
+          />
+          <AccordionContent className='pb-4'>
+            {metricEntries.length > 0 ? (
+              <div className='grid grid-cols-2 gap-x-6'>
+                {metricEntries.map(([key, metric]) => (
+                  <KeyValueRow key={key} label={key} value={formatMetricValue(metric)} />
+                ))}
               </div>
-              <Button
-                type='button'
-                variant='ghost'
-                size='icon-sm'
-                aria-label='Refresh logs'
-                title='Refresh logs'
-                disabled={logs?.refreshing}
-                onClick={() => void refreshLogs(server, pmId)}
-              >
-                <RefreshCw
-                  strokeWidth={2}
-                  className={cn(logs?.refreshing && 'animate-spin')}
-                />
-              </Button>
-            </div>
-
-            {!logs || logs.status === 'loading' ? (
-              <div className='flex items-center gap-2 py-4 text-xs text-muted-foreground'>
-                <Spinner className='size-4' />
-                Loading logs…
-              </div>
-            ) : logs.status === 'error' && logs.lines.length === 0 ? (
-              logs.requestError ? (
-                <ErrorAlert
-                  error={logs.requestError}
-                  onRetry={() => void refreshLogs(server, pmId)}
-                />
-              ) : null
-            ) : logs.lines.length === 0 ? (
-              <p className='py-2 text-xs text-muted-foreground'>No logs</p>
             ) : (
-              <ScrollArea className='max-h-72 rounded-md border bg-muted/30 **:data-[slot=scroll-area-viewport]:max-h-72'>
-                <div className='p-2'>
-                  {logs.lines.map((line) => (
-                    <div key={line.id} className='flex gap-2 py-0.5 font-mono text-xs'>
-                      <span
-                        className='shrink-0 tabular-nums text-muted-foreground'
-                        title={line.timestamp ?? undefined}
-                      >
-                        {formatLogTimestamp(line.timestamp)}
-                      </span>
-                      <span
-                        className={cn(
-                          'shrink-0 font-medium uppercase',
-                          line.stream === 'error'
-                            ? 'text-destructive'
-                            : 'text-muted-foreground',
-                        )}
-                      >
-                        {line.stream === 'error' ? 'err' : 'out'}
-                      </span>
-                      <span
-                        className={cn(
-                          'min-w-0 whitespace-pre-wrap break-all',
-                          line.stream === 'error' && 'text-destructive',
-                        )}
-                      >
-                        {line.message}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
+              <p className='text-sm text-muted-foreground'>No custom metrics</p>
+            )}
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value='paths' className={cn(accordionItemClass, 'border-b')}>
+          <GroupTrigger label='Paths' count={describe.entire_log_path ? 4 : 3} />
+          <AccordionContent className='space-y-2.5 pb-4'>
+            <StackedField label='Out log' value={describe.out_log_path} />
+            <StackedField label='Error log' value={describe.error_log_path} />
+            <StackedField label='PID file' value={describe.pid_path} />
+            {describe.entire_log_path && (
+              <StackedField label='Entire log path' value={describe.entire_log_path} />
             )}
           </AccordionContent>
         </AccordionItem>
       </Accordion>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Logs — merged out/error timeline
+// ---------------------------------------------------------------------------
+
+type StreamFilter = 'all' | 'error'
+
+function LogsTab({
+  server,
+  pmId,
+  logs,
+}: {
+  server: RegisteredServer
+  pmId: number
+  logs: LogsEntry | undefined
+}) {
+  const [filter, setFilter] = useState<StreamFilter>('all')
+  const tail = logs?.tail ?? LOGS_DEFAULT_TAIL
+  const setTail = useProcessLogsStore((state) => state.setTail)
+  const refreshLogs = useProcessLogsStore((state) => state.refresh)
+
+  const lines = logs?.lines ?? []
+  const errorCount = lines.filter((line) => line.stream === 'error').length
+  const visible = filter === 'error' ? lines.filter((line) => line.stream === 'error') : lines
+
+  return (
+    <div>
+      <div className='mb-2 flex items-center justify-between gap-2'>
+        <div className='flex items-center gap-2'>
+          <span className='text-xs text-muted-foreground'>Rows</span>
+          <Select
+            value={String(tail)}
+            onValueChange={(value) => void setTail(server, pmId, Number(value))}
+          >
+            <SelectTrigger size='sm' className='w-20'>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {LOGS_TAIL_OPTIONS.map((option) => (
+                <SelectItem key={option} value={String(option)}>
+                  {option}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <div className='flex gap-0.5 rounded-md bg-muted/50 p-0.5'>
+            <Button
+              type='button'
+              size='sm'
+              variant={filter === 'all' ? 'secondary' : 'ghost'}
+              className='h-6 px-2.5 text-xs'
+              onClick={() => setFilter('all')}
+            >
+              All
+            </Button>
+            <Button
+              type='button'
+              size='sm'
+              variant={filter === 'error' ? 'secondary' : 'ghost'}
+              className='h-6 px-2.5 text-xs'
+              onClick={() => setFilter('error')}
+            >
+              Errors{errorCount > 0 && ` ${errorCount}`}
+            </Button>
+          </div>
+        </div>
+        <Button
+          type='button'
+          variant='ghost'
+          size='icon-sm'
+          aria-label='Refresh logs'
+          title='Refresh logs'
+          disabled={logs?.refreshing}
+          onClick={() => void refreshLogs(server, pmId)}
+        >
+          <RefreshCw strokeWidth={2} className={cn(logs?.refreshing && 'animate-spin')} />
+        </Button>
+      </div>
+
+      {!logs || logs.status === 'loading' ? (
+        <div className='flex items-center gap-2 py-4 text-xs text-muted-foreground'>
+          <Spinner className='size-4' />
+          Loading logs…
+        </div>
+      ) : logs.status === 'error' && logs.lines.length === 0 ? (
+        logs.requestError ? (
+          <ErrorAlert error={logs.requestError} onRetry={() => void refreshLogs(server, pmId)} />
+        ) : null
+      ) : logs.lines.length === 0 ? (
+        <p className='py-2 text-xs text-muted-foreground'>No logs</p>
+      ) : visible.length === 0 ? (
+        <p className='py-2 text-xs text-muted-foreground'>
+          No errors in the last {lines.length} lines
+        </p>
+      ) : (
+        <>
+          <ScrollArea className='max-h-96 rounded-md border bg-muted/30 **:data-[slot=scroll-area-viewport]:max-h-96'>
+            <div className='p-2'>
+              {visible.map((line) => (
+                <div key={line.id} className='flex gap-2 py-0.5 font-mono text-xs'>
+                  <span
+                    className='shrink-0 tabular-nums text-muted-foreground'
+                    title={line.timestamp ?? undefined}
+                  >
+                    {formatLogTimestamp(line.timestamp)}
+                  </span>
+                  <span
+                    className={cn(
+                      'w-6 shrink-0 font-medium',
+                      line.stream === 'error' ? 'text-destructive' : 'text-muted-foreground',
+                    )}
+                  >
+                    {line.stream === 'error' ? 'err' : 'out'}
+                  </span>
+                  <span
+                    className={cn(
+                      'min-w-0 whitespace-pre-wrap break-all',
+                      line.stream === 'error' && 'text-destructive',
+                    )}
+                  >
+                    {line.message}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+          <p className='mt-2 text-xs text-muted-foreground'>
+            Showing {visible.length} of {lines.length} lines
+          </p>
+        </>
+      )}
     </div>
   )
 }
@@ -477,9 +651,41 @@ type ProcessDetailsProps = {
   logs: LogsEntry | undefined
 }
 
+/** Loading / error / ready states for tabs that depend on the describe payload. */
+function WithDescribe({
+  describe,
+  children,
+}: {
+  describe: ProcessDetailsProps['describe']
+  children: (data: ProcessDescribe) => React.ReactNode
+}) {
+  if (describe.status === 'loading') {
+    return (
+      <div className='flex items-center justify-center gap-2 py-8 text-muted-foreground'>
+        <Spinner className='size-4' />
+        Loading details…
+      </div>
+    )
+  }
+  if (describe.status === 'error' && describe.requestError) {
+    return <ErrorAlert error={describe.requestError} onRetry={describe.retry} />
+  }
+  if (describe.status === 'success' && describe.data) return <>{children(describe.data)}</>
+  return null
+}
+
+function IdentityTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className='rounded-lg bg-muted/50 p-3'>
+      <p className='text-xs text-muted-foreground'>{label}</p>
+      <p className='mt-0.5 truncate font-mono text-sm font-medium'>{value}</p>
+    </div>
+  )
+}
+
 /**
- * Identity tiles plus the process detail body. The Paths/Logs accordion state
- * is internal; remount the component with a per-process `key` to reset it.
+ * Identity tiles plus Overview / Config / Logs tabs. Tab and accordion state is
+ * internal; remount the component with a per-process `key` to reset it.
  */
 export function ProcessDetails({
   server,
@@ -488,68 +694,60 @@ export function ProcessDetails({
   totalMemoryBytes,
   logs,
 }: ProcessDetailsProps) {
-  const [pathsOpen, setPathsOpen] = useState(false)
-  const [logsOpen, setLogsOpen] = useState(false)
+  const [tab, setTab] = useState<TabValue>('overview')
+  const [overviewOpen, setOverviewOpen] = useState<string[]>(DEFAULT_OVERVIEW_OPEN)
+  const [configOpen, setConfigOpen] = useState<string[]>(DEFAULT_CONFIG_OPEN)
   const loadLogs = useProcessLogsStore((state) => state.load)
 
-  // Fetch logs when the Logs accordion opens (the store serves the in-memory
+  // Fetch logs when the Logs tab opens (the store serves the in-memory
   // timeline first and only refetches when it is stale).
   useEffect(() => {
-    if (!logsOpen) return
+    if (tab !== 'logs') return
     void loadLogs(server, process.pm_id)
-  }, [logsOpen, server, process.pm_id, loadLogs])
+  }, [tab, server, process.pm_id, loadLogs])
 
   return (
     <div className='px-6 pb-6'>
       <div className='grid grid-cols-2 gap-3'>
-        <div className='rounded-lg bg-muted/50 p-3'>
-          <p className='text-xs text-muted-foreground'>Server</p>
-          <p className='mt-0.5 truncate font-mono text-sm font-medium'>
-            {orDash(server.server)}
-          </p>
-        </div>
-        <div className='rounded-lg bg-muted/50 p-3'>
-          <p className='text-xs text-muted-foreground'>Host</p>
-          <p className='mt-0.5 truncate font-mono text-sm font-medium'>
-            {server.host}:{server.port}
-          </p>
-        </div>
-        <div className='rounded-lg bg-muted/50 p-3'>
-          <p className='text-xs text-muted-foreground'>PID</p>
-          <p className='mt-0.5 truncate font-mono text-sm font-medium'>
-            {orDash(process.pid)}
-          </p>
-        </div>
-        <div className='rounded-lg bg-muted/50 p-3'>
-          <p className='text-xs text-muted-foreground'>PM ID</p>
-          <p className='mt-0.5 truncate font-mono text-sm font-medium'>
-            {orDash(process.pm_id)}
-          </p>
-        </div>
+        <IdentityTile label='Server' value={orDash(server.server)} />
+        <IdentityTile label='Host' value={`${server.host}:${server.port}`} />
+        <IdentityTile label='PID' value={orDash(process.pid)} />
+        <IdentityTile label='PM ID' value={orDash(process.pm_id)} />
       </div>
       <Separator className='my-5' />
 
-      {describe.status === 'loading' && (
-        <div className='flex items-center justify-center gap-2 py-8 text-muted-foreground'>
-          <Spinner className='size-4' />
-          Loading details…
-        </div>
-      )}
-      {describe.status === 'error' && describe.requestError && (
-        <ErrorAlert error={describe.requestError} onRetry={describe.retry} />
-      )}
-      {describe.status === 'success' && describe.data && (
-        <ProcessDetailsBody
-          data={describe.data}
-          server={server}
-          totalMemoryBytes={totalMemoryBytes}
-          pathsOpen={pathsOpen}
-          onPathsOpenChange={setPathsOpen}
-          logsOpen={logsOpen}
-          onLogsOpenChange={setLogsOpen}
-          logs={logs}
-        />
-      )}
+      <Tabs value={tab} onValueChange={(value) => setTab(value as TabValue)}>
+        <TabsList variant='line' className='w-full justify-start'>
+          <TabsTrigger value='overview'>Overview</TabsTrigger>
+          <TabsTrigger value='config'>Config</TabsTrigger>
+          <TabsTrigger value='logs'>Logs</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value='overview' className='pt-4'>
+          <WithDescribe describe={describe}>
+            {(data) => (
+              <OverviewTab
+                data={data}
+                totalMemoryBytes={totalMemoryBytes}
+                open={overviewOpen}
+                onOpenChange={setOverviewOpen}
+              />
+            )}
+          </WithDescribe>
+        </TabsContent>
+
+        <TabsContent value='config' className='pt-2'>
+          <WithDescribe describe={describe}>
+            {(data) => (
+              <ConfigTab data={data} open={configOpen} onOpenChange={setConfigOpen} />
+            )}
+          </WithDescribe>
+        </TabsContent>
+
+        <TabsContent value='logs' className='pt-4'>
+          <LogsTab server={server} pmId={process.pm_id} logs={logs} />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
