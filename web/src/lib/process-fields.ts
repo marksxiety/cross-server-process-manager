@@ -327,6 +327,17 @@ export function advancedGroupFields(group: AdvancedGroupId): ProcessFieldSpec[] 
     );
 }
 
+/** Keys that need the full row width even though their type is narrow. */
+const WIDE_FIELD_KEYS = new Set(["cwd", "interpreter", "script", "cron_restart"]);
+
+/**
+ * True when a field's value needs the full row width. Shared by the register
+ * form and the read-only details view so both lay fields out the same way.
+ */
+export function isWideField(spec: ProcessFieldSpec): boolean {
+    return spec.type === "array" || spec.type === "object" || WIDE_FIELD_KEYS.has(spec.key);
+}
+
 /**
  * Real, sendable starting values: every catalog field that carries a PM2
  * default. The form seeds these so the controls, the payload preview and what
