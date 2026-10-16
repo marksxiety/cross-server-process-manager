@@ -33,7 +33,7 @@ import {
   isFieldEnabled,
 } from '@/lib/process-fields'
 import { cn } from '@/lib/utils'
-import type { ProcessFieldSpec } from '@/lib/process-fields'
+import { isWideField, type ProcessFieldSpec } from '@/lib/process-fields'
 import type { TemplateValues } from '@/types/template'
 
 interface ProcessFormProps {
@@ -41,12 +41,6 @@ interface ProcessFormProps {
   values: TemplateValues
   errors?: Record<string, string>
   onChange: (key: string, value: unknown) => void
-}
-
-const WIDE_FIELD_KEYS = new Set(['cwd', 'interpreter', 'script', 'cron_restart'])
-
-function isWideField(spec: ProcessFieldSpec): boolean {
-  return spec.type === 'array' || spec.type === 'object' || WIDE_FIELD_KEYS.has(spec.key)
 }
 
 function typeTag(spec: ProcessFieldSpec): string {
