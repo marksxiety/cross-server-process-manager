@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/accordion'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Progress } from '@/components/ui/progress'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Select,
@@ -42,7 +43,7 @@ import {
   type RegistrationField,
 } from '@/lib/process-registration'
 import { getStatusVisual } from '@/lib/status-styles'
-import { toneSurfaceClasses } from '@/lib/status-tone'
+import { percentTone, toneProgressClasses, toneSurfaceClasses } from '@/lib/status-tone'
 import { cn } from '@/lib/utils'
 import {
   LOGS_DEFAULT_TAIL,
@@ -137,12 +138,13 @@ function StatTile({
         {sub && <span className='text-xs font-normal opacity-80'>{sub}</span>}
       </p>
       {progress !== null && progress !== undefined && (
-        <div className='mt-2 h-0.5 overflow-hidden rounded-full bg-foreground/10'>
-          <div
-            className='h-full rounded-full bg-foreground/40'
-            style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
-          />
-        </div>
+        <Progress
+          value={Math.min(100, Math.max(0, progress))}
+          className={cn(
+            'mt-2.5 **:data-[slot=progress-track]:h-1 **:data-[slot=progress-indicator]:min-w-1',
+            toneProgressClasses[percentTone(progress)],
+          )}
+        />
       )}
     </div>
   )
@@ -411,44 +413,38 @@ function OverviewTab({
   const { summary, describe, metrics } = data
   const metricEntries = Object.entries(metrics)
   const memoryShare = memorySharePercent(summary.memory, totalMemoryBytes)
-
-  const restarts = summary.restarts ?? 0
-  const unstable = summary.unstable_restarts ?? 0
-  const restartTone: Tone = unstable > 0 ? 'danger' : restarts > 0 ? 'warning' : 'default'
   const cpuKnown = Number.isFinite(summary.cpu)
 
   return (
     <div className='space-y-5'>
-      <div className='grid grid-cols-2 gap-3'>
-        <StatTile label='Uptime' value={formatUptime(summary.uptime)} />
-        <StatTile
-          label='Restarts'
-          value={orDash(summary.restarts)}
-          sub={
-            summary.unstable_restarts !== null && summary.unstable_restarts !== undefined
-              ? `${summary.unstable_restarts} unstable`
-              : undefined
-          }
-          tone={restartTone}
-        />
-        <StatTile
-          label='CPU'
-          value={cpuKnown ? `${summary.cpu}%` : '—'}
-          progress={cpuKnown ? summary.cpu : null}
-        />
-        <StatTile
-          label='Memory'
-          value={formatBytes(summary.memory)}
-          sub={memoryShare === null ? undefined : formatPercent(memoryShare)}
-          progress={memoryShare}
-        />
-      </div>
-
       <section>
-        <SectionLabel>Behavior</SectionLabel>
-        <div className='flex gap-1.5'>
-          <FlagBadge label='autorestart' active={summary.autorestart ?? false} />
-          <FlagBadge label='watch' active={summary.watch} />
+        <div className='mb-2.5 flex items-center justify-between'>
+          <SectionLabel>Live status</SectionLabel>
+          <div className='flex gap-1.5'>
+            <FlagBadge label='autorestart' active={summary.autorestart ?? false} />
+            <FlagBadge label='watch' active={summary.watch} />
+          </div>
+        </div>
+        <div className='grid grid-cols-3 gap-3'>
+          <StatTile label='Uptime' value={formatUptime(summary.uptime)} />
+          <StatTile label='Restarts' value={orDash(summary.restarts)} />
+          <StatTile
+            label='Unstable restarts'
+            value={orDash(summary.unstable_restarts)}
+          />
+        </div>
+        <div className='mt-3 grid grid-cols-2 gap-3'>
+          <StatTile
+            label='CPU'
+            value={cpuKnown ? `${summary.cpu}%` : '—'}
+            progress={cpuKnown ? summary.cpu : null}
+          />
+          <StatTile
+            label='Memory'
+            value={formatBytes(summary.memory)}
+            sub={memoryShare === null ? undefined : formatPercent(memoryShare)}
+            progress={memoryShare}
+          />
         </div>
       </section>
 
