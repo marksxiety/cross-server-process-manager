@@ -10,6 +10,7 @@ import {
   clearDisabledValues,
   createDefaultValues,
   isFieldEnabled,
+  isWideField,
   validateRegisterValues,
 } from '@/lib/process-fields'
 
@@ -82,6 +83,18 @@ describe('process field catalog', () => {
     expect(catalogField('watch_delay')?.type).toBe('duration')
     expect(catalogField('script')?.required).toBe(true)
     expect(catalogField('not-a-field')).toBeUndefined()
+  })
+
+  it('flags fields that need the full row width', () => {
+    expect(isWideField(catalogField('script')!)).toBe(true)
+    expect(isWideField(catalogField('cwd')!)).toBe(true)
+    expect(isWideField(catalogField('interpreter')!)).toBe(true)
+    expect(isWideField(catalogField('cron_restart')!)).toBe(true)
+    expect(isWideField(catalogField('args')!)).toBe(true)
+    expect(isWideField(catalogField('env')!)).toBe(true)
+    expect(isWideField(catalogField('name')!)).toBe(false)
+    expect(isWideField(catalogField('max_restarts')!)).toBe(false)
+    expect(isWideField(catalogField('windowsHide')!)).toBe(false)
   })
 
   it('dims dependent fields until their toggle is set', () => {
