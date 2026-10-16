@@ -9,7 +9,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { StatusDot } from '@/components/custom/status-dot'
-import { formatBytes } from '@/lib/format'
+import { formatBytes, formatPercent, memorySharePercent } from '@/lib/format'
 import { getStatusVisual } from '@/lib/status-styles'
 import { cn } from '@/lib/utils'
 import type { ProcessSummary } from '@/types/process'
@@ -17,11 +17,19 @@ import type { ProcessSummary } from '@/types/process'
 type ProcessCardProps = {
   process: ProcessSummary
   serverLabel?: string
+  /** Total RAM of the process's host, when known; enables the memory share %. */
+  totalMemoryBytes?: number | null
   onSelect?: () => void
 }
 
-export function ProcessCard({ process, serverLabel, onSelect }: ProcessCardProps) {
+export function ProcessCard({
+  process,
+  serverLabel,
+  totalMemoryBytes,
+  onSelect,
+}: ProcessCardProps) {
   const visual = getStatusVisual(process)
+  const memoryShare = memorySharePercent(process.memory, totalMemoryBytes)
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'Enter' || event.key === ' ') {
@@ -74,7 +82,10 @@ export function ProcessCard({ process, serverLabel, onSelect }: ProcessCardProps
 
       <CardContent className='flex items-center justify-between text-xs tabular-nums text-muted-foreground'>
         <span>CPU {process.cpu}%</span>
-        <span>{formatBytes(process.memory)}</span>
+        <span>
+          {formatBytes(process.memory)}
+          {memoryShare !== null && ` (${formatPercent(memoryShare)})`}
+        </span>
       </CardContent>
     </Card>
   )
