@@ -82,6 +82,28 @@ export function formatBytes(bytes: number, precision = 1): string {
 }
 
 /**
+ * Share of a whole in percent, e.g. a process's memory against the host's
+ * total RAM. Returns null when the total is missing or not a usable positive
+ * number, so callers can omit the percentage instead of showing nonsense.
+ */
+export function memorySharePercent(
+  usedBytes: number | null | undefined,
+  totalBytes: number | null | undefined,
+): number | null {
+  if (typeof usedBytes !== 'number' || !Number.isFinite(usedBytes)) return null
+  if (typeof totalBytes !== 'number' || !Number.isFinite(totalBytes) || totalBytes <= 0) {
+    return null
+  }
+  return (usedBytes / totalBytes) * 100
+}
+
+/** Formats a percentage with fixed decimals (e.g. "2.51%"); em dash when not finite. */
+export function formatPercent(value: number | null | undefined, digits = 2): string {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return EMPTY_VALUE
+  return `${value.toFixed(digits)}%`
+}
+
+/**
  * Mirrors how PM2 joins script/interpreter args in `pm2 describe` (space
  * separated) while tolerating the agent's `string | string[]` union.
  */
