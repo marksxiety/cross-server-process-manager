@@ -519,8 +519,8 @@ function LogsTab({
   const visible = filter === 'error' ? lines.filter((line) => line.stream === 'error') : lines
 
   return (
-    <div>
-      <div className='mb-2 flex items-center justify-between gap-2'>
+    <div className='flex h-full min-h-0 flex-col'>
+      <div className='mb-2 flex shrink-0 items-center justify-between gap-2'>
         <div className='flex items-center gap-2'>
           <span className='text-xs text-muted-foreground'>Rows</span>
           <Select
@@ -559,70 +559,76 @@ function LogsTab({
             </Button>
           </div>
         </div>
-        <Button
-          type='button'
-          variant='ghost'
-          size='icon-sm'
-          aria-label='Refresh logs'
-          title='Refresh logs'
-          disabled={logs?.refreshing}
-          onClick={() => void refreshLogs(server, pmId)}
-        >
-          <RefreshCw strokeWidth={2} className={cn(logs?.refreshing && 'animate-spin')} />
-        </Button>
+        <div className='flex items-center gap-2'>
+          {logs && logs.status !== 'loading' && visible.length > 0 && (
+            <span className='text-xs whitespace-nowrap text-muted-foreground'>
+              Showing {visible.length} of {lines.length} lines
+            </span>
+          )}
+          <Button
+            type='button'
+            variant='ghost'
+            size='icon-sm'
+            aria-label='Refresh logs'
+            title='Refresh logs'
+            disabled={logs?.refreshing}
+            onClick={() => void refreshLogs(server, pmId)}
+          >
+            <RefreshCw strokeWidth={2} className={cn(logs?.refreshing && 'animate-spin')} />
+          </Button>
+        </div>
       </div>
 
       {!logs || logs.status === 'loading' ? (
-        <div className='flex items-center gap-2 py-4 text-xs text-muted-foreground'>
+        <div className='flex flex-1 items-center justify-center gap-2 text-xs text-muted-foreground'>
           <Spinner className='size-4' />
           Loading logs…
         </div>
-      ) : logs.status === 'error' && logs.lines.length === 0 ? (
+      ) : logs.status === 'error' && lines.length === 0 ? (
         logs.requestError ? (
-          <ErrorAlert error={logs.requestError} onRetry={() => void refreshLogs(server, pmId)} />
+          <div className='flex flex-1 items-center'>
+            <ErrorAlert error={logs.requestError} onRetry={() => void refreshLogs(server, pmId)} />
+          </div>
         ) : null
-      ) : logs.lines.length === 0 ? (
-        <p className='py-2 text-xs text-muted-foreground'>No logs</p>
+      ) : lines.length === 0 ? (
+        <p className='flex flex-1 items-center justify-center text-xs text-muted-foreground'>
+          No logs
+        </p>
       ) : visible.length === 0 ? (
-        <p className='py-2 text-xs text-muted-foreground'>
+        <p className='flex flex-1 items-center justify-center text-xs text-muted-foreground'>
           No errors in the last {lines.length} lines
         </p>
       ) : (
-        <>
-          <ScrollArea className='max-h-96 rounded-md border bg-muted/30 **:data-[slot=scroll-area-viewport]:max-h-96'>
-            <div className='p-2'>
-              {visible.map((line) => (
-                <div key={line.id} className='flex gap-2 py-0.5 font-mono text-xs'>
-                  <span
-                    className='shrink-0 tabular-nums text-muted-foreground'
-                    title={line.timestamp ?? undefined}
-                  >
-                    {formatLogTimestamp(line.timestamp)}
-                  </span>
-                  <span
-                    className={cn(
-                      'w-6 shrink-0 font-medium',
-                      line.stream === 'error' ? 'text-destructive' : 'text-muted-foreground',
-                    )}
-                  >
-                    {line.stream === 'error' ? 'err' : 'out'}
-                  </span>
-                  <span
-                    className={cn(
-                      'min-w-0 whitespace-pre-wrap break-all',
-                      line.stream === 'error' && 'text-destructive',
-                    )}
-                  >
-                    {line.message}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </ScrollArea>
-          <p className='mt-2 text-xs text-muted-foreground'>
-            Showing {visible.length} of {lines.length} lines
-          </p>
-        </>
+        <ScrollArea className='min-h-0 flex-1 rounded-md border bg-muted/30'>
+          <div className='p-2'>
+            {visible.map((line) => (
+              <div key={line.id} className='flex gap-2 py-0.5 font-mono text-xs'>
+                <span
+                  className='shrink-0 tabular-nums text-muted-foreground'
+                  title={line.timestamp ?? undefined}
+                >
+                  {formatLogTimestamp(line.timestamp)}
+                </span>
+                <span
+                  className={cn(
+                    'w-6 shrink-0 font-medium',
+                    line.stream === 'error' ? 'text-destructive' : 'text-muted-foreground',
+                  )}
+                >
+                  {line.stream === 'error' ? 'err' : 'out'}
+                </span>
+                <span
+                  className={cn(
+                    'min-w-0 whitespace-pre-wrap break-all',
+                    line.stream === 'error' && 'text-destructive',
+                  )}
+                >
+                  {line.message}
+                </span>
+              </div>
+            ))}
+          </div>
+        </ScrollArea>
       )}
     </div>
   )
@@ -703,44 +709,52 @@ export function ProcessDetails({
   }, [tab, server, process.pm_id, loadLogs])
 
   return (
-    <div className='px-6 pb-6'>
-      <div className='grid grid-cols-2 gap-3'>
+    <div className='flex min-h-0 flex-1 flex-col px-6 pb-6'>
+      <div className='grid shrink-0 grid-cols-2 gap-3'>
         <IdentityTile label='Server' value={orDash(server.server)} />
         <IdentityTile label='Host' value={`${server.host}:${server.port}`} />
         <IdentityTile label='PID' value={orDash(process.pid)} />
         <IdentityTile label='PM ID' value={orDash(process.pm_id)} />
       </div>
-      <Separator className='my-5' />
+      <Separator className='my-5 shrink-0' />
 
-      <Tabs value={tab} onValueChange={(value) => setTab(value as TabValue)}>
-        <TabsList variant='line' className='w-full justify-start'>
+      <Tabs
+        value={tab}
+        onValueChange={(value) => setTab(value as TabValue)}
+        className='min-h-0 flex-1'
+      >
+        <TabsList variant='line' className='w-full shrink-0 justify-start'>
           <TabsTrigger value='overview'>Overview</TabsTrigger>
           <TabsTrigger value='config'>Config</TabsTrigger>
           <TabsTrigger value='logs'>Logs</TabsTrigger>
         </TabsList>
 
-        <TabsContent value='overview' className='pt-4'>
-          <WithDescribe describe={describe}>
-            {(data) => (
-              <OverviewTab
-                data={data}
-                totalMemoryBytes={totalMemoryBytes}
-                open={overviewOpen}
-                onOpenChange={setOverviewOpen}
-              />
-            )}
-          </WithDescribe>
+        <TabsContent value='overview' className='flex min-h-0 flex-1 flex-col pt-4'>
+          <ScrollArea className='min-h-0 flex-1'>
+            <WithDescribe describe={describe}>
+              {(data) => (
+                <OverviewTab
+                  data={data}
+                  totalMemoryBytes={totalMemoryBytes}
+                  open={overviewOpen}
+                  onOpenChange={setOverviewOpen}
+                />
+              )}
+            </WithDescribe>
+          </ScrollArea>
         </TabsContent>
 
-        <TabsContent value='config' className='pt-2'>
-          <WithDescribe describe={describe}>
-            {(data) => (
-              <ConfigTab data={data} open={configOpen} onOpenChange={setConfigOpen} />
-            )}
-          </WithDescribe>
+        <TabsContent value='config' className='flex min-h-0 flex-1 flex-col pt-2'>
+          <ScrollArea className='min-h-0 flex-1'>
+            <WithDescribe describe={describe}>
+              {(data) => (
+                <ConfigTab data={data} open={configOpen} onOpenChange={setConfigOpen} />
+              )}
+            </WithDescribe>
+          </ScrollArea>
         </TabsContent>
 
-        <TabsContent value='logs' className='pt-4'>
+        <TabsContent value='logs' className='flex min-h-0 flex-1 flex-col pt-4'>
           <LogsTab server={server} pmId={process.pm_id} logs={logs} />
         </TabsContent>
       </Tabs>
