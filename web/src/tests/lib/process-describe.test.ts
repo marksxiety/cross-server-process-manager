@@ -50,6 +50,13 @@ describe('normalizeProcessDescribe', () => {
         entire_log_path: 'C:\\logs\\combined.log',
         cron_restart: '*/5 * * * *',
         max_memory_restart: '500M',
+        max_restarts: 5,
+        min_uptime: 1000,
+        restart_delay: 0,
+        kill_timeout: 1600,
+        ignore_watch: ['logs', 'tmp'],
+        watch_delay: 100,
+        windowsHide: true,
       },
       metrics,
     }
@@ -78,6 +85,26 @@ describe('normalizeProcessDescribe', () => {
       version: '1.2.3',
       node_env: 'production',
     })
+  })
+
+  test('drops malformed optional describe values instead of guessing', () => {
+    const result = normalizeProcessDescribe({
+      summary,
+      describe: {
+        max_restarts: '5',
+        min_uptime: true,
+        ignore_watch: ['logs', 7],
+        windowsHide: 'true',
+        kill_timeout: 1600,
+      },
+      metrics: {},
+    })
+
+    expect(result?.describe.max_restarts).toBeUndefined()
+    expect(result?.describe.min_uptime).toBeUndefined()
+    expect(result?.describe.ignore_watch).toEqual(['logs'])
+    expect(result?.describe.windowsHide).toBeUndefined()
+    expect(result?.describe.kill_timeout).toBe(1600)
   })
 
   test('adapts the legacy summary array payload', () => {
