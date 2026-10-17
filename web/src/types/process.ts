@@ -30,6 +30,32 @@ export type ProcessCommandTarget = Pick<
 
 export type LogStreamType = "both" | "output" | "error";
 
+export type LogClearStream = "all" | "out" | "err";
+export type LogClearScope = "active" | "rotated" | "all";
+
+export interface ProcessLogSize {
+    out?: number;
+    error?: number;
+}
+
+export interface RotatedLogsCleared {
+    count: number;
+    bytesFreed: number;
+}
+
+export interface ProcessLogsClearResult {
+    pm_id: number;
+    name: string;
+    stream: LogClearStream;
+    scope: LogClearScope;
+    truncated: ProcessLogSize;
+    deleted: {
+        out?: RotatedLogsCleared;
+        error?: RotatedLogsCleared;
+    };
+    bytesFreed: number;
+}
+
 export interface StartIssue {
     field: string;
     message: string;
@@ -65,6 +91,7 @@ export type LogStream = "out" | "error";
 export interface ProcessLogs {
     out?: string[];
     error?: string[];
+    size?: ProcessLogSize;
 }
 
 export interface ProcessLogLine {
