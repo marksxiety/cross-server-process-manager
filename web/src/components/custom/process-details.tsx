@@ -374,7 +374,7 @@ function ConfigTab({
   )
 
   return (
-    <Accordion value={open} onValueChange={onOpenChange} className={accordionRootClass}>
+    <Accordion value={open} onValueChange={onOpenChange} className={cn(accordionRootClass, 'p-4')}>
       {groups.map((group) => (
         <AccordionItem key={group.id} value={group.id} className={accordionItemClass}>
           <GroupTrigger label={group.label} count={group.fields.length} />
@@ -416,7 +416,7 @@ function OverviewTab({
   const cpuKnown = Number.isFinite(summary.cpu)
 
   return (
-    <div className='space-y-5'>
+    <div className='space-y-5 p-4'>
       <section>
         <div className='mb-2.5 flex items-center justify-between'>
           <SectionLabel>Live status</SectionLabel>
@@ -519,7 +519,7 @@ function LogsTab({
   const visible = filter === 'error' ? lines.filter((line) => line.stream === 'error') : lines
 
   return (
-    <div className='flex h-full min-h-0 flex-col'>
+    <div className='flex h-full min-h-0 flex-col my-4'>
       <div className='mb-2 flex shrink-0 items-center justify-between gap-2'>
         <div className='flex items-center gap-2'>
           <span className='text-xs text-muted-foreground'>Rows</span>
