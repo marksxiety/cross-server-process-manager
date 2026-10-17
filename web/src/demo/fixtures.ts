@@ -1,8 +1,11 @@
 import type { ApiResponse } from "@/types/api";
 import type {
+    LogClearScope,
+    LogClearStream,
     ProcessDescribe,
     ProcessDescribeDetails,
     ProcessLogs,
+    ProcessLogsClearResult,
     ProcessStatus,
     ProcessSummary,
 } from "@/types/process";
@@ -470,12 +473,25 @@ function genericLogs(summary: ProcessSummary): ProcessLogs {
     return { out, error };
 }
 
-function logsFor(summary: ProcessSummary, tail: number): ProcessLogs {
+/**
+ * Demo-only bookkeeping so a flush performed in the UI is reflected by the
+ * later `GET /pm2/logs` calls, just like a real agent would.
+ */
+const CLEARED_LOG_STREAMS = new Set<string>();
+
+function clearedLogKey(agentKey: string, pmId: number, stream: "out" | "error"): string {
+    return `${agentKey}:${pmId}:${stream}`;
+}
+
+function logsFor(agentKey: string, summary: ProcessSummary, tail: number): ProcessLogs {
     const template = LOG_TEMPLATES[summary.name] ?? genericLogs(summary);
-    return {
-        out: template.out?.slice(-tail) ?? [],
-        error: template.error?.slice(-tail) ?? [],
-    };
+    const out = CLEARED_LOG_STREAMS.has(clearedLogKey(agentKey, summary.pm_id, "out"))
+        ? []
+        : template.out ?? [];
+    const error = CLEARED_LOG_STREAMS.has(clearedLogKey(agentKey, summary.pm_id, "error"))
+        ? []
+        : template.error ?? [];
+    return { out: out.slice(-tail), error: error.slice(-tail) };
 }
 
 function describeFor(summary: ProcessSummary): ProcessDescribe {
@@ -523,8 +539,38 @@ export function resolveFixture(endpoint: string, method: string): ApiResponse<un
         return ok(FIXTURE_SERVERS, "Servers retrieved");
     }
 
-    const agent = AGENTS[`${url.hostname}:${url.port}`];
-    if (agent === undefined || method !== "GET") return null;
+    const agentKey = `${url.hostname}:${url.port}`;
+    const agent = AGENTS[agentKey];
+    if (agent === undefined) return null;
+
+    if (method === "DELETE") {
+        const clearMatch = /^\/pm2\/logs\/(\d+)$/.exec(url.pathname);
+        if (!clearMatch) return null;
+        const pmId = Number(clearMatch[1]);
+        const summary = agent.processes.find((process) => process.pm_id === pmId);
+        if (!summary) return null;
+        const stream = (url.searchParams.get("stream") ?? "all") as LogClearStream;
+        const scope = (url.searchParams.get("scope") ?? "active") as LogClearScope;
+        const streams: ("out" | "error")[] =
+            stream === "all" ? ["out", "error"] : [stream === "out" ? "out" : "error"];
+        if (scope === "active" || scope === "all") {
+            for (const item of streams) {
+                CLEARED_LOG_STREAMS.add(clearedLogKey(agentKey, pmId, item));
+            }
+        }
+        const info: ProcessLogsClearResult = {
+            pm_id: pmId,
+            name: summary.name,
+            stream,
+            scope,
+            truncated: {},
+            deleted: {},
+            bytesFreed: 0,
+        };
+        return ok(info, `Process ${pmId} logs cleared successfully`);
+    }
+
+    if (method !== "GET") return null;
 
     if (url.pathname === "/") {
         return ok({ pid: agent.processes[0]?.pid ?? 0 }, "XPM agent is running");
@@ -548,7 +594,7 @@ export function resolveFixture(endpoint: string, method: string): ApiResponse<un
         const summary = agent.processes.find((process) => process.pm_id === Number(logsMatch[1]));
         if (!summary) return null;
         const tail = Number(url.searchParams.get("tail")) || DEFAULT_LOG_TAIL;
-        return ok(logsFor(summary, tail), "Process logs retrieved successfully");
+        return ok(logsFor(agentKey, summary, tail), "Process logs retrieved successfully");
     }
 
     return null;
