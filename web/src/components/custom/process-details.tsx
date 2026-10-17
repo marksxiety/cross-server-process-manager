@@ -1,5 +1,16 @@
 import { useEffect, useState } from 'react'
-import { Check, RefreshCw, X } from 'lucide-react'
+import { Check, ChevronDown, Eraser, RefreshCw, X } from 'lucide-react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogMedia,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import {
   Accordion,
   AccordionContent,
@@ -8,6 +19,14 @@ import {
 } from '@/components/ui/accordion'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Progress } from '@/components/ui/progress'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
@@ -20,7 +39,10 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { Spinner } from '@/components/ui/spinner'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { toast } from '@/components/ui/toast'
 import { ErrorAlert } from '@/components/custom/error-alert'
+import { processService } from '@/api/services/process.service'
+import { errorCodeLabel, toApiError } from '@/lib/error-code'
 import {
   formatBytes,
   formatLogTimestamp,
@@ -51,9 +73,15 @@ import {
   useProcessLogsStore,
   type LogsEntry,
 } from '@/stores/process-logs.store'
-import type { ApiError } from '@/types/api'
+import type { ApiError, ApiResponse } from '@/types/api'
 import type { LoadStatus } from '@/types/dashboard'
-import type { ProcessDescribe, ProcessSummary } from '@/types/process'
+import type {
+  LogClearScope,
+  LogClearStream,
+  ProcessDescribe,
+  ProcessLogsClearResult,
+  ProcessSummary,
+} from '@/types/process'
 import type { RegisteredServer } from '@/types/server'
 
 type TabValue = 'overview' | 'config' | 'logs'
@@ -486,16 +514,53 @@ function OverviewTab({
 
 type StreamFilter = 'all' | 'error'
 
+const LOG_STREAM_OPTIONS: LogClearStream[] = ['all', 'out', 'err']
+
+const LOG_STREAM_LABELS: Record<LogClearStream, string> = {
+  all: 'All logs',
+  out: 'Output only',
+  err: 'Errors only',
+}
+
+const LOG_SCOPE_OPTIONS: { value: LogClearScope; label: string; hint: string }[] = [
+  {
+    value: 'active',
+    label: 'Active',
+    hint: 'Truncates the active log file(s) in place; the process keeps writing.',
+  },
+  {
+    value: 'rotated',
+    label: 'Rotated',
+    hint: 'Permanently deletes rotated archive files (.log.gz, .log.N).',
+  },
+  {
+    value: 'all',
+    label: 'Both',
+    hint: 'Truncates active files and permanently deletes rotated archives.',
+  },
+]
+
+type FlushOutcome = {
+  result: ApiResponse<ProcessLogsClearResult | null>
+  usedFallback: boolean
+}
+
 function LogsTab({
   server,
   pmId,
+  processName,
   logs,
 }: {
   server: RegisteredServer
   pmId: number
+  processName: string
   logs: LogsEntry | undefined
 }) {
   const [filter, setFilter] = useState<StreamFilter>('all')
+  const [pendingStream, setPendingStream] = useState<LogClearStream | null>(null)
+  const [scope, setScope] = useState<LogClearScope>('active')
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false)
+  const [isFlushing, setIsFlushing] = useState(false)
   const tail = logs?.tail ?? LOGS_DEFAULT_TAIL
   const setTail = useProcessLogsStore((state) => state.setTail)
   const refreshLogs = useProcessLogsStore((state) => state.refresh)
@@ -503,6 +568,75 @@ function LogsTab({
   const lines = logs?.lines ?? []
   const errorCount = lines.filter((line) => line.stream === 'error').length
   const visible = filter === 'error' ? lines.filter((line) => line.stream === 'error') : lines
+
+  const openConfirm = (stream: LogClearStream) => {
+    setPendingStream(stream)
+    setScope('active')
+    setIsConfirmOpen(true)
+  }
+
+  // Tries the stream/scope-aware route first and falls back to the legacy
+  // both-streams flush only when an older agent lacks the new route.
+  const requestFlush = async (
+    stream: LogClearStream,
+    selectedScope: LogClearScope,
+  ): Promise<FlushOutcome> => {
+    const service = processService(server)
+    const result = await service.clearLogs(pmId, { stream, scope: selectedScope })
+    if (result.success) return { result, usedFallback: false }
+
+    const routeMissing = result.status === 404 && result.code === undefined
+    if (!routeMissing) return { result, usedFallback: false }
+
+    if (stream === 'all' && selectedScope === 'active') {
+      return { result: await service.flushLegacy(pmId), usedFallback: true }
+    }
+
+    throw {
+      code: 'AGENT_UPDATE_REQUIRED',
+      message:
+        'This agent does not support per-stream or rotated-log clearing. Update the agent to use this option.',
+      status: 404,
+    } satisfies ApiError
+  }
+
+  const confirmFlush = async () => {
+    if (pendingStream === null) return
+
+    const stream = pendingStream
+    const selectedScope = scope
+    setIsFlushing(true)
+
+    const request = requestFlush(stream, selectedScope).then(({ result, usedFallback }) => {
+      if (!result.success) throw toApiError(result)
+      return { result, usedFallback }
+    })
+
+    try {
+      await toast.promise(request, {
+        loading: { title: 'Flushing logs…' },
+        success: ({ result, usedFallback }) => ({
+          title: 'Logs cleared',
+          description: result.info
+            ? `${formatBytes(result.info.bytesFreed)} freed on ${server.server}.`
+            : usedFallback
+              ? `Both active streams were flushed on ${server.server}.`
+              : `Logs cleared on ${server.server}.`,
+        }),
+        error: (error: ApiError) => ({
+          title: errorCodeLabel(error.code),
+          description: error.message,
+        }),
+      })
+      setIsConfirmOpen(false)
+      setPendingStream(null)
+      await refreshLogs(server, pmId)
+    } catch {
+      // toast.promise already surfaced the error; keep the dialog open.
+    } finally {
+      setIsFlushing(false)
+    }
+  }
 
   return (
     <div className='flex h-full min-h-0 flex-col my-4'>
@@ -551,6 +685,34 @@ function LogsTab({
               Showing {visible.length} of {lines.length} lines
             </span>
           )}
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  type='button'
+                  variant='outline'
+                  size='sm'
+                  aria-label='Flush logs'
+                  title='Flush logs'
+                  disabled={isFlushing}
+                />
+              }
+            >
+              {isFlushing ? <Spinner className='size-3.5' /> : <Eraser strokeWidth={2} />}
+              Flush
+              <ChevronDown strokeWidth={2} className='size-3.5' />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align='end' className='w-44'>
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>Flush logs</DropdownMenuLabel>
+                {LOG_STREAM_OPTIONS.map((stream) => (
+                  <DropdownMenuItem key={stream} onClick={() => openConfirm(stream)}>
+                    {LOG_STREAM_LABELS[stream]}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button
             type='button'
             variant='ghost'
@@ -616,6 +778,71 @@ function LogsTab({
           </div>
         </ScrollArea>
       )}
+
+      <AlertDialog
+        open={isConfirmOpen}
+        onOpenChange={(open) => {
+          if (!open && !isFlushing) {
+            setIsConfirmOpen(false)
+            setPendingStream(null)
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogMedia className='text-destructive'>
+              <Eraser strokeWidth={2} />
+            </AlertDialogMedia>
+            <AlertDialogTitle>Flush logs?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {`This permanently deletes the selected log data for ${processName} on ${server.server}. This cannot be undone.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className='space-y-2.5'>
+            <div className='flex items-center justify-between gap-3 text-xs'>
+              <span className='text-muted-foreground'>Stream</span>
+              <span className='font-medium'>
+                {pendingStream === null ? '—' : LOG_STREAM_LABELS[pendingStream]}
+              </span>
+            </div>
+
+            <div className='space-y-1.5'>
+              <span className='text-xs text-muted-foreground'>Scope</span>
+              <div className='grid grid-cols-3 gap-0.5 rounded-md bg-muted/50 p-0.5'>
+                {LOG_SCOPE_OPTIONS.map((option) => (
+                  <Button
+                    key={option.value}
+                    type='button'
+                    size='sm'
+                    variant={scope === option.value ? 'secondary' : 'ghost'}
+                    className='h-6 px-2 text-xs'
+                    disabled={isFlushing}
+                    onClick={() => setScope(option.value)}
+                  >
+                    {option.label}
+                  </Button>
+                ))}
+              </div>
+              <p className='text-[11px] text-muted-foreground'>
+                {LOG_SCOPE_OPTIONS.find((option) => option.value === scope)?.hint}
+              </p>
+            </div>
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isFlushing}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant='destructive'
+              disabled={isFlushing || pendingStream === null}
+              onClick={() => void confirmFlush()}
+            >
+              {isFlushing && <Spinner className='size-4' />}
+              Flush logs
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
@@ -738,7 +965,7 @@ export function ProcessDetails({
         </TabsContent>
 
         <TabsContent value='logs' className='flex min-h-0 flex-1 flex-col pt-4'>
-          <LogsTab server={server} pmId={process.pm_id} logs={logs} />
+          <LogsTab server={server} pmId={process.pm_id} processName={process.name} logs={logs} />
         </TabsContent>
       </Tabs>
     </div>
