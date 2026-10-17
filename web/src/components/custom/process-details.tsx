@@ -58,7 +58,6 @@ import type { RegisteredServer } from '@/types/server'
 
 type TabValue = 'overview' | 'config' | 'logs'
 
-const DEFAULT_OVERVIEW_OPEN = ['paths']
 const DEFAULT_CONFIG_OPEN = ['identity', 'execution', 'restart']
 
 // ---------------------------------------------------------------------------
@@ -367,6 +366,7 @@ function ConfigTab({
   open: string[]
   onOpenChange: (open: string[]) => void
 }) {
+  const { describe } = data
   const groups = buildConfigGroups(data)
   // Dependencies resolve against every field's value, like the form does.
   const values = Object.fromEntries(
@@ -391,6 +391,17 @@ function ConfigTab({
           </AccordionContent>
         </AccordionItem>
       ))}
+      <AccordionItem value='paths' className={accordionItemClass}>
+        <GroupTrigger label='Paths' count={describe.entire_log_path ? 4 : 3} />
+        <AccordionContent className='space-y-2.5 pb-4'>
+          <StackedField label='Out log' value={describe.out_log_path} />
+          <StackedField label='Error log' value={describe.error_log_path} />
+          <StackedField label='PID file' value={describe.pid_path} />
+          {describe.entire_log_path && (
+            <StackedField label='Entire log path' value={describe.entire_log_path} />
+          )}
+        </AccordionContent>
+      </AccordionItem>
     </Accordion>
   )
 }
@@ -402,13 +413,9 @@ function ConfigTab({
 function OverviewTab({
   data,
   totalMemoryBytes,
-  open,
-  onOpenChange,
 }: {
   data: ProcessDescribe
   totalMemoryBytes: number | null
-  open: string[]
-  onOpenChange: (open: string[]) => void
 }) {
   const { summary, describe, metrics } = data
   const metricEntries = Object.entries(metrics)
@@ -459,37 +466,16 @@ function OverviewTab({
         <KeyValueRow label='Created' value={describe.created_at} />
       </section>
 
-      <Accordion value={open} onValueChange={onOpenChange} className={accordionRootClass}>
-        <AccordionItem value='metrics' className={accordionItemClass}>
-          <GroupTrigger
-            label='Custom metrics'
-            count={metricEntries.length > 0 ? metricEntries.length : 'none'}
-          />
-          <AccordionContent className='pb-4'>
-            {metricEntries.length > 0 ? (
-              <div className='grid grid-cols-2 gap-x-6'>
-                {metricEntries.map(([key, metric]) => (
-                  <KeyValueRow key={key} label={key} value={formatMetricValue(metric)} />
-                ))}
-              </div>
-            ) : (
-              <p className='text-sm text-muted-foreground'>No custom metrics</p>
-            )}
-          </AccordionContent>
-        </AccordionItem>
-
-        <AccordionItem value='paths' className={cn(accordionItemClass, 'border-b')}>
-          <GroupTrigger label='Paths' count={describe.entire_log_path ? 4 : 3} />
-          <AccordionContent className='space-y-2.5 pb-4'>
-            <StackedField label='Out log' value={describe.out_log_path} />
-            <StackedField label='Error log' value={describe.error_log_path} />
-            <StackedField label='PID file' value={describe.pid_path} />
-            {describe.entire_log_path && (
-              <StackedField label='Entire log path' value={describe.entire_log_path} />
-            )}
-          </AccordionContent>
-        </AccordionItem>
-      </Accordion>
+      {metricEntries.length > 0 && (
+        <section>
+          <SectionLabel>Custom metrics</SectionLabel>
+          <div className='grid grid-cols-2 gap-x-6'>
+            {metricEntries.map(([key, metric]) => (
+              <KeyValueRow key={key} label={key} value={formatMetricValue(metric)} />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   )
 }
@@ -697,7 +683,6 @@ export function ProcessDetails({
   logs,
 }: ProcessDetailsProps) {
   const [tab, setTab] = useState<TabValue>('overview')
-  const [overviewOpen, setOverviewOpen] = useState<string[]>(DEFAULT_OVERVIEW_OPEN)
   const [configOpen, setConfigOpen] = useState<string[]>(DEFAULT_CONFIG_OPEN)
   const loadLogs = useProcessLogsStore((state) => state.load)
 
@@ -736,8 +721,6 @@ export function ProcessDetails({
                 <OverviewTab
                   data={data}
                   totalMemoryBytes={totalMemoryBytes}
-                  open={overviewOpen}
-                  onOpenChange={setOverviewOpen}
                 />
               )}
             </WithDescribe>
