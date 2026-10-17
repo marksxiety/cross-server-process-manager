@@ -2,7 +2,7 @@ import { createConnection } from "@/api/connection";
 import { normalizeProcessDescribe } from "@/lib/process-describe";
 import type { ApiResponse } from "@/types/api";
 import type { RegisteredServer } from "@/types/server";
-import type { LogStreamType, ProcessDescribe, ProcessLogs, ProcessSummary, StartIssue, StartProcessPayload } from "@/types/process";
+import type { LogClearScope, LogClearStream, LogStreamType, ProcessDescribe, ProcessLogs, ProcessLogsClearResult, ProcessSummary, StartIssue, StartProcessPayload } from "@/types/process";
 import type { SystemOverview } from "@/types/system";
 
 export function processService(server: RegisteredServer) {
@@ -37,6 +37,15 @@ export function processService(server: RegisteredServer) {
             const query = search.toString();
             return api.get<ProcessLogs>(`/pm2/logs/${pmId}${query ? `?${query}` : ""}`);
         },
+        clearLogs: (pmId: number, params: { stream?: LogClearStream; scope?: LogClearScope } = {}) => {
+            const search = new URLSearchParams();
+            if (params.stream !== undefined) search.set("stream", params.stream);
+            if (params.scope !== undefined) search.set("scope", params.scope);
+            const query = search.toString();
+            return api.del<ProcessLogsClearResult>(`/pm2/logs/${pmId}${query ? `?${query}` : ""}`);
+        },
+        /** Older agents only expose this route; it flushes both active streams. */
+        flushLegacy: (pmId: number) => api.post<null>(`/pm2/flush/${pmId}`),
         start: (payload: StartProcessPayload) =>
             api.post<ProcessSummary[] | StartIssue[]>("/pm2/start", payload),
         stop: (pmId: number) => api.post<ProcessSummary[]>(`/pm2/stop/${pmId}`),
