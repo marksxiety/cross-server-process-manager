@@ -441,8 +441,8 @@ function OverviewTab({
           />
           <StatTile
             label='Memory'
-            value={formatBytes(summary.memory)}
-            sub={memoryShare === null ? undefined : formatPercent(memoryShare)}
+            value={memoryShare === null ? formatBytes(summary.memory) : formatPercent(memoryShare)}
+            sub={memoryShare === null ? undefined : formatBytes(summary.memory)}
             progress={memoryShare}
           />
         </div>
