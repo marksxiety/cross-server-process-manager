@@ -26,6 +26,7 @@ export const SORT_KEYS = [
 export type ProcessSortKey = (typeof SORT_KEYS)[number]
 
 // Severity order: unhealthy processes surface above healthy ones for triage.
+// 1 = most severe, 6 = healthy.
 export function getSeverityRank(pm2_env: {
   status: ProcessStatus
   autorestart?: boolean
@@ -40,33 +41,32 @@ export function getSeverityRank(pm2_env: {
     case 'errored':
       return 1
 
-    // 2. HIGH (or CRITICAL / IDLE depending on why it stopped)
     case 'stopped':
       if (isCronOrOneShot) {
-        // Cron/One-shot crashed (non-zero exit code) -> Treat as Critical (Rank 2, right under errored)
+        // 2. CRITICAL: Cron/one-shot crashed (non-zero exit code)
         if (exit_code !== undefined && exit_code !== null && exit_code !== 0) {
           return 2
         }
-        // Cron/One-shot finished normally (exit_code === 0) -> Not an issue! Push to Rank 6 (right above online)
+        // 6. HEALTHY: Cron/one-shot finished cleanly or is idle between runs
         return 6
       }
-      // Normal long-running service that is stopped -> High severity (Rank 3)
+      // 3. HIGH: Long-running service that is stopped
       return 3
 
-    // 3. MEDIUM: Process exited; backoff/restart timer running
+    // 4. MEDIUM: Process exited; backoff/restart timer running
     case 'waiting restart':
       return 4
 
-    // 4. INFO: Graceful stop or initial launch in progress
+    // 5. INFO: Graceful stop or initial launch in progress
     case 'stopping':
     case 'launching':
       return 5
 
-    // 5. NONE / LEGACY: Healthy online process (Bottom of the list)
+    // 6. HEALTHY
     case 'online':
     case 'one-launch-status':
     default:
-      return 7
+      return 6
   }
 }
 
