@@ -43,6 +43,7 @@ import { toast } from '@/components/ui/toast'
 import { ErrorAlert } from '@/components/custom/error-alert'
 import { processService } from '@/api/services/process.service'
 import { errorCodeLabel, toApiError } from '@/lib/error-code'
+import { isProcessInactive } from '@/lib/process-status'
 import {
   formatBytes,
   formatLogTimestamp,
@@ -143,6 +144,7 @@ function StatTile({
   sub,
   progress,
   tone = 'default',
+  disabled = false,
 }: {
   label: string
   value: string
@@ -151,6 +153,8 @@ function StatTile({
   /** 0–100; draws a thin bar under the value. */
   progress?: number | null
   tone?: Tone
+  /** Mutes the value and bar for an inactive process (crashed, stopped…). */
+  disabled?: boolean
 }) {
   return (
     <div className={cn('rounded-lg p-3', statToneClasses(tone))}>
@@ -158,7 +162,9 @@ function StatTile({
       <p
         className={cn(
           'mt-0.5 flex items-baseline gap-1.5 text-base font-medium',
-          tone !== 'default' && statLabelClasses(tone),
+          disabled
+            ? 'text-muted-foreground'
+            : tone !== 'default' && statLabelClasses(tone),
         )}
       >
         {value}
@@ -169,7 +175,9 @@ function StatTile({
           value={Math.min(100, Math.max(0, progress))}
           className={cn(
             'mt-2.5 **:data-[slot=progress-track]:h-1 **:data-[slot=progress-indicator]:min-w-1',
-            toneProgressClasses[percentTone(progress)],
+            disabled
+              ? toneProgressClasses.neutral
+              : toneProgressClasses[percentTone(progress)],
           )}
         />
       )}
@@ -449,6 +457,7 @@ function OverviewTab({
   const metricEntries = Object.entries(metrics)
   const memoryShare = memorySharePercent(summary.memory, totalMemoryBytes)
   const cpuKnown = Number.isFinite(summary.cpu)
+  const inactive = isProcessInactive(summary)
 
   return (
     <div className='space-y-5 p-4'>
@@ -475,12 +484,14 @@ function OverviewTab({
             label='CPU'
             value={cpuKnown ? `${summary.cpu}%` : '—'}
             progress={cpuKnown ? summary.cpu : null}
+            disabled={inactive}
           />
           <StatTile
             label='Memory'
             value={memoryShare === null ? formatBytes(summary.memory) : formatPercent(memoryShare)}
             sub={memoryShare === null ? undefined : formatBytes(summary.memory)}
             progress={memoryShare}
+            disabled={inactive}
           />
         </div>
       </section>
