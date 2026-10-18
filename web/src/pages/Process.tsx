@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Check,
+  ChevronDown,
   Copy,
   ServerOff,
   Terminal,
@@ -25,6 +26,11 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
 import {
   Empty,
   EmptyContent,
@@ -194,7 +200,7 @@ function PayloadPreview({ payload }: { payload: StartProcessPayload }) {
 
   return (
     <>
-      <ScrollArea className='max-h-105 rounded-md border bg-muted **:data-[slot=scroll-area-viewport]:max-h-105'>
+      <ScrollArea className='max-h-64 rounded-md border bg-muted sm:max-h-80 lg:max-h-105 **:data-[slot=scroll-area-viewport]:max-h-64 sm:**:data-[slot=scroll-area-viewport]:max-h-80 lg:**:data-[slot=scroll-area-viewport]:max-h-105'>
         <pre className='whitespace-pre-wrap wrap-break-words p-3 font-mono text-[11px] leading-relaxed'>
           {json}
         </pre>
@@ -208,6 +214,49 @@ function PayloadPreview({ payload }: { payload: StartProcessPayload }) {
         {copied ? 'Copied' : 'Copy JSON'}
       </Button>
     </>
+  )
+}
+
+function PayloadPreviewCard({
+  serverName,
+  payload,
+  orphanIssues,
+  requestError,
+}: {
+  serverName: string
+  payload: StartProcessPayload
+  orphanIssues: StartIssue[]
+  requestError: ApiError | null
+}) {
+  return (
+    <CardContent className='space-y-3'>
+      <div>
+        <p className='text-[11px] text-muted-foreground'>Server</p>
+        <p className='truncate text-sm font-medium' title={serverName}>
+          {serverName}
+        </p>
+      </div>
+
+      <PayloadPreview payload={payload} />
+
+      {orphanIssues.length > 0 && (
+        <Alert variant='destructive'>
+          <TriangleAlert strokeWidth={2} />
+          <AlertTitle>Additional issues</AlertTitle>
+          <AlertDescription>
+            <ul className='ml-4 list-disc'>
+              {orphanIssues.map((issue) => (
+                <li key={`${issue.field}:${issue.message}`}>
+                  {issue.field}: {issue.message}
+                </li>
+              ))}
+            </ul>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {requestError && <ErrorAlert error={requestError} />}
+    </CardContent>
   )
 }
 
@@ -349,10 +398,10 @@ export function Process() {
   }
 
   return (
-    <div className='mx-auto w-full max-w-[75%]'>
-      <div className='mb-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-4'>
+    <div className='min-w-0'>
+      <div className='mb-6 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-6'>
         <div>
-          <h1 className='text-2xl font-semibold tracking-tight'>Register process</h1>
+          <h1 className='text-xl font-semibold tracking-tight sm:text-2xl'>Register process</h1>
           <p className='text-sm text-muted-foreground'>Register a new process to monitor.</p>
         </div>
 
@@ -496,7 +545,12 @@ export function Process() {
           </Card>
 
           <div className='flex justify-end lg:col-span-2'>
-            <Button type='button' disabled={!canGoToStep2} onClick={() => goToStep(2)}>
+            <Button
+              type='button'
+              className='w-full sm:w-auto'
+              disabled={!canGoToStep2}
+              onClick={() => goToStep(2)}
+            >
               Next: configure
               <ArrowRight strokeWidth={2} />
             </Button>
@@ -506,9 +560,9 @@ export function Process() {
 
       {serversStatus === 'success' && activeServers.length > 0 && step === 2 && server && (
         <div className='grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]'>
-          <div className='space-y-4'>
+          <div className='min-w-0 space-y-4'>
             {!isDismissed && (
-              <div className='flex items-center justify-between mx-2 mb-2'>
+              <div className='mb-2'>
                 <Alert variant='destructive'>
                   <TriangleAlert strokeWidth={2} />
                   <AlertTitle>Test on the server first</AlertTitle>
@@ -531,13 +585,45 @@ export function Process() {
             )}
 
             <ProcessForm values={values} errors={errors} onChange={setValue} />
-            <div className='flex items-center justify-between mx-2 mb-2'>
-              <Button type='button' variant='outline' onClick={() => goToStep(1)}>
+
+            <Collapsible defaultOpen={false} className='lg:hidden'>
+              <CollapsibleTrigger
+                render={
+                  <Button
+                    type='button'
+                    variant='outline'
+                    className='w-full justify-between'
+                  />
+                }
+              >
+                Payload preview
+                <ChevronDown strokeWidth={2} className='size-4' />
+              </CollapsibleTrigger>
+              <CollapsibleContent className='mt-2'>
+                <Card>
+                  <PayloadPreviewCard
+                    serverName={server.server}
+                    payload={payload}
+                    orphanIssues={orphanIssues}
+                    requestError={issues.length === 0 ? requestError : null}
+                  />
+                </Card>
+              </CollapsibleContent>
+            </Collapsible>
+
+            <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
+              <Button
+                type='button'
+                variant='outline'
+                className='w-full sm:w-auto'
+                onClick={() => goToStep(1)}
+              >
                 <ArrowLeft strokeWidth={2} />
                 Back
               </Button>
               <Button
                 type='button'
+                className='w-full sm:w-auto'
                 disabled={status === 'loading'}
                 onClick={() => void handleSubmit()}
               >
@@ -547,38 +633,18 @@ export function Process() {
             </div>
           </div>
 
-          <Card className='h-fit lg:sticky lg:top-4'>
+          <Card className='hidden h-fit lg:sticky lg:top-4 lg:block'>
             <CardHeader className='pb-2'>
               <CardTitle className='text-xs font-medium tracking-wide text-muted-foreground uppercase'>
                 Payload preview
               </CardTitle>
             </CardHeader>
-            <CardContent className='space-y-3'>
-              <div>
-                <p className='text-[11px] text-muted-foreground'>Server</p>
-                <p className='text-sm font-medium'>{server.server}</p>
-              </div>
-
-              <PayloadPreview payload={payload} />
-
-              {orphanIssues.length > 0 && (
-                <Alert variant='destructive'>
-                  <TriangleAlert strokeWidth={2} />
-                  <AlertTitle>Additional issues</AlertTitle>
-                  <AlertDescription>
-                    <ul className='ml-4 list-disc'>
-                      {orphanIssues.map((issue) => (
-                        <li key={`${issue.field}:${issue.message}`}>
-                          {issue.field}: {issue.message}
-                        </li>
-                      ))}
-                    </ul>
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {requestError && issues.length === 0 && <ErrorAlert error={requestError} />}
-            </CardContent>
+            <PayloadPreviewCard
+              serverName={server.server}
+              payload={payload}
+              orphanIssues={orphanIssues}
+              requestError={issues.length === 0 ? requestError : null}
+            />
           </Card>
         </div>
       )}

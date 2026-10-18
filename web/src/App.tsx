@@ -10,7 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 
 export function App() {
   return (
-    <SidebarProvider className="h-svh overflow-hidden">
+    <SidebarProvider className="h-dvh overflow-hidden">
       <AppLayout />
     </SidebarProvider>
   )
@@ -35,22 +35,22 @@ function AppLayout() {
         {/* Fixed Header */}
         <header
           className={cn(
-            'flex h-16 shrink-0 items-center justify-between border-b px-4 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12',
+            'flex h-14 shrink-0 items-center justify-between border-b px-3 transition-[width,height] ease-linear sm:h-16 sm:px-4 lg:px-6 group-has-data-[collapsible=icon]/sidebar-wrapper:h-12',
             isFullscreen && 'hidden',
           )}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
             <SidebarTrigger />
           </div>
 
           {/* Theme & Fullscreen Triggers */}
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
             <ThemeToggle />
             {showFullscreenToggle && (
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                className="size-10 text-muted-foreground hover:text-foreground lg:size-8"
                 onClick={() => void handleToggleFullscreen()}
                 title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
                 aria-label={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
@@ -68,8 +68,8 @@ function AppLayout() {
         {/* Scrollable Page Content */}
         <div className="min-h-0 flex-1 overflow-hidden bg-muted/30">
           <ScrollArea className="h-full">
-            <div className="flex min-h-full flex-col px-6 py-4">
-              <div className="flex-1">
+            <div className="mx-auto flex min-h-full w-full max-w-7xl min-w-0 flex-col px-4 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6">
+              <div className="min-w-0 flex-1">
                 <Outlet />
               </div>
             </div>

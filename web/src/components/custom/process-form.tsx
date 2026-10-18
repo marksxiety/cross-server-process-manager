@@ -136,7 +136,7 @@ function TagInput({
             index === editingIndex ? (
               <Input
                 key={`edit-${index}`}
-                className='h-6 w-32 px-1.5 font-mono text-[11px]'
+                className='h-9 w-full px-1.5 font-mono text-[11px] sm:w-32 lg:h-6'
                 value={editDraft}
                 aria-label={`Edit ${spec.key} value`}
                 ref={(element) => {
@@ -176,7 +176,7 @@ function TagInput({
                   type='button'
                   disabled={disabled}
                   aria-label={`Remove ${tag}`}
-                  className='rounded-sm p-0.5 text-muted-foreground transition-colors hover:text-foreground disabled:pointer-events-none'
+                  className='rounded-sm p-1 text-muted-foreground transition-colors hover:text-foreground disabled:pointer-events-none'
                   onClick={() => removeAt(index)}
                 >
                   <X className='size-3' strokeWidth={2} />
@@ -241,7 +241,7 @@ function KeyValueEditor({
   return (
     <div className={cn('space-y-2', disabled && 'opacity-60')}>
       {rows.map((row, index) => (
-        <div key={index} className='flex gap-2'>
+        <div key={index} className='flex flex-col gap-2 sm:flex-row'>
           <Input
             className='font-mono text-xs'
             placeholder='KEY'
@@ -264,6 +264,7 @@ function KeyValueEditor({
             type='button'
             variant='outline'
             size='icon'
+            className='self-end sm:self-auto'
             disabled={disabled}
             aria-label='Remove variable'
             onClick={() => update(rows.filter((_, i) => i !== index))}
@@ -425,7 +426,7 @@ function ProcessField({
       {cron ? (
         // The field spans both grid columns: the input and its translation
         // each take one column (same gap as the surrounding form grid).
-        <div className='flex items-center gap-4'>
+        <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4'>
           <div className='min-w-0 flex-1'>
             <FieldControl
               spec={spec}
@@ -488,7 +489,7 @@ export function ProcessForm({ values, errors = {}, onChange }: ProcessFormProps)
   )
 
   return (
-    <div className='space-y-4 mx-2 mb-2'>
+    <div className='space-y-4'>
       <Card>
         <CardHeader>
           <CardTitle>Basic</CardTitle>

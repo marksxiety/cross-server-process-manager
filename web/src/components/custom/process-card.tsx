@@ -53,14 +53,14 @@ export function ProcessCard({
       )}
     >
       <CardHeader>
-        <CardTitle className='flex min-w-0 items-center gap-2'>
+        <CardTitle className='flex min-w-0 flex-wrap items-center gap-2'>
           <StatusDot process={process} />
-          <span className={cn('min-w-0 truncate', visual.text)}>
+          <span className={cn('min-w-0 max-w-full truncate', visual.text)}>
             {process.name}
           </span>
           <Badge
             variant='outline'
-            className='shrink-0 font-normal text-muted-foreground'
+            className='max-w-[50%] shrink-0 truncate font-normal text-muted-foreground'
           >
             {process.namespace}
           </Badge>
@@ -80,7 +80,7 @@ export function ProcessCard({
         </CardAction>
       </CardHeader>
 
-      <CardContent className='flex items-center justify-between text-xs tabular-nums text-muted-foreground'>
+      <CardContent className='flex flex-wrap items-center justify-between gap-2 text-xs tabular-nums text-muted-foreground'>
         <span>CPU {process.cpu}%</span>
         <span>
           {formatBytes(process.memory)}

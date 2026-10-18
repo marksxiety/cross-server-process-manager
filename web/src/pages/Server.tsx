@@ -226,13 +226,13 @@ export function Server() {
   }, [servers, filter])
 
   return (
-    <div className='mx-auto w-full max-w-[75%]'>
+    <div className='min-w-0'>
       <PageHeader
         title='Servers'
         description="Manage the fleet's registered servers, including inactive ones."
       >
         <Tabs value={filter} onValueChange={(v) => setFilter(v as StatusFilter)}>
-          <TabsList>
+          <TabsList className='w-full overflow-hidden sm:w-fit'>
             <TabsTrigger value='all'>
               All <span className='ml-1.5 text-muted-foreground'>{counts.all}</span>
             </TabsTrigger>
@@ -246,12 +246,12 @@ export function Server() {
         </Tabs>
 
         <Sheet open={isSheetOpen} onOpenChange={handleSheetOpenChange}>
-          <Button size='sm' onClick={openRegister}>
+          <Button size='sm' className='w-full sm:w-auto' onClick={openRegister}>
             <Plus strokeWidth={2} />
             Register server
           </Button>
           <SheetContent size='md'>
-            <SheetHeader>
+            <SheetHeader className='shrink-0 pr-8'>
               <SheetTitle>
                 {editingServer ? 'Edit server' : 'Register server'}
               </SheetTitle>
@@ -262,10 +262,10 @@ export function Server() {
               </SheetDescription>
             </SheetHeader>
 
-            <div className='flex-1 overflow-y-auto px-6'>
+            <div className='flex-1 overflow-y-auto px-4 sm:px-6'>
               <form id='server-form' onSubmit={onSubmit}>
                 <FieldSet>
-                  <FieldGroup className='grid grid-cols-2 gap-3'>
+                  <FieldGroup className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
                     <Field data-invalid={!!errors.server}>
                       <FieldLabel htmlFor='server'>Server</FieldLabel>
                       <Input id='server' aria-invalid={!!errors.server} {...register('server')} />
@@ -298,8 +298,8 @@ export function Server() {
                     </Field>
                   </FieldGroup>
 
-                  <FieldGroup className='grid grid-cols-3 gap-3 mt-3'>
-                    <Field className='col-span-2' data-invalid={!!errors.host}>
+                  <FieldGroup className='mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3'>
+                    <Field className='sm:col-span-2' data-invalid={!!errors.host}>
                       <FieldLabel htmlFor='host'>Host</FieldLabel>
                       <Input
                         id='host'
@@ -315,6 +315,7 @@ export function Server() {
                       <Input
                         id='port'
                         type='number'
+                        inputMode='numeric'
                         placeholder='4000'
                         aria-invalid={!!errors.port}
                         {...register('port')}
@@ -351,7 +352,7 @@ export function Server() {
               </form>
             </div>
 
-            <SheetFooter className='grid grid-cols-2'>
+            <SheetFooter className='grid shrink-0 grid-cols-2 gap-2'>
               <Button
                 type='button'
                 variant='outline'

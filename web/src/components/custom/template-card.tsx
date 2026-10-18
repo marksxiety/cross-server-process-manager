@@ -43,12 +43,18 @@ export function TemplateCard({ template, onOpen, onUse }: TemplateCardProps) {
       )}
     >
       <CardHeader>
-        <CardTitle>{template.template_name}</CardTitle>
+        <CardTitle className='min-w-0 truncate' title={template.template_name}>
+          {template.template_name}
+        </CardTitle>
         <CardDescription className='line-clamp-2'>
           {template.description ?? 'No description'}
         </CardDescription>
         <CardAction>
-          <Badge variant='outline' className='font-normal text-muted-foreground'>
+          <Badge
+            variant='outline'
+            className='max-w-32 truncate font-normal text-muted-foreground'
+            title={template.category ?? 'Uncategorized'}
+          >
             {template.category ?? 'Uncategorized'}
           </Badge>
         </CardAction>

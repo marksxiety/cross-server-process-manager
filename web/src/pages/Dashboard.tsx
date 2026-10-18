@@ -46,7 +46,6 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty'
 import { Input } from '@/components/ui/input'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Sheet,
   SheetContent,
@@ -307,17 +306,16 @@ export function Dashboard() {
   }, [refresh])
 
   return (
-    <ScrollArea className='h-full'>
-      <div className='p-4'>
-        <div className='flex items-center justify-between'>
-          <h1 className='text-2xl font-semibold tracking-tight'>
+    <div className='min-w-0'>
+        <div className='flex flex-wrap items-center justify-between gap-3'>
+          <h1 className='text-xl font-semibold tracking-tight sm:text-2xl'>
             Servers Overview
           </h1>
 
           <div className='flex items-center gap-2'>
             <Button
               variant='ghost'
-              size='icon-sm'
+              size='icon'
               onClick={() => void reload()}
               disabled={serversStatus === 'loading' || isRefreshing}
               aria-label='Refresh servers and processes'
@@ -361,7 +359,7 @@ export function Dashboard() {
 
         {serversStatus === 'success' && servers.length > 0 && (
           <>
-            <div className='mt-4 flex flex-wrap gap-3'>
+            <div className='mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'>
               {servers.map((server) => {
                 const entry = processesByServer[server.server]
                 const isSelectable = entry?.status === 'success'
@@ -390,7 +388,7 @@ export function Dashboard() {
                         : undefined
                     }
                     className={cn(
-                      '@container/server min-w-48 grow basis-[calc(20%-0.625rem)]',
+                      '@container/server min-w-0',
                       isSelectable &&
                         'cursor-pointer transition-shadow hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring',
                       isSelected && 'ring-2 ring-primary',
@@ -402,22 +400,26 @@ export function Dashboard() {
               })}
             </div>
 
-            <div className='mt-6 flex flex-wrap items-center gap-3'>
-              <p className='shrink-0 text-xs font-medium text-muted-foreground'>
-                {`Processes (${sortedProcessItems.length}${
-                  activeServerName !== null || query !== ''
-                    ? `/${processItems.length}`
-                    : ''
-                })`}
-              </p>
-              <Separator className='flex-1' />
-              <div className='flex shrink-0 items-center gap-2'>
+            <div className='mt-6 space-y-3'>
+              <div className='flex items-center gap-3'>
+                <p className='shrink-0 text-xs font-medium text-muted-foreground'>
+                  {`Processes (${sortedProcessItems.length}${
+                    activeServerName !== null || query !== ''
+                      ? `/${processItems.length}`
+                      : ''
+                  })`}
+                </p>
+                <Separator className='flex-1' />
+              </div>
+
+              <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end'>
                 <DropdownMenu>
                   <DropdownMenuTrigger
                     render={
                       <Button
                         variant='outline'
                         size='sm'
+                        className='w-full sm:w-auto'
                         aria-label={`Sort by, ${sortOrder.length} active`}
                       />
                     }
@@ -452,41 +454,42 @@ export function Dashboard() {
                     </DropdownMenuGroup>
                   </DropdownMenuContent>
                 </DropdownMenu>
-              </div>
-              <div className='relative w-full max-w-56 shrink-0'>
-                <Search
-                  className='pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground'
-                  strokeWidth={2}
-                />
-                <Input
-                  size='xs'
-                  className='pl-7'
-                  value={searchQuery}
-                  placeholder='Search name or namespace…'
-                  aria-label='Search processes by name or namespace'
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Escape') setSearchQuery('')
-                  }}
-                />
-                {searchQuery !== '' && (
-                  <button
-                    type='button'
-                    aria-label='Clear search'
-                    title='Clear search'
-                    className='absolute top-1/2 right-2 -translate-y-1/2 rounded-sm text-muted-foreground transition-colors hover:text-foreground'
-                    onClick={() => setSearchQuery('')}
-                  >
-                    <X className='size-3.5' strokeWidth={2} />
-                  </button>
-                )}
+
+                <div className='relative w-full sm:max-w-56'>
+                  <Search
+                    className='pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground'
+                    strokeWidth={2}
+                  />
+                  <Input
+                    size='xs'
+                    className='pl-7'
+                    value={searchQuery}
+                    placeholder='Search name or namespace…'
+                    aria-label='Search processes by name or namespace'
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Escape') setSearchQuery('')
+                    }}
+                  />
+                  {searchQuery !== '' && (
+                    <button
+                      type='button'
+                      aria-label='Clear search'
+                      title='Clear search'
+                      className='absolute top-1/2 right-2 -translate-y-1/2 rounded-sm p-1 text-muted-foreground transition-colors hover:text-foreground'
+                      onClick={() => setSearchQuery('')}
+                    >
+                      <X className='size-3.5' strokeWidth={2} />
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
             {sortedProcessItems.length > 0 ? (
               <div
                 ref={processGridRef}
-                className='mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4'
+                className='mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
               >
                 {sortedProcessItems.map((item) => {
                   const key = processItemKey(item)
@@ -549,7 +552,6 @@ export function Dashboard() {
             )}
           </>
         )}
-      </div>
 
       <Sheet
         open={selected !== null}
@@ -559,7 +561,7 @@ export function Dashboard() {
       >
         <SheetContent size='lg'>
           <SheetHeader>
-            <div className='flex items-start justify-between gap-3 pr-6'>
+            <div className='flex flex-wrap items-start justify-between gap-3 pr-8'>
               <div className='flex min-w-0 items-center gap-2'>
                 <SheetTitle className='truncate'>
                   {selectedProcess?.name ?? ''}
@@ -728,6 +730,6 @@ export function Dashboard() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </ScrollArea>
+    </div>
   )
 }

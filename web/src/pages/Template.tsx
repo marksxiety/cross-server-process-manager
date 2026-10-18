@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { Check, Copy, FileText, Plus, RefreshCw, Trash2, Wand2 } from 'lucide-react'
+import {
+  Check,
+  ChevronDown,
+  Copy,
+  FileText,
+  Plus,
+  RefreshCw,
+  Trash2,
+  Wand2,
+} from 'lucide-react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,6 +23,11 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
@@ -44,7 +58,7 @@ import { errorCodeLabel, toApiError } from '@/lib/error-code'
 import { clearDisabledValues } from '@/lib/process-fields'
 import { toSavableValues } from '@/lib/template-keys'
 import { buildTemplatePayload } from '@/lib/template-payload'
-import { copyText } from '@/lib/utils'
+import { cn, copyText } from '@/lib/utils'
 import type { ApiResponse } from '@/types/api'
 import type { ProcessTemplate, TemplateInput, TemplateValues } from '@/types/template'
 
@@ -64,6 +78,41 @@ const EMPTY_DRAFT: TemplateDraft = {
   description: '',
   preview: '',
   is_active: true,
+}
+
+function PayloadPanel({
+  payloadJson,
+  copied,
+  onCopy,
+  className,
+}: {
+  payloadJson: string
+  copied: boolean
+  onCopy: () => void
+  className?: string
+}) {
+  return (
+    <div className={cn('space-y-2', className)}>
+      <ScrollArea className='max-h-64 rounded-md border bg-muted sm:max-h-80 xl:max-h-105 **:data-[slot=scroll-area-viewport]:max-h-64 sm:**:data-[slot=scroll-area-viewport]:max-h-80 xl:**:data-[slot=scroll-area-viewport]:max-h-105'>
+        <pre className='whitespace-pre-wrap wrap-break-words p-3 font-mono text-[11px] leading-relaxed'>
+          {payloadJson}
+        </pre>
+      </ScrollArea>
+      <Button
+        type='button'
+        variant='outline'
+        className='w-full'
+        onClick={onCopy}
+      >
+        {copied ? (
+          <Check className='size-3.5' strokeWidth={2} />
+        ) : (
+          <Copy className='size-3.5' strokeWidth={2} />
+        )}
+        {copied ? 'Copied' : 'Copy JSON'}
+      </Button>
+    </div>
+  )
 }
 
 export function Template() {
@@ -253,10 +302,10 @@ export function Template() {
   }
 
   return (
-    <div className='mx-auto w-full max-w-[75%]'>
+    <div className='min-w-0'>
       <PageHeader title='Templates' description='Manage process templates.'>
         <Tabs value={filter} onValueChange={(value) => setFilter(value as StatusFilter)}>
-          <TabsList>
+          <TabsList className='w-full overflow-hidden sm:w-fit'>
             <TabsTrigger value='all'>
               All <span className='ml-1.5 text-muted-foreground'>{counts.all}</span>
             </TabsTrigger>
@@ -269,16 +318,16 @@ export function Template() {
           </TabsList>
         </Tabs>
 
-        <div className='flex items-center gap-2'>
+        <div className='flex w-full items-center gap-2 sm:w-auto'>
           <Button
             variant='ghost'
-            size='icon-sm'
+            size='icon'
             aria-label='Refresh templates'
             title='Refresh templates'
           >
             <RefreshCw strokeWidth={2} />
           </Button>
-          <Button size='sm' onClick={openCreate}>
+          <Button size='sm' className='flex-1 sm:flex-none' onClick={openCreate}>
             <Plus strokeWidth={2} />
             New Template
           </Button>
@@ -341,7 +390,7 @@ export function Template() {
         }}
       >
         <SheetContent size='5xl' className='flex flex-col overflow-hidden'>
-          <SheetHeader className='pr-6'>
+          <SheetHeader className='shrink-0 pr-8'>
             <SheetTitle>{selected?.template_name}</SheetTitle>
             {selected?.category && (
               <Badge variant='outline' className='w-fit font-normal text-muted-foreground'>
@@ -353,39 +402,49 @@ export function Template() {
             )}
           </SheetHeader>
 
-          <div className='grid min-h-0 flex-1 grid-cols-1 gap-6 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_320px] lg:overflow-hidden'>
-            <ScrollArea className='h-full min-h-0 p-4'>
+          <div className='grid min-h-0 flex-1 grid-cols-1 gap-6 overflow-y-auto xl:grid-cols-[minmax(0,1fr)_320px]'>
+            <div className='min-w-0 space-y-4 p-4'>
               <ProcessForm values={values} onChange={updateValue} />
-            </ScrollArea>
 
-            <div className='space-y-2 mr-6'>
+              <Collapsible defaultOpen={false} className='xl:hidden'>
+                <CollapsibleTrigger
+                  render={
+                    <Button
+                      type='button'
+                      variant='outline'
+                      className='w-full justify-between'
+                    />
+                  }
+                >
+                  Payload preview
+                  <ChevronDown strokeWidth={2} className='size-4' />
+                </CollapsibleTrigger>
+                <CollapsibleContent className='mt-2'>
+                  <PayloadPanel
+                    payloadJson={payloadJson}
+                    copied={copied}
+                    onCopy={() => void copyPayload()}
+                  />
+                </CollapsibleContent>
+              </Collapsible>
+            </div>
+
+            <div className='hidden min-w-0 space-y-2 p-4 xl:sticky xl:top-4 xl:block xl:self-start xl:pr-6'>
               <p className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>
                 Payload preview
               </p>
-              <ScrollArea className='max-h-105 rounded-md border bg-muted **:data-[slot=scroll-area-viewport]:max-h-105'>
-                <pre className='whitespace-pre-wrap wrap-break-words p-3 font-mono text-[11px] leading-relaxed'>
-                  {payloadJson}
-                </pre>
-              </ScrollArea>
-              <Button
-                type='button'
-                variant='outline'
-                className='w-full'
-                onClick={() => void copyPayload()}
-              >
-                {copied ? (
-                  <Check className='mr-1 h-3.5 w-3.5' />
-                ) : (
-                  <Copy className='mr-1 h-3.5 w-3.5' />
-                )}
-                {copied ? 'Copied' : 'Copy JSON'}
-              </Button>
+              <PayloadPanel
+                payloadJson={payloadJson}
+                copied={copied}
+                onCopy={() => void copyPayload()}
+              />
             </div>
           </div>
 
-          <SheetFooter className='flex-row items-center justify-between'>
+          <SheetFooter className='flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
             <Button
               type='button'
+              className='w-full sm:w-auto'
               onClick={() => {
                 if (!selected) return
                 handleUse(selected)
@@ -395,17 +454,23 @@ export function Template() {
               <Wand2 strokeWidth={2} />
               Use template
             </Button>
-            <div className='flex gap-2'>
+            <div className='grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto'>
               <Button
                 type='button'
                 variant='destructive'
+                className='w-full sm:w-auto'
                 disabled={deleting}
                 onClick={() => setConfirmOpen(true)}
               >
                 <Trash2 strokeWidth={2} />
                 Delete
               </Button>
-              <Button type='button' disabled={saving} onClick={() => void saveKeys()}>
+              <Button
+                type='button'
+                className='w-full sm:w-auto'
+                disabled={saving}
+                onClick={() => void saveKeys()}
+              >
                 {saving && <Spinner className='size-3.5' />}
                 Save
               </Button>
@@ -452,14 +517,14 @@ export function Template() {
         }}
       >
         <SheetContent size='5xl' className='flex flex-col overflow-hidden'>
-          <SheetHeader className='pr-6'>
+          <SheetHeader className='shrink-0 pr-8'>
             <SheetTitle>New Template</SheetTitle>
           </SheetHeader>
 
-          <div className='grid min-h-0 flex-1 grid-cols-1 gap-6 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_320px] lg:overflow-hidden'>
-            <ScrollArea className='h-full min-h-0 p-4'>
+          <div className='grid min-h-0 flex-1 grid-cols-1 gap-6 overflow-y-auto xl:grid-cols-[minmax(0,1fr)_320px]'>
+            <div className='min-w-0 p-4'>
               <div className='space-y-4'>
-                <div className='grid grid-cols-1 gap-3 sm:grid-cols-2 mx-2'>
+                <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
                   <div className='space-y-1.5'>
                     <label
                       htmlFor='template_name'
@@ -533,7 +598,7 @@ export function Template() {
                   </div>
                 </div>
 
-                <div className='flex items-center justify-between rounded-md border px-3 py-2 mx-2'>
+                <div className='flex items-center justify-between gap-3 rounded-md border px-3 py-2'>
                   <div>
                     <p className='text-sm font-medium'>Active</p>
                     <p className='text-xs text-muted-foreground'>
@@ -547,44 +612,59 @@ export function Template() {
                 </div>
 
                 <ProcessForm values={values} onChange={updateValue} />
-              </div>
-            </ScrollArea>
 
-            <div className='space-y-2 mr-6'>
+                <Collapsible defaultOpen={false} className='xl:hidden'>
+                  <CollapsibleTrigger
+                    render={
+                      <Button
+                        type='button'
+                        variant='outline'
+                        className='w-full justify-between'
+                      />
+                    }
+                  >
+                    Payload preview
+                    <ChevronDown strokeWidth={2} className='size-4' />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className='mt-2'>
+                    <PayloadPanel
+                      payloadJson={payloadJson}
+                      copied={copied}
+                      onCopy={() => void copyPayload()}
+                    />
+                  </CollapsibleContent>
+                </Collapsible>
+              </div>
+            </div>
+
+            <div className='hidden min-w-0 space-y-2 p-4 xl:sticky xl:top-4 xl:block xl:self-start xl:pr-6'>
               <p className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>
                 Payload preview
               </p>
-              <ScrollArea className='max-h-105 rounded-md border bg-muted **:data-[slot=scroll-area-viewport]:max-h-105'>
-                <pre className='whitespace-pre-wrap wrap-break-words p-3 font-mono text-[11px] leading-relaxed'>
-                  {payloadJson}
-                </pre>
-              </ScrollArea>
-              <Button
-                type='button'
-                variant='outline'
-                className='w-full'
-                onClick={() => void copyPayload()}
-              >
-                {copied ? (
-                  <Check className='mr-1 h-3.5 w-3.5' />
-                ) : (
-                  <Copy className='mr-1 h-3.5 w-3.5' />
-                )}
-                {copied ? 'Copied' : 'Copy JSON'}
-              </Button>
+              <PayloadPanel
+                payloadJson={payloadJson}
+                copied={copied}
+                onCopy={() => void copyPayload()}
+              />
             </div>
           </div>
 
-          <SheetFooter className='flex-row items-center justify-end'>
+          <SheetFooter className='flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-end'>
             <Button
               type='button'
               variant='outline'
+              className='w-full sm:w-auto'
               disabled={creating}
               onClick={() => setCreateOpen(false)}
             >
               Cancel
             </Button>
-            <Button type='button' disabled={creating} onClick={() => void registerTemplate()}>
+            <Button
+              type='button'
+              className='w-full sm:w-auto'
+              disabled={creating}
+              onClick={() => void registerTemplate()}
+            >
               {creating && <Spinner className='size-3.5' />}
               Register template
             </Button>

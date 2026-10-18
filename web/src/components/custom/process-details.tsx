@@ -369,7 +369,7 @@ function ConfigField({
   const { spec, value, isDefault } = field
 
   return (
-    <div className={cn('min-w-0', isWideField(spec) && 'col-span-2')}>
+    <div className={cn('min-w-0', isWideField(spec) && 'sm:col-span-2')}>
       <div className='mb-1 flex items-center gap-1.5 text-xs text-muted-foreground'>
         <span>{spec.label}</span>
         {enabled && isDefault && <DefaultBadge />}
@@ -407,7 +407,7 @@ function ConfigTab({
         <AccordionItem key={group.id} value={group.id} className={accordionItemClass}>
           <GroupTrigger label={group.label} count={group.fields.length} />
           <AccordionContent className='pb-4'>
-            <div className='grid grid-cols-2 gap-3'>
+            <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
               {group.fields.map((field) => (
                 <ConfigField
                   key={field.spec.key}
@@ -453,20 +453,22 @@ function OverviewTab({
   return (
     <div className='space-y-5 p-4'>
       <section>
-        <div className='mb-2.5 flex items-center justify-between'>
+        <div className='mb-2.5 flex flex-wrap items-center justify-between gap-2'>
           <SectionLabel>Live status</SectionLabel>
-          <div className='flex gap-1.5'>
+          <div className='flex flex-wrap gap-1.5'>
             <FlagBadge label='autorestart' active={summary.autorestart ?? false} />
             <FlagBadge label='watch' active={summary.watch} />
           </div>
         </div>
-        <div className='grid grid-cols-3 gap-3'>
+        <div className='grid grid-cols-2 gap-3 sm:grid-cols-3'>
           <StatTile label='Uptime' value={formatUptime(summary.uptime)} />
           <StatTile label='Restarts' value={orDash(summary.restarts)} />
-          <StatTile
-            label='Unstable restarts'
-            value={orDash(summary.unstable_restarts)}
-          />
+          <div className='col-span-2 sm:col-span-1'>
+            <StatTile
+              label='Unstable restarts'
+              value={orDash(summary.unstable_restarts)}
+            />
+          </div>
         </div>
         <div className='mt-3 grid grid-cols-2 gap-3'>
           <StatTile
@@ -497,7 +499,7 @@ function OverviewTab({
       {metricEntries.length > 0 && (
         <section>
           <SectionLabel>Custom metrics</SectionLabel>
-          <div className='grid grid-cols-2 gap-x-6'>
+          <div className='grid grid-cols-1 gap-x-6 sm:grid-cols-2'>
             {metricEntries.map(([key, metric]) => (
               <KeyValueRow key={key} label={key} value={formatMetricValue(metric)} />
             ))}
@@ -639,9 +641,9 @@ function LogsTab({
   }
 
   return (
-    <div className='flex h-full min-h-0 flex-col my-4'>
-      <div className='mb-2 flex shrink-0 items-center justify-between gap-2'>
-        <div className='flex items-center gap-2'>
+    <div className='my-3 flex h-full min-h-0 flex-col sm:my-4'>
+      <div className='mb-2 flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
+        <div className='flex flex-wrap items-center gap-2'>
           <span className='text-xs text-muted-foreground'>Rows</span>
           <Select
             value={String(tail)}
@@ -663,7 +665,7 @@ function LogsTab({
               type='button'
               size='sm'
               variant={filter === 'all' ? 'secondary' : 'ghost'}
-              className='h-6 px-2.5 text-xs'
+              className='h-9 px-2.5 text-xs lg:h-6'
               onClick={() => setFilter('all')}
             >
               All
@@ -672,14 +674,14 @@ function LogsTab({
               type='button'
               size='sm'
               variant={filter === 'error' ? 'secondary' : 'ghost'}
-              className='h-6 px-2.5 text-xs'
+              className='h-9 px-2.5 text-xs lg:h-6'
               onClick={() => setFilter('error')}
             >
               Errors{errorCount > 0 && ` ${errorCount}`}
             </Button>
           </div>
         </div>
-        <div className='flex items-center gap-2'>
+        <div className='flex items-center justify-end gap-2 sm:justify-start'>
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
@@ -821,7 +823,7 @@ function LogsTab({
                     type='button'
                     size='sm'
                     variant={scope === option.value ? 'secondary' : 'ghost'}
-                    className='h-6 px-2 text-xs'
+                    className='h-9 px-2 text-xs lg:h-6'
                     disabled={isFlushing}
                     onClick={() => setScope(option.value)}
                   >
@@ -898,7 +900,9 @@ function IdentityTile({ label, value }: { label: string; value: string }) {
   return (
     <div className='rounded-lg bg-muted/50 p-3'>
       <p className='text-xs text-muted-foreground'>{label}</p>
-      <p className='mt-0.5 truncate font-mono text-sm font-medium'>{value}</p>
+      <p className='mt-0.5 truncate font-mono text-sm font-medium' title={value}>
+        {value}
+      </p>
     </div>
   )
 }
@@ -926,8 +930,8 @@ export function ProcessDetails({
   }, [tab, server, process.pm_id, loadLogs])
 
   return (
-    <div className='flex min-h-0 flex-1 flex-col px-6 pb-6'>
-      <div className='grid shrink-0 grid-cols-2 gap-3'>
+    <div className='flex min-h-0 flex-1 flex-col px-4 pb-4 sm:px-6 sm:pb-6'>
+      <div className='grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-2'>
         <IdentityTile label='Server' value={orDash(server.server)} />
         <IdentityTile label='Host' value={`${server.host}:${server.port}`} />
         <IdentityTile label='PID' value={orDash(process.pid)} />
@@ -940,7 +944,7 @@ export function ProcessDetails({
         onValueChange={(value) => setTab(value as TabValue)}
         className='min-h-0 flex-1'
       >
-        <TabsList variant='line' className='w-full shrink-0 justify-start'>
+        <TabsList variant='line' className='w-full shrink-0 justify-start overflow-hidden'>
           <TabsTrigger value='overview'>Overview</TabsTrigger>
           <TabsTrigger value='config'>Config</TabsTrigger>
           <TabsTrigger value='logs'>Logs</TabsTrigger>
