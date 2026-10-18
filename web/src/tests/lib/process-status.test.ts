@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { deriveEffectiveStatus } from '../../lib/process-status'
+import { deriveEffectiveStatus, isProcessInactive } from '../../lib/process-status'
 import type { EffectiveStatus, ProcessStatus } from '../../types/process'
 
 const EFFECTIVE_STATUSES: EffectiveStatus[] = [
@@ -98,5 +98,36 @@ describe('deriveEffectiveStatus', () => {
   test('derives non-stopped wire statuses from a summary object', () => {
     expect(deriveEffectiveStatus({ status: 'waiting restart' })).toBe('waiting_restart')
     expect(deriveEffectiveStatus({ status: 'online' })).toBe('online')
+  })
+})
+
+describe('isProcessInactive', () => {
+  const INACTIVE: EffectiveStatus[] = [
+    'errored',
+    'failed_exit',
+    'stopped_manual',
+    'completed',
+    'scheduled_idle',
+  ]
+  const ACTIVE: EffectiveStatus[] = [
+    'online',
+    'degraded',
+    'waiting_restart',
+    'transitioning',
+  ]
+
+  test.each(INACTIVE)('treats %s as inactive', (status) => {
+    expect(isProcessInactive(status)).toBe(true)
+  })
+
+  test.each(ACTIVE)('treats %s as still active', (status) => {
+    expect(isProcessInactive(status)).toBe(false)
+  })
+
+  test('accepts a process summary and unknown values', () => {
+    expect(isProcessInactive({ status: 'errored' })).toBe(true)
+    expect(isProcessInactive({ status: 'online' })).toBe(false)
+    expect(isProcessInactive('not-a-status')).toBe(true)
+    expect(isProcessInactive(null)).toBe(true)
   })
 })
