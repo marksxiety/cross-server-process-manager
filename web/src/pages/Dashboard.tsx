@@ -594,6 +594,7 @@ export function Dashboard() {
                 </Badge>
               )}
             </div>
+            <Separator className='my-2' />
             {selectedContext && (
               <Alert
                 className={cn(
