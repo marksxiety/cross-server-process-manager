@@ -11,6 +11,7 @@ import {
 import { StatBar } from '@/components/custom/stat-bar'
 import { StatusDot } from '@/components/custom/status-dot'
 import { formatBytes, memorySharePercent } from '@/lib/format'
+import { isProcessInactive } from '@/lib/process-status'
 import { getStatusVisual } from '@/lib/status-styles'
 import { percentTone } from '@/lib/status-tone'
 import { cn } from '@/lib/utils'
@@ -32,6 +33,7 @@ export function ProcessCard({
 }: ProcessCardProps) {
   const visual = getStatusVisual(process)
   const memoryShare = memorySharePercent(process.memory, totalMemoryBytes)
+  const inactive = isProcessInactive(process)
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'Enter' || event.key === ' ') {
@@ -86,13 +88,13 @@ export function ProcessCard({
         <StatBar
           label='CPU'
           value={process.cpu}
-          tone={percentTone(process.cpu)}
+          tone={inactive ? 'neutral' : percentTone(process.cpu)}
         />
         {memoryShare !== null ? (
           <StatBar
             label='Mem'
             value={memoryShare}
-            tone={percentTone(memoryShare)}
+            tone={inactive ? 'neutral' : percentTone(memoryShare)}
           />
         ) : (
           <div className='w-full min-w-0'>
