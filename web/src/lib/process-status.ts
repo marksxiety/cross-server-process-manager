@@ -66,3 +66,23 @@ export function deriveEffectiveStatus(
     }
     return FALLBACK_STATUS;
 }
+
+/**
+ * Statuses where the process is not currently up: crashed, manually stopped,
+ * or finished a one-shot / waiting for a cron tick. `online`, `degraded`,
+ * `waiting_restart` and `transitioning` are deliberately excluded — the process
+ * is expected to be running (or about to be) so its live stats stay meaningful.
+ */
+const INACTIVE_STATUSES: ReadonlySet<EffectiveStatus> = new Set([
+    "errored",
+    "failed_exit",
+    "stopped_manual",
+    "completed",
+    "scheduled_idle",
+]);
+
+export function isProcessInactive(
+    input?: EffectiveStatusInput | null,
+): boolean {
+    return INACTIVE_STATUSES.has(deriveEffectiveStatus(input));
+}
