@@ -680,11 +680,6 @@ function LogsTab({
           </div>
         </div>
         <div className='flex items-center gap-2'>
-          {logs && logs.status !== 'loading' && visible.length > 0 && (
-            <span className='text-xs whitespace-nowrap text-muted-foreground'>
-              Showing {visible.length} of {lines.length} lines
-            </span>
-          )}
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
@@ -738,45 +733,55 @@ function LogsTab({
             <ErrorAlert error={logs.requestError} onRetry={() => void refreshLogs(server, pmId)} />
           </div>
         ) : null
-      ) : lines.length === 0 ? (
-        <p className='flex flex-1 items-center justify-center text-xs text-muted-foreground'>
-          No logs
-        </p>
-      ) : visible.length === 0 ? (
-        <p className='flex flex-1 items-center justify-center text-xs text-muted-foreground'>
-          No errors in the last {lines.length} lines
-        </p>
       ) : (
-        <ScrollArea className='min-h-0 flex-1 rounded-md border bg-muted/30'>
-          <div className='p-2'>
-            {visible.map((line) => (
-              <div key={line.id} className='flex gap-2 py-0.5 font-mono text-xs'>
-                <span
-                  className='shrink-0 tabular-nums text-muted-foreground'
-                  title={line.timestamp ?? undefined}
-                >
-                  {formatLogTimestamp(line.timestamp)}
-                </span>
-                <span
-                  className={cn(
-                    'w-6 shrink-0 font-medium',
-                    line.stream === 'error' ? 'text-destructive' : 'text-muted-foreground',
-                  )}
-                >
-                  {line.stream === 'error' ? 'err' : 'out'}
-                </span>
-                <span
-                  className={cn(
-                    'min-w-0 whitespace-pre-wrap break-all',
-                    line.stream === 'error' && 'text-destructive',
-                  )}
-                >
-                  {line.message}
-                </span>
+        <div className='flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border bg-muted/30'>
+          {lines.length === 0 ? (
+            <p className='flex flex-1 items-center justify-center text-xs text-muted-foreground'>
+              No logs
+            </p>
+          ) : visible.length === 0 ? (
+            <p className='flex flex-1 items-center justify-center text-xs text-muted-foreground'>
+              No errors in the last {lines.length} lines
+            </p>
+          ) : (
+            <ScrollArea className='min-h-0 flex-1'>
+              <div className='p-2'>
+                {visible.map((line) => (
+                  <div key={line.id} className='flex gap-2 py-0.5 font-mono text-xs'>
+                    <span
+                      className='shrink-0 tabular-nums text-muted-foreground'
+                      title={line.timestamp ?? undefined}
+                    >
+                      {formatLogTimestamp(line.timestamp)}
+                    </span>
+                    <span
+                      className={cn(
+                        'w-6 shrink-0 font-medium',
+                        line.stream === 'error' ? 'text-destructive' : 'text-muted-foreground',
+                      )}
+                    >
+                      {line.stream === 'error' ? 'err' : 'out'}
+                    </span>
+                    <span
+                      className={cn(
+                        'min-w-0 whitespace-pre-wrap break-all',
+                        line.stream === 'error' && 'text-destructive',
+                      )}
+                    >
+                      {line.message}
+                    </span>
+                  </div>
+                ))}
               </div>
-            ))}
+            </ScrollArea>
+          )}
+
+          <div className='flex shrink-0 items-center gap-2 border-t px-2 py-1 text-xs text-muted-foreground'>
+            <span>
+              Showing {visible.length} of {lines.length} lines
+            </span>
           </div>
-        </ScrollArea>
+        </div>
       )}
 
       <AlertDialog
