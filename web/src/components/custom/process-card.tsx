@@ -8,9 +8,11 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { StatBar } from '@/components/custom/stat-bar'
 import { StatusDot } from '@/components/custom/status-dot'
-import { formatBytes, formatPercent, memorySharePercent } from '@/lib/format'
+import { formatBytes, memorySharePercent } from '@/lib/format'
 import { getStatusVisual } from '@/lib/status-styles'
+import { percentTone } from '@/lib/status-tone'
 import { cn } from '@/lib/utils'
 import type { ProcessSummary } from '@/types/process'
 
@@ -80,12 +82,28 @@ export function ProcessCard({
         </CardAction>
       </CardHeader>
 
-      <CardContent className='flex flex-wrap items-center justify-between gap-2 text-xs tabular-nums text-muted-foreground'>
-        <span>CPU {process.cpu}%</span>
-        <span>
-          {formatBytes(process.memory)}
-          {memoryShare !== null && ` (${formatPercent(memoryShare)})`}
-        </span>
+      <CardContent className='mt-auto grid grid-cols-2 gap-3'>
+        <StatBar
+          label='CPU'
+          value={process.cpu}
+          tone={percentTone(process.cpu)}
+        />
+        {memoryShare !== null ? (
+          <StatBar
+            label='Mem'
+            value={memoryShare}
+            tone={percentTone(memoryShare)}
+          />
+        ) : (
+          <div className='w-full min-w-0'>
+            <div className='mb-0.5 flex justify-between text-xs uppercase tracking-wide text-muted-foreground'>
+              <span>Mem</span>
+            </div>
+            <span className='text-xs tabular-nums text-muted-foreground'>
+              {formatBytes(process.memory)}
+            </span>
+          </div>
+        )}
       </CardContent>
     </Card>
   )
