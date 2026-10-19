@@ -57,9 +57,9 @@ export function ProcessCard({
       )}
     >
       <CardHeader>
-        <CardTitle className='flex min-w-0 flex-wrap items-center gap-2'>
+        <CardTitle className='flex min-w-0 items-center gap-2'>
           <StatusDot process={process} />
-          <span className={cn('min-w-0 max-w-full truncate', visual.text)}>
+          <span className={cn('min-w-0 flex-1 truncate', visual.text)}>
             {process.name}
           </span>
           <Badge
