@@ -359,7 +359,7 @@ export function Dashboard() {
 
         {serversStatus === 'success' && servers.length > 0 && (
           <>
-            <div className='mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'>
+            <div className='mt-4 flex flex-wrap gap-3'>
               {servers.map((server) => {
                 const entry = processesByServer[server.server]
                 const isSelectable = entry?.status === 'success'
@@ -388,7 +388,7 @@ export function Dashboard() {
                         : undefined
                     }
                     className={cn(
-                      '@container/server min-w-0',
+                      '@container/server min-w-48 grow basis-[calc(20%-0.625rem)]',
                       isSelectable &&
                         'cursor-pointer transition-shadow hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring',
                       isSelected && 'ring-2 ring-primary',
