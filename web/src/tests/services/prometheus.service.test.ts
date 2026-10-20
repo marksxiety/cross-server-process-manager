@@ -11,9 +11,15 @@ const RANGE: ResolvedMetricsRange = {
   step: 15,
 }
 
-const TARGET = {
+const PROCESS_SCOPE = {
+  kind: 'process' as const,
   name: 'xpm-server',
   namespace: 'XPM',
+  server: 'MYPC',
+}
+
+const SERVER_SCOPE = {
+  kind: 'server' as const,
   server: 'MYPC',
 }
 
@@ -75,7 +81,7 @@ describe('queryRange', () => {
       }),
     )
 
-    const series = await queryRange('pm2_cpu', TARGET, RANGE)
+    const series = await queryRange('pm2_cpu', PROCESS_SCOPE, RANGE)
 
     expect(series).toEqual([
       {
@@ -96,6 +102,20 @@ describe('queryRange', () => {
     expect(url.searchParams.get('step')).toBe('15')
   })
 
+  test('builds a server-scoped selector without name', async () => {
+    const calls = stubFetch(() =>
+      jsonResponse({
+        status: 'success',
+        data: { resultType: 'matrix', result: [] },
+      }),
+    )
+
+    await queryRange('pm2_cpu', SERVER_SCOPE, RANGE)
+
+    const url = new URL(calls[0]!.url)
+    expect(url.searchParams.get('query')).toBe('pm2_cpu{app="MYPC"}')
+  })
+
   test('throws a typed error for an error envelope', async () => {
     stubFetch(() =>
       jsonResponse(
@@ -108,7 +128,7 @@ describe('queryRange', () => {
       ),
     )
 
-    await expect(queryRange('pm2_cpu', TARGET, RANGE)).rejects.toMatchObject({
+    await expect(queryRange('pm2_cpu', PROCESS_SCOPE, RANGE)).rejects.toMatchObject({
       code: 'PROMETHEUS_QUERY_ERROR',
       status: 400,
       message: 'bad_data: invalid query',
@@ -123,7 +143,7 @@ describe('queryRange', () => {
       }),
     )
 
-    await expect(queryRange('pm2_cpu', TARGET, RANGE)).rejects.toMatchObject({
+    await expect(queryRange('pm2_cpu', PROCESS_SCOPE, RANGE)).rejects.toMatchObject({
       code: 'PROMETHEUS_INVALID_RESPONSE',
     })
   })
@@ -133,7 +153,7 @@ describe('queryRange', () => {
       throw new Error('fetch failed')
     })
 
-    await expect(queryRange('pm2_cpu', TARGET, RANGE)).rejects.toMatchObject({
+    await expect(queryRange('pm2_cpu', PROCESS_SCOPE, RANGE)).rejects.toMatchObject({
       code: 'PROMETHEUS_UNREACHABLE',
       status: 0,
     })
@@ -142,7 +162,7 @@ describe('queryRange', () => {
   test('rejects when the URL is not configured', async () => {
     vi.stubEnv('VITE_PROMETHEUS_URL', '')
 
-    await expect(queryRange('pm2_cpu', TARGET, RANGE)).rejects.toMatchObject({
+    await expect(queryRange('pm2_cpu', PROCESS_SCOPE, RANGE)).rejects.toMatchObject({
       code: 'PROMETHEUS_NOT_CONFIGURED',
     })
   })
