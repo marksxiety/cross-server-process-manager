@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Check, ChevronDown, Eraser, RefreshCw, X } from 'lucide-react'
 import {
   AlertDialog,
@@ -85,7 +85,13 @@ import type {
 } from '@/types/process'
 import type { RegisteredServer } from '@/types/server'
 
-type TabValue = 'overview' | 'config' | 'logs'
+const ProcessMetricsTab = lazy(() =>
+  import('@/components/custom/process-metrics-tab').then((module) => ({
+    default: module.ProcessMetricsTab,
+  })),
+)
+
+type TabValue = 'overview' | 'metrics' | 'config' | 'logs'
 
 const DEFAULT_CONFIG_OPEN = ['identity', 'execution', 'restart']
 
@@ -957,6 +963,7 @@ export function ProcessDetails({
       >
         <TabsList variant='line' className='w-full shrink-0 justify-start overflow-hidden'>
           <TabsTrigger value='overview'>Overview</TabsTrigger>
+          <TabsTrigger value='metrics'>Metrics</TabsTrigger>
           <TabsTrigger value='config'>Config</TabsTrigger>
           <TabsTrigger value='logs'>Logs</TabsTrigger>
         </TabsList>
@@ -972,6 +979,24 @@ export function ProcessDetails({
               )}
             </WithDescribe>
           </ScrollArea>
+        </TabsContent>
+
+        <TabsContent value='metrics' className='flex min-h-0 flex-1 flex-col pt-4'>
+          <Suspense
+            fallback={
+              <div className='flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground'>
+                <Spinner className='size-4' />
+                Loading metrics…
+              </div>
+            }
+          >
+            <ProcessMetricsTab
+              server={server}
+              process={process}
+              totalMemoryBytes={totalMemoryBytes}
+              active={tab === 'metrics'}
+            />
+          </Suspense>
         </TabsContent>
 
         <TabsContent value='config' className='flex min-h-0 flex-1 flex-col pt-2'>
