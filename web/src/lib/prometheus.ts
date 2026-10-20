@@ -1,0 +1,221 @@
+import { formatBytes, formatUptime } from "@/lib/format";
+import type {
+    MetricsRange,
+    ProcessMetricName,
+    PrometheusPoint,
+    PrometheusSeries,
+    PrometheusTarget,
+    ResolvedMetricsRange,
+} from "@/types/prometheus";
+
+export const PROMETHEUS_SERVER_LABEL = "app";
+export const PROMETHEUS_RETENTION_MS = 15 * 24 * 60 * 60 * 1000;
+export const MAX_DATA_POINTS = 500;
+export const MIN_STEP_SECONDS = 15;
+export const DEFAULT_METRICS_REFRESH_MS = 30_000;
+export const DEFAULT_METRICS_RANGE: MetricsRange = {
+    kind: "relative",
+    durationMs: 60 * 60 * 1000,
+};
+
+export const PROCESS_METRICS: ProcessMetricName[] = [
+    "pm2_cpu",
+    "pm2_memory",
+    "pm2_uptime",
+    "pm2_start_time_seconds",
+    "pm2_restarts_total",
+    "pm2_unstable_restarts_total",
+    "pm2_status",
+];
+
+export interface MetricsRangePreset {
+    value: string;
+    label: string;
+    durationMs: number;
+}
+
+export const METRICS_RANGE_PRESETS: MetricsRangePreset[] = [
+    { value: "5m", label: "Last 5 minutes", durationMs: 5 * 60 * 1000 },
+    { value: "15m", label: "Last 15 minutes", durationMs: 15 * 60 * 1000 },
+    { value: "1h", label: "Last 1 hour", durationMs: 60 * 60 * 1000 },
+    { value: "6h", label: "Last 6 hours", durationMs: 6 * 60 * 60 * 1000 },
+    { value: "24h", label: "Last 24 hours", durationMs: 24 * 60 * 60 * 1000 },
+    { value: "7d", label: "Last 7 days", durationMs: 7 * 24 * 60 * 60 * 1000 },
+];
+
+/** Status codes emitted by xpm-exporter. Never renumber or reuse them. */
+export const PM2_STATUS_LABELS = [
+    "unknown",
+    "online",
+    "launching",
+    "stopping",
+    "waiting restart",
+    "stopped",
+    "errored",
+    "one-launch-status",
+] as const;
+
+const NICE_STEPS_SECONDS = [
+    15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 21600, 43200, 86400,
+];
+
+export function escapeLabelValue(value: string): string {
+    return value
+        .replace(/\\/g, "\\\\")
+        .replace(/"/g, '\\"')
+        .replace(/\r/g, "\\n")
+        .replace(/\n/g, "\\n");
+}
+
+export function buildSelector(metric: ProcessMetricName, target: PrometheusTarget): string {
+    const labels: string[] = [];
+
+    if (target.name) labels.push(`name="${escapeLabelValue(target.name)}"`);
+    if (target.namespace) labels.push(`namespace="${escapeLabelValue(target.namespace)}"`);
+    if (target.server) {
+        labels.push(`${PROMETHEUS_SERVER_LABEL}="${escapeLabelValue(target.server)}"`);
+    }
+
+    return labels.length > 0 ? `${metric}{${labels.join(",")}}` : metric;
+}
+
+export function computeStep(rangeMs: number): number {
+    if (!Number.isFinite(rangeMs) || rangeMs <= 0) return MIN_STEP_SECONDS;
+
+    const rawStep = rangeMs / 1000 / MAX_DATA_POINTS;
+    return (
+        NICE_STEPS_SECONDS.find((step) => step >= rawStep) ??
+        Math.ceil(rawStep / 86400) * 86400
+    );
+}
+
+export function resolveMetricsRange(
+    range: MetricsRange,
+    now = Date.now(),
+): ResolvedMetricsRange {
+    const end = range.kind === "relative" ? now : Math.min(range.end, now);
+    const requestedStart =
+        range.kind === "relative" ? end - range.durationMs : range.start;
+    const earliest = now - PROMETHEUS_RETENTION_MS;
+    const start = Math.max(requestedStart, earliest);
+    const safeEnd = Math.max(end, start + 1000);
+
+    return {
+        start,
+        end: safeEnd,
+        step: computeStep(safeEnd - start),
+    };
+}
+
+export function parseMatrixResult(result: unknown): PrometheusSeries[] {
+    if (!Array.isArray(result)) return [];
+
+    const series: PrometheusSeries[] = [];
+
+    for (const entry of result) {
+        if (typeof entry !== "object" || entry === null) continue;
+
+        const candidate = entry as { metric?: unknown; values?: unknown };
+        if (
+            typeof candidate.metric !== "object" ||
+            candidate.metric === null ||
+            !Array.isArray(candidate.values)
+        ) {
+            continue;
+        }
+
+        const metric: Record<string, string> = {};
+        for (const [key, value] of Object.entries(
+            candidate.metric as Record<string, unknown>,
+        )) {
+            if (typeof value === "string") metric[key] = value;
+        }
+
+        const points: PrometheusPoint[] = [];
+        for (const value of candidate.values) {
+            if (!Array.isArray(value) || value.length < 2) continue;
+
+            const timestamp = Number(value[0]);
+            const sample = Number(value[1]);
+            if (!Number.isFinite(timestamp) || !Number.isFinite(sample)) continue;
+
+            points.push({ timestamp: timestamp * 1000, value: sample });
+        }
+
+        if (points.length === 0) continue;
+
+        points.sort((a, b) => a.timestamp - b.timestamp);
+        series.push({ metric, points });
+    }
+
+    return series;
+}
+
+export function lastPoint(series: PrometheusSeries[]): PrometheusPoint | null {
+    let latest: PrometheusPoint | null = null;
+
+    for (const entry of series) {
+        for (const point of entry.points) {
+            if (latest === null || point.timestamp > latest.timestamp) {
+                latest = point;
+            }
+        }
+    }
+
+    return latest;
+}
+
+export function lastValue(series: PrometheusSeries[] | undefined): number | null {
+    return series ? (lastPoint(series)?.value ?? null) : null;
+}
+
+export function statusLabel(code: number): string {
+    const index = Math.trunc(code);
+    return PM2_STATUS_LABELS[index] ?? PM2_STATUS_LABELS[0];
+}
+
+export function formatDurationSeconds(seconds: number): string {
+    if (!Number.isFinite(seconds) || seconds <= 0) return "0s";
+    return formatUptime(seconds * 1000);
+}
+
+export function formatMetricValue(metric: ProcessMetricName, value: number): string {
+    switch (metric) {
+        case "pm2_cpu":
+            return `${value.toFixed(2)}%`;
+        case "pm2_memory":
+            return formatBytes(value);
+        case "pm2_uptime":
+            return formatDurationSeconds(value);
+        case "pm2_start_time_seconds":
+            return new Date(value * 1000).toLocaleString();
+        case "pm2_restarts_total":
+        case "pm2_unstable_restarts_total":
+            return String(Math.trunc(value));
+        case "pm2_status":
+            return statusLabel(value);
+    }
+}
+
+export function formatMetricAxisValue(
+    metric: ProcessMetricName,
+    value: number,
+): string {
+    switch (metric) {
+        case "pm2_cpu":
+            return `${Math.round(value)}%`;
+        case "pm2_memory":
+            return formatBytes(value);
+        case "pm2_uptime":
+            return formatDurationSeconds(value);
+        case "pm2_restarts_total":
+        case "pm2_unstable_restarts_total":
+            return String(Math.trunc(value));
+        default:
+            return String(value);
+    }
+}
+
+export function findRangePreset(durationMs: number): MetricsRangePreset | undefined {
+    return METRICS_RANGE_PRESETS.find((preset) => preset.durationMs === durationMs);
+}
