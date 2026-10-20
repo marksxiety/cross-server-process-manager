@@ -129,18 +129,7 @@ export function Dashboard() {
     process: ProcessSummary
   } | null>(null)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
-  const [selectedServerName, setSelectedServerName] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-
-  // Applies the filter only while its server is still registered, so a reload
-  // that drops the server falls back to the full process list.
-  const activeServerName = useMemo(
-    () =>
-      servers.some((server) => server.server === selectedServerName)
-        ? selectedServerName
-        : null,
-    [servers, selectedServerName],
-  )
 
   const describe = useProcessDescribe(
     selected?.server ?? null,
@@ -172,10 +161,6 @@ export function Dashboard() {
 
   const showReload =
     selectedProcess !== null && canRunProcessCommand(selectedProcess, 'reload')
-
-  const toggleServerFilter = (serverName: string) => {
-    setSelectedServerName((prev) => (prev === serverName ? null : serverName))
-  }
 
   const toggleSortKey = (key: ProcessSortKey) => {
     if (sortOrder.includes(key)) {
@@ -259,24 +244,20 @@ export function Dashboard() {
 
   const query = searchQuery.trim().toLowerCase()
 
-  // Applies the active server filter and the name/namespace search. An empty
-  // query leaves the list untouched so refreshing never shuffles results.
-  const filteredProcessItems = useMemo(() => {
-    const byServer =
-      activeServerName === null
-        ? processItems
-        : processItems.filter((item) => item.server.server === activeServerName)
-    if (query === '') return byServer
-    return byServer.filter(
+  // Applies the name/namespace search. An empty query leaves the list
+  // untouched so refreshing never shuffles results.
+  const searchedProcessItems = useMemo(() => {
+    if (query === '') return processItems
+    return processItems.filter(
       (item) =>
         item.process.name.toLowerCase().includes(query) ||
         item.process.namespace.toLowerCase().includes(query),
     )
-  }, [processItems, activeServerName, query])
+  }, [processItems, query])
 
   const sortedProcessItems = useMemo(
-    () => sortProcesses(filteredProcessItems, sortOrder),
-    [filteredProcessItems, sortOrder],
+    () => sortProcesses(searchedProcessItems, sortOrder),
+    [searchedProcessItems, sortOrder],
   )
 
   const orderSignature = useMemo(
@@ -284,11 +265,9 @@ export function Dashboard() {
     [sortedProcessItems],
   )
 
-  const isLoadingProcesses = servers
-    .filter(
-      (server) => activeServerName === null || server.server === activeServerName,
-    )
-    .some((server) => processesByServer[server.server]?.status === 'loading')
+  const isLoadingProcesses = servers.some(
+    (server) => processesByServer[server.server]?.status === 'loading',
+  )
 
   const processGridRef = useRef<HTMLDivElement | null>(null)
   useFlipReorder({ containerRef: processGridRef, orderSignature })
@@ -362,40 +341,18 @@ export function Dashboard() {
             <div className='mt-4 flex flex-wrap gap-3'>
               {servers.map((server) => {
                 const entry = processesByServer[server.server]
-                const isSelectable = entry?.status === 'success'
-                const isSelected = activeServerName === server.server
 
                 return (
-                  <Card
+                  <Link
                     key={server.server}
-                    role={isSelectable ? 'button' : undefined}
-                    tabIndex={isSelectable ? 0 : undefined}
-                    aria-pressed={isSelectable ? isSelected : undefined}
-                    aria-label={
-                      isSelectable ? `Filter processes on ${server.server}` : undefined
-                    }
-                    onClick={
-                      isSelectable ? () => toggleServerFilter(server.server) : undefined
-                    }
-                    onKeyDown={
-                      isSelectable
-                        ? (event) => {
-                            if (event.key === 'Enter' || event.key === ' ') {
-                              event.preventDefault()
-                              toggleServerFilter(server.server)
-                            }
-                          }
-                        : undefined
-                    }
-                    className={cn(
-                      '@container/server min-w-48 grow basis-[calc(20%-0.625rem)]',
-                      isSelectable &&
-                        'cursor-pointer transition-shadow hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring',
-                      isSelected && 'ring-2 ring-primary',
-                    )}
+                    to={`/server/${encodeURIComponent(server.server)}/metrics`}
+                    aria-label={`View metrics for ${server.server}`}
+                    className='@container/server block min-w-48 grow basis-[calc(20%-0.625rem)] rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring'
                   >
-                    <ServerHeader server={server} entry={entry} />
-                  </Card>
+                    <Card className='h-full transition-shadow hover:bg-accent/40'>
+                      <ServerHeader server={server} entry={entry} />
+                    </Card>
+                  </Link>
                 )
               })}
             </div>
@@ -404,9 +361,7 @@ export function Dashboard() {
               <div className='flex items-center gap-3'>
                 <p className='shrink-0 text-xs font-medium text-muted-foreground'>
                   {`Processes (${sortedProcessItems.length}${
-                    activeServerName !== null || query !== ''
-                      ? `/${processItems.length}`
-                      : ''
+                    query !== '' ? `/${processItems.length}` : ''
                   })`}
                 </p>
                 <Separator className='flex-1' />
@@ -543,9 +498,7 @@ export function Dashboard() {
                   </EmptyMedia>
                   <EmptyTitle>No processes</EmptyTitle>
                   <EmptyDescription>
-                    {activeServerName
-                      ? `${activeServerName} is not reporting any processes.`
-                      : 'None of the registered servers are reporting processes.'}
+                    None of the registered servers are reporting processes.
                   </EmptyDescription>
                 </EmptyHeader>
               </Empty>
