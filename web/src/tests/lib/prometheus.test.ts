@@ -1,23 +1,45 @@
 import { describe, expect, test } from 'vitest'
 import {
   buildSelector,
+  buildSelectorForScope,
+  buildServerSelector,
   computeStep,
+  countByStatus,
   escapeLabelValue,
+  filterSeries,
   formatDurationSeconds,
   formatMetricAxisValue,
   formatMetricValue,
+  formatSeriesLabel,
   lastPoint,
   lastValue,
+  latestPoints,
   parseMatrixResult,
   PROMETHEUS_RETENTION_MS,
   resolveMetricsRange,
   statusLabel,
+  sumLastValues,
 } from '../../lib/prometheus'
+import type { PrometheusSeries } from '../../types/prometheus'
 
 const SECOND = 1000
 const MINUTE = 60 * SECOND
 const HOUR = 60 * MINUTE
 const DAY = 24 * HOUR
+
+function series(
+  name: string,
+  namespace: string,
+  values: number[],
+): PrometheusSeries {
+  return {
+    metric: { name, namespace, app: 'MYPC' },
+    points: values.map((value, index) => ({
+      timestamp: index * 15 * SECOND,
+      value,
+    })),
+  }
+}
 
 describe('escapeLabelValue', () => {
   test('escapes backslashes, quotes and newlines', () => {
@@ -45,6 +67,87 @@ describe('buildSelector', () => {
     expect(buildSelector('pm2_cpu', { ...target, name: 'api"gateway' })).toBe(
       'pm2_cpu{name="api\\"gateway",namespace="XPM",app="MYPC"}',
     )
+  })
+})
+
+describe('buildServerSelector', () => {
+  test('selects every process on a server', () => {
+    expect(buildServerSelector('pm2_cpu', { server: 'MYPC' })).toBe(
+      'pm2_cpu{app="MYPC"}',
+    )
+  })
+
+  test('supports an optional namespace filter', () => {
+    expect(
+      buildServerSelector('pm2_cpu', { server: 'MYPC', namespace: 'XPM' }),
+    ).toBe('pm2_cpu{app="MYPC",namespace="XPM"}')
+  })
+})
+
+describe('buildSelectorForScope', () => {
+  test('builds process and server selectors', () => {
+    expect(
+      buildSelectorForScope('pm2_cpu', {
+        kind: 'process',
+        name: 'xpm-server',
+        namespace: 'XPM',
+        server: 'MYPC',
+      }),
+    ).toBe('pm2_cpu{name="xpm-server",namespace="XPM",app="MYPC"}')
+
+    expect(
+      buildSelectorForScope('pm2_cpu', { kind: 'server', server: 'MYPC' }),
+    ).toBe('pm2_cpu{app="MYPC"}')
+  })
+})
+
+describe('series labels and aggregates', () => {
+  const entries = [
+    series('xpm-agent', 'XPM', [1, 2]),
+    series('xpm-server', 'XPM', [3, 4]),
+    series('worker', 'production', [5]),
+  ]
+
+  test('labels series with namespace and name', () => {
+    expect(formatSeriesLabel(entries[0]!)).toBe('XPM · xpm-agent')
+    expect(
+      formatSeriesLabel({ metric: { name: 'plain' }, points: [] }),
+    ).toBe('plain')
+  })
+
+  test('returns the latest point for each series', () => {
+    expect(latestPoints(entries)).toEqual([
+      { series: entries[0], point: { timestamp: 15 * SECOND, value: 2 } },
+      { series: entries[1], point: { timestamp: 15 * SECOND, value: 4 } },
+      { series: entries[2], point: { timestamp: 0, value: 5 } },
+    ])
+    expect(sumLastValues(entries)).toBe(11)
+    expect(sumLastValues([])).toBeNull()
+  })
+
+  test('counts statuses from the latest values', () => {
+    const statuses = [
+      series('a', 'XPM', [1]),
+      series('b', 'XPM', [1]),
+      series('c', 'XPM', [5]),
+      series('d', 'XPM', [6]),
+    ]
+
+    expect(countByStatus(statuses)).toEqual({
+      online: 2,
+      stopped: 1,
+      errored: 1,
+    })
+  })
+
+  test('filters by namespace and search query', () => {
+    expect(filterSeries(entries, { namespace: 'XPM' })).toEqual([
+      entries[0],
+      entries[1],
+    ])
+    expect(filterSeries(entries, { query: 'server' })).toEqual([entries[1]])
+    expect(filterSeries(entries, { query: 'production' })).toEqual([entries[2]])
+    expect(filterSeries(entries, {})).toEqual(entries)
   })
 })
 
