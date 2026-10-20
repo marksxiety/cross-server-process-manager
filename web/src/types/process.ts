@@ -19,7 +19,8 @@ export type EffectiveStatus =
     | "stopped_manual"
     | "scheduled_idle"
     | "completed"
-    | "online";
+    | "online"
+    | "unknown";
 
 export type ProcessCommand = "start" | "stop" | "restart" | "reload" | "delete";
 

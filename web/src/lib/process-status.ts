@@ -20,7 +20,7 @@ const EFFECTIVE_STATUS_BY_WIRE_VALUE = new Map<string, EffectiveStatus>([
     ["launching", "transitioning"],
     ["one-launch-status", "transitioning"],
     ["waiting restart", "waiting_restart"],
-    ["unknown", "stopped_manual"],
+    ["unknown", "unknown"],
     ["failed_exit", "failed_exit"],
     ["degraded", "degraded"],
     ["waiting_restart", "waiting_restart"],
@@ -49,11 +49,14 @@ function hasNonZeroExitCode(exitCode: number | null | undefined): boolean {
 function deriveStoppedStatus(
     process: Pick<ProcessSummary, "autorestart" | "cron_restart" | "exit_code">,
 ): EffectiveStatus {
-    const isOneShot = process.autorestart === false;
-    if (isOneShot && hasNonZeroExitCode(process.exit_code)) return "failed_exit";
-    if (process.cron_restart) return "scheduled_idle";
-    if (isOneShot && process.exit_code === 0) return "completed";
-    return "stopped_manual";
+  const isCronOrOneShot =
+    process.autorestart === false || Boolean(process.cron_restart);
+  if (isCronOrOneShot && hasNonZeroExitCode(process.exit_code)) {
+    return "failed_exit";
+  }
+  if (process.cron_restart) return "scheduled_idle";
+  if (isCronOrOneShot && process.exit_code === 0) return "completed";
+  return "stopped_manual";
 }
 
 export function deriveEffectiveStatus(
@@ -79,6 +82,7 @@ const INACTIVE_STATUSES: ReadonlySet<EffectiveStatus> = new Set([
     "stopped_manual",
     "completed",
     "scheduled_idle",
+    "unknown",
 ]);
 
 export function isProcessInactive(
