@@ -26,7 +26,7 @@ export const SORT_KEYS = [
 export type ProcessSortKey = (typeof SORT_KEYS)[number]
 
 // Severity order: unhealthy processes surface above healthy ones for triage.
-// 1 = most severe, 6 = healthy.
+// 1 = most severe, 7 = healthy.
 export function getSeverityRank(pm2_env: {
   status: ProcessStatus
   autorestart?: boolean
@@ -62,11 +62,11 @@ export function getSeverityRank(pm2_env: {
     case 'launching':
       return 5
 
-    // 6. HEALTHY
+    // 7. HEALTHY
     case 'online':
     case 'one-launch-status':
     default:
-      return 6
+      return 7
   }
 }
 
