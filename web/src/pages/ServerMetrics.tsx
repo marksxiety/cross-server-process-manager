@@ -8,13 +8,6 @@ import { MetricChartCard } from '@/components/custom/metric-chart-card'
 import { MetricsToolbar } from '@/components/custom/metrics-toolbar'
 import { Button } from '@/components/ui/button'
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
-import {
   Empty,
   EmptyContent,
   EmptyDescription,
@@ -42,12 +35,10 @@ import {
   toMetricChartSeries,
 } from '@/lib/metric-chart'
 import {
-  combineStatus,
   metricDescription,
   metricError,
 } from '@/lib/metric-status'
 import {
-  PM2_STATUS_LABELS,
   PROCESS_METRICS,
   countByStatus,
   filterSeries,
@@ -56,16 +47,22 @@ import {
   formatSeriesLabel,
   normalizeCpu,
   normalizeMetricsRefreshMs,
-  statusLabel,
   sumLastValues,
 } from '@/lib/prometheus'
+import {
+  STATUS_CATALOG,
+  STATUS_CHART_CATEGORIES,
+  STATUS_ORDER,
+  statusLabelFromCode,
+} from '@/lib/status-catalog'
 import { useDashboardStore } from '@/stores/dashboard.store'
 import { useMetricsStore } from '@/stores/metrics.store'
 import type { ApiError } from '@/types/api'
 import type { LoadStatus } from '@/types/dashboard'
-import type { ProcessMetricName, PrometheusSeries } from '@/types/prometheus'
-
-const STATUS_CATEGORIES = [...PM2_STATUS_LABELS]
+import type {
+  ProcessMetricName,
+  PrometheusSeries,
+} from '@/types/prometheus'
 
 function metricValueFormatter(metric: ProcessMetricName) {
   return (value: number | string) => formatMetricValue(metric, Number(value))
@@ -80,21 +77,12 @@ const formatMemoryValue = metricValueFormatter('pm2_memory')
 const formatMemoryAxis = metricAxisFormatter('pm2_memory')
 const formatUptimeValue = metricValueFormatter('pm2_uptime')
 const formatUptimeAxis = metricAxisFormatter('pm2_uptime')
-const formatRestartsValue = metricValueFormatter('pm2_restarts_total')
-const formatRestartsAxis = metricAxisFormatter('pm2_restarts_total')
+const STATUS_SUMMARY_ORDER = STATUS_ORDER.map(
+  (status) => STATUS_CATALOG[status].label,
+)
 
 function statusSummary(counts: Record<string, number>): string | null {
-  const order = [
-    'online',
-    'launching',
-    'stopping',
-    'waiting restart',
-    'stopped',
-    'errored',
-    'one-launch-status',
-    'unknown',
-  ]
-  const parts = order
+  const parts = STATUS_SUMMARY_ORDER
     .filter((label) => (counts[label] ?? 0) > 0)
     .map((label) => `${counts[label]} ${label}`)
 
@@ -179,7 +167,6 @@ export function ServerMetrics() {
   const cpuSeries = filterMetric(metrics.data.pm2_cpu)
   const memorySeries = filterMetric(metrics.data.pm2_memory)
   const statusSeries = filterMetric(metrics.data.pm2_status)
-  const restartsSeries = filterMetric(metrics.data.pm2_restarts_total)
   const unstableSeries = filterMetric(
     metrics.data.pm2_unstable_restarts_total,
   )
@@ -207,7 +194,7 @@ export function ServerMetrics() {
     cpuSeries,
     memorySeries,
     statusSeries,
-    restartsSeries,
+    unstableSeries,
     uptimeSeries,
   ]) {
     for (const series of seriesList) visibleLabels.add(formatSeriesLabel(series))
@@ -217,7 +204,6 @@ export function ServerMetrics() {
   const cpuTotalRaw = sumLastValues(cpuSeries)
   const memoryTotalRaw = sumLastValues(memorySeries)
   const statusCounts = countByStatus(statusSeries)
-  const restartsTotal = sumLastValues(restartsSeries)
   const unstableTotal = sumLastValues(unstableSeries)
 
   const metricsLoading = metrics.isRefreshing && visibleProcessCount === 0
@@ -228,13 +214,6 @@ export function ServerMetrics() {
   )
   const showEmptyState =
     allSettled && visibleProcessCount === 0 && !hasError
-  const restartsStatus = combineStatus(
-    metrics.status.pm2_restarts_total,
-    metrics.status.pm2_unstable_restarts_total,
-  )
-  const restartsError =
-    metricError(metrics.errors, 'pm2_restarts_total') ??
-    metricError(metrics.errors, 'pm2_unstable_restarts_total')
 
   const cpuServerPending =
     overviewStatus === 'loading' || overviewStatus === 'idle'
@@ -450,6 +429,41 @@ export function ServerMetrics() {
             />
           </div>
         </div>
+
+        <div className='grid grid-cols-2 gap-2 sm:grid-cols-4'>
+          <SummaryStat
+            label='CPU total (PM2)'
+            value={
+              cpuTotalRaw === null ? '—' : formatPercent(cpuTotalRaw, 1)
+            }
+          />
+          <SummaryStat
+            label='Memory total'
+            value={
+              memoryServerPercent === null
+                ? memoryTotalRaw === null
+                  ? '—'
+                  : formatBytes(memoryTotalRaw)
+                : `${formatPercent(memoryServerPercent, 1)} (${formatBytes(
+                    memoryTotalRaw ?? 0,
+                  )})`
+            }
+          />
+          <SummaryStat
+            label='Host RAM'
+            value={
+              totalMemoryBytes === null
+                ? '—'
+                : formatBytes(totalMemoryBytes)
+            }
+          />
+          <SummaryStat
+            label='Unstable restarts'
+            value={
+              unstableTotal === null ? '—' : String(Math.trunc(unstableTotal))
+            }
+          />
+        </div>
       </div>
 
       {registryError && <ErrorAlert error={registryError} className='mb-3' />}
@@ -566,46 +580,14 @@ export function ServerMetrics() {
             color: colorFor,
             stepped: true,
             label: formatSeriesLabel,
-            valueMapper: statusLabel,
+            valueMapper: statusLabelFromCode,
           })}
           theme={theme}
           valueFormatter={(value) => String(value)}
-          yAxisCategories={STATUS_CATEGORIES}
+          yAxisCategories={STATUS_CHART_CATEGORIES}
           chartClassName='h-56'
           status={metrics.status.pm2_status}
           error={metricError(metrics.errors, 'pm2_status')}
-          onRetry={metrics.refresh}
-        />
-
-        <MetricChartCard
-          title='Restarts'
-          description={metricDescription(
-            restartsStatus,
-            restartsSeries.length === 0 && unstableSeries.length === 0
-              ? null
-              : `${processCountLabel(restartsSeries.length)} · ${
-                  restartsTotal ?? 0
-                } total · ${unstableTotal ?? 0} unstable`,
-          )}
-          series={[
-            ...toMetricChartSeries(restartsSeries, {
-              color: colorFor,
-              stepped: true,
-              label: (series) => `${formatSeriesLabel(series)} · total`,
-            }),
-            ...toMetricChartSeries(unstableSeries, {
-              color: theme.series.unstable,
-              stepped: true,
-              dashed: true,
-              label: (series) => `${formatSeriesLabel(series)} · unstable`,
-            }),
-          ]}
-          theme={theme}
-          valueFormatter={formatRestartsValue}
-          yAxisFormatter={formatRestartsAxis}
-          chartClassName='h-56'
-          status={restartsStatus}
-          error={restartsError}
           onRetry={metrics.refresh}
         />
 
@@ -630,55 +612,6 @@ export function ServerMetrics() {
           error={metricError(metrics.errors, 'pm2_uptime')}
           onRetry={metrics.refresh}
         />
-
-        <Card size='sm'>
-          <CardHeader className='pb-1'>
-            <CardTitle>Summary</CardTitle>
-            <CardDescription>
-              {metricsLoading
-                ? 'Loading processes…'
-                : `${processCountLabel(visibleProcessCount)} · ${namespaces.length} ${
-                    namespaces.length === 1 ? 'namespace' : 'namespaces'
-                  }`}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className='grid grid-cols-2 gap-2'>
-            <SummaryStat
-              label='CPU total (PM2)'
-              value={
-                cpuTotalRaw === null ? '—' : formatPercent(cpuTotalRaw, 1)
-              }
-            />
-            <SummaryStat
-              label='Memory total'
-              value={
-                memoryServerPercent === null
-                  ? memoryTotalRaw === null
-                    ? '—'
-                    : formatBytes(memoryTotalRaw)
-                  : `${formatPercent(memoryServerPercent, 1)} (${formatBytes(
-                      memoryTotalRaw ?? 0,
-                    )})`
-              }
-            />
-            <SummaryStat
-              label='Host RAM'
-              value={
-                totalMemoryBytes === null
-                  ? '—'
-                  : formatBytes(totalMemoryBytes)
-              }
-            />
-            <SummaryStat
-              label='Unstable restarts'
-              value={
-                unstableTotal === null
-                  ? '—'
-                  : String(Math.trunc(unstableTotal))
-              }
-            />
-          </CardContent>
-        </Card>
       </div>
       )}
     </div>
