@@ -2,6 +2,8 @@ import { lazy, Suspense, useMemo } from 'react'
 import type { ReactNode } from 'react'
 import type { EChartsCoreOption } from 'echarts/core'
 import { RefreshCw, TriangleAlert } from 'lucide-react'
+import { buildLineOption } from '@/components/custom/metric-chart-options'
+import { Button } from '@/components/ui/button'
 import {
   Card,
   CardAction,
@@ -10,7 +12,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import type { ChartTheme } from '@/hooks/use-chart-theme'
 import { cn } from '@/lib/utils'
@@ -26,15 +27,10 @@ const LazyEChart = lazy(() =>
   })),
 )
 
-type MetricChartCardProps = {
+type MetricChartCardBase = {
   title: string
   description?: string
-  series: MetricChartSeries[]
   theme: ChartTheme
-  valueFormatter: (value: number | string) => string
-  yAxisFormatter?: (value: number) => string
-  yAxisMax?: number
-  yAxisCategories?: string[]
   emptyLabel?: string
   className?: string
   chartClassName?: string
@@ -42,6 +38,14 @@ type MetricChartCardProps = {
   error?: ApiError | null
   onRetry?: () => void
   action?: ReactNode
+}
+
+export type MetricChartCardProps = MetricChartCardBase & {
+  series: MetricChartSeries[]
+  valueFormatter: (value: number | string) => string
+  yAxisFormatter?: (value: number) => string
+  yAxisMax?: number
+  yAxisCategories?: string[]
 }
 
 function ChartBodyLoading({
@@ -94,127 +98,36 @@ function ChartBodyError({
   )
 }
 
-export function MetricChartCard({
-  title,
-  description,
-  series,
-  theme,
-  valueFormatter,
-  yAxisFormatter,
-  yAxisMax,
-  yAxisCategories,
-  emptyLabel,
-  className,
-  chartClassName,
-  status,
-  error,
-  onRetry,
-  action,
-}: MetricChartCardProps) {
-  const hasData = series.some((entry) => entry.points.length > 0)
+function hasChartData(props: MetricChartCardProps): boolean {
+  return props.series.some((entry) => entry.points.length > 0)
+}
+
+function buildOption(props: MetricChartCardProps): EChartsCoreOption {
+  return buildLineOption({
+    series: props.series,
+    theme: props.theme,
+    valueFormatter: props.valueFormatter,
+    yAxisFormatter: props.yAxisFormatter,
+    yAxisMax: props.yAxisMax,
+    yAxisCategories: props.yAxisCategories,
+  })
+}
+
+export function MetricChartCard(props: MetricChartCardProps) {
+  const {
+    title,
+    description,
+    emptyLabel,
+    className,
+    chartClassName,
+    status,
+    error,
+    onRetry,
+    action,
+  } = props
+  const hasData = hasChartData(props)
   const loading = status === 'loading' || status === 'idle'
-
-  const option = useMemo<EChartsCoreOption>(() => {
-    const showLegend = series.length > 1
-
-    return {
-      animation: true,
-      animationDuration: 300,
-      animationDurationUpdate: 300,
-      animationEasingUpdate: 'cubicOut',
-      grid: {
-        left: 8,
-        right: 14,
-        top: 12,
-        bottom: showLegend ? 42 : 6,
-        containLabel: true,
-      },
-      tooltip: {
-        trigger: 'axis',
-        confine: true,
-        backgroundColor: theme.tooltipBackground,
-        borderColor: theme.border,
-        borderWidth: 1,
-        textStyle: { color: theme.text, fontSize: 11 },
-        valueFormatter: (value: unknown) =>
-          valueFormatter(value as number | string),
-        axisPointer: {
-          type: 'line',
-          lineStyle: { color: theme.mutedText, opacity: 0.35 },
-        },
-      },
-      legend: showLegend
-        ? {
-            type: 'scroll',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            itemWidth: 8,
-            itemHeight: 8,
-            icon: 'roundRect',
-            textStyle: { color: theme.mutedText, fontSize: 10 },
-          }
-        : undefined,
-      xAxis: {
-        type: 'time',
-        axisLine: { lineStyle: { color: theme.border } },
-        axisTick: { show: false },
-        axisLabel: { color: theme.mutedText, fontSize: 10, hideOverlap: true },
-        splitLine: { show: false },
-      },
-      yAxis: yAxisCategories
-        ? {
-            type: 'category',
-            data: yAxisCategories,
-            axisLine: { show: false },
-            axisTick: { show: false },
-            axisLabel: { color: theme.mutedText, fontSize: 10 },
-            splitLine: {
-              lineStyle: { color: theme.border, opacity: 0.5 },
-            },
-          }
-        : {
-            type: 'value',
-            min: 0,
-            max: yAxisMax,
-            axisLine: { show: false },
-            axisTick: { show: false },
-            axisLabel: {
-              color: theme.mutedText,
-              fontSize: 10,
-              formatter: yAxisFormatter,
-            },
-            splitLine: {
-              lineStyle: { color: theme.border, opacity: 0.5 },
-            },
-          },
-      series: series.map((entry) => ({
-        id: entry.id,
-        name: entry.name,
-        type: 'line',
-        data: entry.points,
-        showSymbol: false,
-        step: entry.stepped ? 'end' : false,
-        lineStyle: {
-          width: 1.5,
-          color: entry.color,
-          type: entry.dashed ? 'dashed' : 'solid',
-        },
-        itemStyle: { color: entry.color },
-        areaStyle: entry.filled
-          ? { color: entry.color, opacity: 0.08 }
-          : undefined,
-        emphasis: { focus: 'series' },
-      })),
-    }
-  }, [
-    series,
-    theme,
-    valueFormatter,
-    yAxisFormatter,
-    yAxisMax,
-    yAxisCategories,
-  ])
+  const option = useMemo(() => buildOption(props), [props])
 
   return (
     <Card size='sm' className={cn(className)}>
