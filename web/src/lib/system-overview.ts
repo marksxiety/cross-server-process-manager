@@ -16,6 +16,7 @@ export function toSystemOverview(value: unknown): SystemOverview {
     return {
         cpu: {
             usagePercent: toNumber(cpu.usagePercent),
+            cores: toNumber(cpu.cores),
         },
         memory: {
             totalBytes: toNumber(memory.totalBytes),
