@@ -1,10 +1,6 @@
 import { Activity } from 'lucide-react'
-import { isPrometheusConfigured, toPrometheusApiError } from '@/api/services/prometheus.service'
-import { ErrorAlert } from '@/components/custom/error-alert'
-import {
-  MetricChartCard,
-  type MetricChartSeries,
-} from '@/components/custom/metric-chart-card'
+import { isPrometheusConfigured } from '@/api/services/prometheus.service'
+import { MetricChartCard } from '@/components/custom/metric-chart-card'
 import { MetricsToolbar } from '@/components/custom/metrics-toolbar'
 import {
   Card,
@@ -20,12 +16,18 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Spinner } from '@/components/ui/spinner'
-import { formatBytes, formatPercent, memorySharePercent } from '@/lib/format'
 import { useChartTheme } from '@/hooks/use-chart-theme'
 import { useProcessMetrics } from '@/hooks/use-process-metrics'
+import { formatBytes, formatPercent, memorySharePercent } from '@/lib/format'
+import { toMetricChartSeries } from '@/lib/metric-chart'
+import {
+  combineStatus,
+  metricDescription,
+  metricError,
+} from '@/lib/metric-status'
 import {
   PM2_STATUS_LABELS,
+  PROCESS_METRICS,
   formatMetricAxisValue,
   formatMetricValue,
   lastValue,
@@ -33,11 +35,7 @@ import {
   statusLabel,
 } from '@/lib/prometheus'
 import { useMetricsStore } from '@/stores/metrics.store'
-import type {
-  MetricsData,
-  ProcessMetricName,
-  PrometheusSeries,
-} from '@/types/prometheus'
+import type { MetricsData, ProcessMetricName } from '@/types/prometheus'
 import type { ProcessSummary } from '@/types/process'
 import type { RegisteredServer } from '@/types/server'
 
@@ -66,33 +64,6 @@ const formatUptimeValue = metricValueFormatter('pm2_uptime')
 const formatUptimeAxis = metricAxisFormatter('pm2_uptime')
 const formatRestartsValue = metricValueFormatter('pm2_restarts_total')
 const formatRestartsAxis = metricAxisFormatter('pm2_restarts_total')
-
-function toChartSeries(
-  seriesList: PrometheusSeries[] | undefined,
-  color: string,
-  options?: {
-    stepped?: boolean
-    filled?: boolean
-    name?: string
-    mapValue?: (value: number) => number | string
-  },
-): MetricChartSeries[] {
-  return (seriesList ?? [])
-    .filter((series) => series.points.length > 0)
-    .map((series) => ({
-      name: options?.name ?? series.metric.name ?? 'Process',
-      color,
-      stepped: options?.stepped,
-      filled: options?.filled,
-      points: series.points.map(
-        (point) =>
-          [
-            point.timestamp,
-            options?.mapValue ? options.mapValue(point.value) : point.value,
-          ] as [number, number | string],
-      ),
-    }))
-}
 
 function hasAnyData(data: MetricsData): boolean {
   return Object.values(data).some((seriesList) =>
@@ -148,15 +119,16 @@ export function ProcessMetricsTab({
     memoryLast === null || memoryPercentTotal === null
       ? null
       : memorySharePercent(memoryLast, memoryPercentTotal)
-  const memoryDescription =
+  const memoryValueDescription =
     memoryLast === null
-      ? 'No data in this range.'
+      ? null
       : memoryLastPercent === null
         ? formatMemoryValue(memoryLast)
         : `${formatPercent(memoryLastPercent, 1)} of host RAM · ${formatBytes(memoryLast)}`
-  const memoryChartSeries = toChartSeries(memorySeries, theme.series.memory, {
+  const memoryChartSeries = toMetricChartSeries(memorySeries, {
+    color: theme.series.memory,
     filled: true,
-    mapValue: (value) =>
+    valueMapper: (value) =>
       memoryPercentTotal === null
         ? value
         : (memorySharePercent(value, memoryPercentTotal) ?? 0),
@@ -174,10 +146,20 @@ export function ProcessMetricsTab({
     return `${Math.round(value)}%`
   }
 
-  const chartData = hasAnyData(metrics.data)
-  const loading =
-    (metrics.status === 'idle' || metrics.status === 'loading') && !chartData
-  const apiError = metrics.error ? toPrometheusApiError(metrics.error) : null
+  const restartsStatus = combineStatus(
+    metrics.status.pm2_restarts_total,
+    metrics.status.pm2_unstable_restarts_total,
+  )
+  const restartsError =
+    metricError(metrics.errors, 'pm2_restarts_total') ??
+    metricError(metrics.errors, 'pm2_unstable_restarts_total')
+  const hasError = Object.keys(metrics.errors).length > 0
+  const allSettled = PROCESS_METRICS.every(
+    (metric) =>
+      metrics.status[metric] === 'success' || metrics.status[metric] === 'error',
+  )
+  const showEmptyState =
+    allSettled && !hasAnyData(metrics.data) && !hasError
 
   if (!configured) {
     return (
@@ -198,31 +180,22 @@ export function ProcessMetricsTab({
 
   return (
     <div className='flex min-h-0 flex-1 flex-col'>
-      <MetricsToolbar
-        range={range}
-        refreshMs={activeRefreshMs}
-        lastUpdated={metrics.lastUpdated}
-        isRefreshing={metrics.isRefreshing}
-        hasError={metrics.error !== null}
-        onRangeChange={setRange}
-        onRefreshMsChange={setRefreshMs}
-        onRefresh={metrics.refresh}
-      />
+      <div className='shrink-0 px-3 pt-3'>
+        <MetricsToolbar
+          range={range}
+          refreshMs={activeRefreshMs}
+          lastUpdated={metrics.lastUpdated}
+          isRefreshing={metrics.isRefreshing}
+          hasError={hasError}
+          onRangeChange={setRange}
+          onRefreshMsChange={setRefreshMs}
+          onRefresh={metrics.refresh}
+        />
+      </div>
 
       <ScrollArea className='min-h-0 flex-1'>
-        <div className='space-y-3 py-3 px-3'>
-          {apiError && (
-            <ErrorAlert error={apiError} onRetry={metrics.refresh} />
-          )}
-
-          {loading && !apiError && (
-            <div className='flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground'>
-              <Spinner className='size-4' />
-              Loading metrics…
-            </div>
-          )}
-
-          {!loading && !apiError && !chartData && (
+        <div className='px-3 py-3'>
+          {showEmptyState ? (
             <Empty>
               <EmptyHeader>
                 <EmptyMedia variant='icon'>
@@ -236,94 +209,118 @@ export function ProcessMetricsTab({
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>
-          )}
-
-          {chartData && (
+          ) : (
             <div className='space-y-3'>
               <MetricChartCard
                 title='CPU'
-                description={
-                  cpuLast === null ? 'No data in this range.' : formatCpuValue(cpuLast)
-                }
-                series={toChartSeries(cpuSeries, theme.series.cpu, {
+                description={metricDescription(
+                  metrics.status.pm2_cpu,
+                  cpuLast === null ? null : formatCpuValue(cpuLast),
+                )}
+                series={toMetricChartSeries(cpuSeries, {
+                  color: theme.series.cpu,
                   filled: true,
                 })}
                 theme={theme}
                 valueFormatter={formatCpuValue}
                 yAxisFormatter={formatCpuAxis}
                 yAxisMax={100}
+                status={metrics.status.pm2_cpu}
+                error={metricError(metrics.errors, 'pm2_cpu')}
+                onRetry={metrics.refresh}
               />
 
               <MetricChartCard
                 title='Memory'
-                description={memoryDescription}
+                description={metricDescription(
+                  metrics.status.pm2_memory,
+                  memoryValueDescription,
+                )}
                 series={memoryChartSeries}
                 theme={theme}
                 valueFormatter={memoryValueFormatter}
                 yAxisFormatter={memoryAxisFormatter}
                 yAxisMax={memoryPercentTotal === null ? undefined : 100}
+                status={metrics.status.pm2_memory}
+                error={metricError(metrics.errors, 'pm2_memory')}
+                onRetry={metrics.refresh}
               />
 
               <MetricChartCard
                 title='Status'
-                description={
-                  statusLast === null
-                    ? 'No data in this range.'
-                    : statusLabel(statusLast)
-                }
-                series={toChartSeries(statusSeries, theme.series.status, {
+                description={metricDescription(
+                  metrics.status.pm2_status,
+                  statusLast === null ? null : statusLabel(statusLast),
+                )}
+                series={toMetricChartSeries(statusSeries, {
+                  color: theme.series.status,
                   stepped: true,
-                  mapValue: (value) => statusLabel(value),
+                  valueMapper: statusLabel,
                 })}
                 theme={theme}
                 valueFormatter={(value) => String(value)}
                 yAxisCategories={STATUS_CATEGORIES}
+                status={metrics.status.pm2_status}
+                error={metricError(metrics.errors, 'pm2_status')}
+                onRetry={metrics.refresh}
               />
 
               <MetricChartCard
                 title='Restarts'
-                description={
+                description={metricDescription(
+                  restartsStatus,
                   restartsLast === null && unstableLast === null
-                    ? 'No data in this range.'
-                    : `${restartsLast ?? 0} total · ${unstableLast ?? 0} unstable`
-                }
+                    ? null
+                    : `${restartsLast ?? 0} total · ${unstableLast ?? 0} unstable`,
+                )}
                 series={[
-                  ...toChartSeries(restartsSeries, theme.series.restarts, {
+                  ...toMetricChartSeries(restartsSeries, {
+                    color: theme.series.restarts,
                     stepped: true,
-                    name: 'Total',
+                    label: () => 'Total',
                   }),
-                  ...toChartSeries(unstableSeries, theme.series.unstable, {
+                  ...toMetricChartSeries(unstableSeries, {
+                    color: theme.series.unstable,
                     stepped: true,
-                    name: 'Unstable',
+                    label: () => 'Unstable',
                   }),
                 ]}
                 theme={theme}
                 valueFormatter={formatRestartsValue}
                 yAxisFormatter={formatRestartsAxis}
+                status={restartsStatus}
+                error={restartsError}
+                onRetry={metrics.refresh}
               />
 
               <MetricChartCard
                 title='Uptime'
-                description={
-                  uptimeLast === null
-                    ? 'No data in this range.'
-                    : formatUptimeValue(uptimeLast)
-                }
-                series={toChartSeries(uptimeSeries, theme.series.uptime, {
+                description={metricDescription(
+                  metrics.status.pm2_uptime,
+                  uptimeLast === null ? null : formatUptimeValue(uptimeLast),
+                )}
+                series={toMetricChartSeries(uptimeSeries, {
+                  color: theme.series.uptime,
                   filled: true,
                 })}
                 theme={theme}
                 valueFormatter={formatUptimeValue}
                 yAxisFormatter={formatUptimeAxis}
+                status={metrics.status.pm2_uptime}
+                error={metricError(metrics.errors, 'pm2_uptime')}
+                onRetry={metrics.refresh}
               />
 
               <Card size='sm'>
                 <CardHeader className='pb-1'>
                   <CardTitle>Started at</CardTitle>
                   <CardDescription>
-                    {startedAt === null
-                      ? 'No data in this range.'
-                      : new Date(startedAt * 1000).toLocaleString()}
+                    {metricDescription(
+                      metrics.status.pm2_start_time_seconds,
+                      startedAt === null
+                        ? null
+                        : new Date(startedAt * 1000).toLocaleString(),
+                    )}
                   </CardDescription>
                 </CardHeader>
               </Card>
