@@ -14,6 +14,7 @@ import {
   lastPoint,
   lastValue,
   latestPoints,
+  normalizeCpu,
   parseMatrixResult,
   PROMETHEUS_RETENTION_MS,
   resolveMetricsRange,
@@ -273,6 +274,22 @@ describe('statusLabel', () => {
     expect(statusLabel(4)).toBe('waiting restart')
     expect(statusLabel(7)).toBe('one-launch-status')
     expect(statusLabel(99)).toBe('unknown')
+  })
+})
+
+describe('normalizeCpu', () => {
+  test('converts PM2 CPU into a share of the server', () => {
+    expect(normalizeCpu(320, 8)).toBe(40)
+    expect(normalizeCpu(4, 8)).toBe(0.5)
+  })
+
+  test('caps the server share at 100', () => {
+    expect(normalizeCpu(1000, 8)).toBe(100)
+  })
+
+  test('returns the raw value when core count is unavailable', () => {
+    expect(normalizeCpu(120, null)).toBe(120)
+    expect(normalizeCpu(120, 0)).toBe(120)
   })
 })
 
