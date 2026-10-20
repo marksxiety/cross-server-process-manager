@@ -1,11 +1,11 @@
 import { resolveMetricsFixture } from "@/demo/metrics-fixtures";
 import { isDemoMode } from "@/lib/demo-mode";
-import { buildSelector, parseMatrixResult } from "@/lib/prometheus";
+import { buildSelectorForScope, parseMatrixResult } from "@/lib/prometheus";
 import type { ApiError } from "@/types/api";
 import type {
+    MetricsScope,
     ProcessMetricName,
     PrometheusSeries,
-    PrometheusTarget,
     ResolvedMetricsRange,
 } from "@/types/prometheus";
 
@@ -39,11 +39,11 @@ export function toPrometheusApiError(error: PrometheusError): ApiError {
 
 export async function queryRange(
     metric: ProcessMetricName,
-    target: PrometheusTarget,
+    scope: MetricsScope,
     range: ResolvedMetricsRange,
     signal?: AbortSignal,
 ): Promise<PrometheusSeries[]> {
-    if (isDemoMode()) return resolveMetricsFixture(metric, target, range);
+    if (isDemoMode()) return resolveMetricsFixture(metric, scope, range);
 
     const baseUrl = prometheusBaseUrl();
     if (baseUrl === "") {
@@ -54,7 +54,7 @@ export async function queryRange(
     }
 
     const params = new URLSearchParams({
-        query: buildSelector(metric, target),
+        query: buildSelectorForScope(metric, scope),
         start: String(range.start / 1000),
         end: String(range.end / 1000),
         step: String(range.step),
