@@ -151,6 +151,11 @@ export function Dashboard() {
     return current ?? selected.process
   }, [selected, processesByServer])
 
+  const selectedServerEntry = useMemo(
+    () => (selected ? processesByServer[selected.server.server] : undefined),
+    [selected, processesByServer],
+  )
+
   const selectedVisual = getStatusVisual(selectedProcess)
   const selectedContext = selectedProcess ? getStatusContext(selectedProcess) : null
   const StatusIcon = selectedVisual.icon
@@ -575,8 +580,10 @@ export function Dashboard() {
                 process={selectedProcess}
                 describe={describe}
                 totalMemoryBytes={
-                  processesByServer[selected.server.server]?.overview?.memory.totalBytes ?? null
+                  selectedServerEntry?.overview?.memory.totalBytes ?? null
                 }
+                cpuCores={selectedServerEntry?.overview?.cpu.cores ?? null}
+                overviewStatus={selectedServerEntry?.status ?? 'idle'}
                 logs={logs}
               />
             )}
