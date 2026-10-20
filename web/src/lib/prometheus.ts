@@ -1,4 +1,5 @@
 import { formatBytes, formatUptime } from "@/lib/format";
+import { statusLabelFromCode } from "@/lib/status-catalog";
 import type {
     MetricsRange,
     MetricsScope,
@@ -90,18 +91,6 @@ export function normalizeMetricsRefreshMs(refreshMs: number): number {
     return match ? refreshMs : DEFAULT_METRICS_REFRESH_MS;
 }
 
-/** Status codes emitted by xpm-exporter. Never renumber or reuse them. */
-export const PM2_STATUS_LABELS = [
-    "unknown",
-    "online",
-    "launching",
-    "stopping",
-    "waiting restart",
-    "stopped",
-    "errored",
-    "one-launch-status",
-] as const;
-
 const NICE_STEPS_SECONDS = [
     15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 21600, 43200, 86400,
 ];
@@ -156,8 +145,10 @@ export function buildSelectorForScope(
 export function formatSeriesLabel(series: PrometheusSeries): string {
     const name = series.metric.name ?? "unknown";
     const namespace = series.metric.namespace;
+    const base = namespace ? `${namespace} · ${name}` : name;
+    const discriminator = series.metric.unique_id ?? series.metric.pm_id;
 
-    return namespace ? `${namespace} · ${name}` : name;
+    return discriminator ? `${base} (${discriminator})` : base;
 }
 
 export function computeStep(rangeMs: number): number {
@@ -273,7 +264,7 @@ export function countByStatus(series: PrometheusSeries[]): Record<string, number
     const counts: Record<string, number> = {};
 
     for (const { point } of latestPoints(series)) {
-        const label = statusLabel(point.value);
+        const label = statusLabelFromCode(point.value);
         counts[label] = (counts[label] ?? 0) + 1;
     }
 
@@ -304,11 +295,6 @@ export function normalizeCpu(value: number, cores: number | null): number {
     return Math.min(100, value / cores);
 }
 
-export function statusLabel(code: number): string {
-    const index = Math.trunc(code);
-    return PM2_STATUS_LABELS[index] ?? PM2_STATUS_LABELS[0];
-}
-
 export function formatDurationSeconds(seconds: number): string {
     if (!Number.isFinite(seconds) || seconds <= 0) return "0s";
     return formatUptime(seconds * 1000);
@@ -328,7 +314,7 @@ export function formatMetricValue(metric: ProcessMetricName, value: number): str
         case "pm2_unstable_restarts_total":
             return String(Math.trunc(value));
         case "pm2_status":
-            return statusLabel(value);
+            return statusLabelFromCode(value);
     }
 }
 
