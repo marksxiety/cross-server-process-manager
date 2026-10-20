@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'vitest'
-import { toMetricChartSeries } from '../../lib/metric-chart'
+import {
+    maxNumericValue,
+    niceCpuProcessMax,
+    nicePercentMax,
+    percentAxisFormatter,
+    toMetricChartSeries,
+} from '../../lib/metric-chart'
 import type { PrometheusSeries } from '../../types/prometheus'
 
 function series(name: string, values: number[]): PrometheusSeries {
@@ -57,5 +63,35 @@ describe('toMetricChartSeries', () => {
             toMetricChartSeries([series('empty', [])], { color: '#000' }),
         ).toEqual([])
         expect(toMetricChartSeries(undefined, { color: '#000' })).toEqual([])
+    })
+})
+
+describe('chart axis helpers', () => {
+    test('finds the maximum numeric value', () => {
+        const chartSeries = toMetricChartSeries(
+            [series('a', [1, 9]), series('b', [3, 4])],
+            { color: '#000' },
+        )
+
+        expect(maxNumericValue(chartSeries)).toBe(9)
+        expect(maxNumericValue([])).toBe(0)
+    })
+
+    test('rounds percentage axes to a readable maximum', () => {
+        expect(nicePercentMax(0.6)).toBe(1)
+        expect(nicePercentMax(18)).toBe(20)
+        expect(nicePercentMax(95)).toBe(100)
+        expect(nicePercentMax(0, 5)).toBe(5)
+    })
+
+    test('uses decimals only for small percentage axes', () => {
+        expect(percentAxisFormatter(1)(0.5)).toBe('0.5%')
+        expect(percentAxisFormatter(20)(10)).toBe('10%')
+    })
+
+    test('allows process CPU axes above 100', () => {
+        expect(niceCpuProcessMax(80)).toBe(100)
+        expect(niceCpuProcessMax(320)).toBe(400)
+        expect(niceCpuProcessMax(700)).toBe(1000)
     })
 })
