@@ -299,6 +299,11 @@ export function filterSeries(
     });
 }
 
+export function normalizeCpu(value: number, cores: number | null): number {
+    if (!cores || cores <= 0) return value;
+    return Math.min(100, value / cores);
+}
+
 export function statusLabel(code: number): string {
     const index = Math.trunc(code);
     return PM2_STATUS_LABELS[index] ?? PM2_STATUS_LABELS[0];
