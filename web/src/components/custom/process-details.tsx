@@ -887,6 +887,10 @@ type ProcessDetailsProps = {
   }
   /** Total RAM of the host, when known; enables the memory share %. */
   totalMemoryBytes: number | null
+  /** Logical CPU core count, when known; enables the server CPU share. */
+  cpuCores: number | null
+  /** Status of the host overview that supplies RAM/cores. */
+  overviewStatus: LoadStatus
   logs: LogsEntry | undefined
 }
 
@@ -933,6 +937,8 @@ export function ProcessDetails({
   process,
   describe,
   totalMemoryBytes,
+  cpuCores,
+  overviewStatus,
   logs,
 }: ProcessDetailsProps) {
   const [tab, setTab] = useState<TabValue>('overview')
@@ -994,6 +1000,8 @@ export function ProcessDetails({
               server={server}
               process={process}
               totalMemoryBytes={totalMemoryBytes}
+              cpuCores={cpuCores}
+              overviewStatus={overviewStatus}
               active={tab === 'metrics'}
             />
           </Suspense>
