@@ -1,6 +1,7 @@
 import { formatBytes, formatUptime } from "@/lib/format";
 import type {
     MetricsRange,
+    MetricsScope,
     ProcessMetricName,
     PrometheusPoint,
     PrometheusSeries,
@@ -125,6 +126,40 @@ export function buildSelector(metric: ProcessMetricName, target: PrometheusTarge
     return labels.length > 0 ? `${metric}{${labels.join(",")}}` : metric;
 }
 
+export function buildServerSelector(
+    metric: ProcessMetricName,
+    target: { server: string; namespace?: string },
+): string {
+    const labels: string[] = [];
+
+    if (target.server) {
+        labels.push(`${PROMETHEUS_SERVER_LABEL}="${escapeLabelValue(target.server)}"`);
+    }
+    if (target.namespace) {
+        labels.push(`namespace="${escapeLabelValue(target.namespace)}"`);
+    }
+
+    return labels.length > 0 ? `${metric}{${labels.join(",")}}` : metric;
+}
+
+export function buildSelectorForScope(
+    metric: ProcessMetricName,
+    scope: MetricsScope,
+): string {
+    if (scope.kind === "process") {
+        return buildSelector(metric, scope);
+    }
+
+    return buildServerSelector(metric, scope);
+}
+
+export function formatSeriesLabel(series: PrometheusSeries): string {
+    const name = series.metric.name ?? "unknown";
+    const namespace = series.metric.namespace;
+
+    return namespace ? `${namespace} · ${name}` : name;
+}
+
 export function computeStep(rangeMs: number): number {
     if (!Number.isFinite(rangeMs) || rangeMs <= 0) return MIN_STEP_SECONDS;
 
@@ -213,6 +248,55 @@ export function lastPoint(series: PrometheusSeries[]): PrometheusPoint | null {
 
 export function lastValue(series: PrometheusSeries[] | undefined): number | null {
     return series ? (lastPoint(series)?.value ?? null) : null;
+}
+
+export interface LatestSeriesPoint {
+    series: PrometheusSeries;
+    point: PrometheusPoint;
+}
+
+export function latestPoints(series: PrometheusSeries[]): LatestSeriesPoint[] {
+    return series.flatMap((entry) => {
+        const point = entry.points[entry.points.length - 1];
+        return point ? [{ series: entry, point }] : [];
+    });
+}
+
+export function sumLastValues(series: PrometheusSeries[]): number | null {
+    const points = latestPoints(series);
+    if (points.length === 0) return null;
+
+    return points.reduce((total, entry) => total + entry.point.value, 0);
+}
+
+export function countByStatus(series: PrometheusSeries[]): Record<string, number> {
+    const counts: Record<string, number> = {};
+
+    for (const { point } of latestPoints(series)) {
+        const label = statusLabel(point.value);
+        counts[label] = (counts[label] ?? 0) + 1;
+    }
+
+    return counts;
+}
+
+export function filterSeries(
+    series: PrometheusSeries[],
+    filter: { namespace?: string; query?: string },
+): PrometheusSeries[] {
+    const query = filter.query?.trim().toLowerCase() ?? "";
+
+    return series.filter((entry) => {
+        const namespace = entry.metric.namespace ?? "default";
+
+        if (filter.namespace && namespace !== filter.namespace) return false;
+        if (query === "") return true;
+
+        return (
+            (entry.metric.name ?? "").toLowerCase().includes(query) ||
+            namespace.toLowerCase().includes(query)
+        );
+    });
 }
 
 export function statusLabel(code: number): string {
