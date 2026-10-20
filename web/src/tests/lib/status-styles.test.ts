@@ -57,7 +57,7 @@ describe('getStatusVisual', () => {
   test('normalizes PM2 wire statuses before lookup', () => {
     expect(getStatusVisual('stopping')).toBe(STATUS_VISUALS.transitioning)
     expect(getStatusVisual('waiting restart')).toBe(STATUS_VISUALS.waiting_restart)
-    expect(getStatusVisual('unknown')).toBe(STATUS_VISUALS.stopped_manual)
+    expect(getStatusVisual('unknown')).toBe(STATUS_VISUALS.unknown)
   })
 
   test('derives from a process summary object', () => {

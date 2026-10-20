@@ -278,29 +278,30 @@ describe('getSeverityRank', () => {
     expect(getSeverityRank({ status: 'stopped', cron_restart: '0 2 * * *', exit_code: 2 })).toBe(2)
   })
 
-  test('ranks a normally stopped service as high severity', () => {
-    expect(getSeverityRank({ status: 'stopped' })).toBe(3)
-    expect(getSeverityRank({ status: 'stopped', autorestart: true })).toBe(3)
+  test('ranks degraded and stopped services as high severity', () => {
+    expect(getSeverityRank('degraded')).toBe(3)
+    expect(getSeverityRank({ status: 'stopped' })).toBe(4)
+    expect(getSeverityRank({ status: 'stopped', autorestart: true })).toBe(4)
   })
 
   test('ranks waiting restart as medium', () => {
-    expect(getSeverityRank({ status: 'waiting restart' })).toBe(4)
+    expect(getSeverityRank({ status: 'waiting restart' })).toBe(5)
   })
 
-  test('ranks stopping and launching as info', () => {
-    expect(getSeverityRank({ status: 'stopping' })).toBe(5)
-    expect(getSeverityRank({ status: 'launching' })).toBe(5)
+  test('ranks stopping, launching and one-launch as info', () => {
+    expect(getSeverityRank({ status: 'stopping' })).toBe(6)
+    expect(getSeverityRank({ status: 'launching' })).toBe(6)
+    expect(getSeverityRank({ status: 'one-launch-status' })).toBe(6)
   })
 
-  test('ranks a cleanly finished cron/one-shot stop right above online', () => {
-    expect(getSeverityRank({ status: 'stopped', autorestart: false, exit_code: 0 })).toBe(6)
-    expect(getSeverityRank({ status: 'stopped', cron_restart: '0 2 * * *', exit_code: 0 })).toBe(6)
+  test('ranks clean cron and one-shot stops above stopped services', () => {
+    expect(getSeverityRank({ status: 'stopped', cron_restart: '0 2 * * *', exit_code: 0 })).toBe(7)
+    expect(getSeverityRank({ status: 'stopped', autorestart: false, exit_code: 0 })).toBe(8)
   })
 
-  test('ranks healthy and unknown statuses lowest', () => {
-    expect(getSeverityRank({ status: 'online' })).toBe(7)
-    expect(getSeverityRank({ status: 'one-launch-status' })).toBe(7)
-    expect(getSeverityRank({ status: 'unknown' })).toBe(7)
+  test('ranks online and unknown statuses lowest', () => {
+    expect(getSeverityRank({ status: 'online' })).toBe(9)
+    expect(getSeverityRank({ status: 'unknown' })).toBe(10)
   })
 })
 

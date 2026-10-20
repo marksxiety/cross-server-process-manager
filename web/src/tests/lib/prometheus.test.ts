@@ -18,9 +18,9 @@ import {
   parseMatrixResult,
   PROMETHEUS_RETENTION_MS,
   resolveMetricsRange,
-  statusLabel,
   sumLastValues,
 } from '../../lib/prometheus'
+import { statusLabelFromCode } from '../../lib/status-catalog'
 import type { PrometheusSeries } from '../../types/prometheus'
 
 const SECOND = 1000
@@ -128,16 +128,16 @@ describe('series labels and aggregates', () => {
 
   test('counts statuses from the latest values', () => {
     const statuses = [
-      series('a', 'XPM', [1]),
-      series('b', 'XPM', [1]),
-      series('c', 'XPM', [5]),
-      series('d', 'XPM', [6]),
+      series('a', 'XPM', [9]),
+      series('b', 'XPM', [9]),
+      series('c', 'XPM', [6]),
+      series('d', 'XPM', [1]),
     ]
 
     expect(countByStatus(statuses)).toEqual({
-      online: 2,
-      stopped: 1,
-      errored: 1,
+      Online: 2,
+      Stopped: 1,
+      Errored: 1,
     })
   })
 
@@ -267,13 +267,13 @@ describe('lastPoint', () => {
   })
 })
 
-describe('statusLabel', () => {
+describe('statusLabelFromCode', () => {
   test('maps exporter status codes', () => {
-    expect(statusLabel(0)).toBe('unknown')
-    expect(statusLabel(1)).toBe('online')
-    expect(statusLabel(4)).toBe('waiting restart')
-    expect(statusLabel(7)).toBe('one-launch-status')
-    expect(statusLabel(99)).toBe('unknown')
+    expect(statusLabelFromCode(0)).toBe('Unknown')
+    expect(statusLabelFromCode(1)).toBe('Errored')
+    expect(statusLabelFromCode(4)).toBe('Waiting Restart')
+    expect(statusLabelFromCode(9)).toBe('Online')
+    expect(statusLabelFromCode(99)).toBe('Unknown')
   })
 })
 
@@ -299,7 +299,7 @@ describe('metric formatting', () => {
     expect(formatMetricValue('pm2_memory', 1024)).toBe('1.0kb')
     expect(formatMetricValue('pm2_uptime', 3600)).toBe('1h')
     expect(formatMetricValue('pm2_restarts_total', 3.8)).toBe('3')
-    expect(formatMetricValue('pm2_status', 1)).toBe('online')
+    expect(formatMetricValue('pm2_status', 9)).toBe('Online')
   })
 
   test('formats axis values', () => {

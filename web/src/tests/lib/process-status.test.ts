@@ -12,6 +12,7 @@ const EFFECTIVE_STATUSES: EffectiveStatus[] = [
   'scheduled_idle',
   'completed',
   'online',
+  'unknown',
 ]
 
 const WIRE_TO_EFFECTIVE: Array<[ProcessStatus, EffectiveStatus]> = [
@@ -22,7 +23,7 @@ const WIRE_TO_EFFECTIVE: Array<[ProcessStatus, EffectiveStatus]> = [
   ['launching', 'transitioning'],
   ['one-launch-status', 'transitioning'],
   ['waiting restart', 'waiting_restart'],
-  ['unknown', 'stopped_manual'],
+  ['unknown', 'unknown'],
 ]
 
 describe('deriveEffectiveStatus', () => {
@@ -58,11 +59,18 @@ describe('deriveEffectiveStatus', () => {
       ).toBe('failed_exit')
     })
 
-    test('keeps failed_exit when a one-shot cron job crashes', () => {
+    test('keeps failed_exit when a cron job crashes', () => {
       expect(
         deriveEffectiveStatus({
           status: 'stopped',
           autorestart: false,
+          cron_restart: '*/5 * * * *',
+          exit_code: 2,
+        }),
+      ).toBe('failed_exit')
+      expect(
+        deriveEffectiveStatus({
+          status: 'stopped',
           cron_restart: '*/5 * * * *',
           exit_code: 2,
         }),
@@ -108,6 +116,7 @@ describe('isProcessInactive', () => {
     'stopped_manual',
     'completed',
     'scheduled_idle',
+    'unknown',
   ]
   const ACTIVE: EffectiveStatus[] = [
     'online',

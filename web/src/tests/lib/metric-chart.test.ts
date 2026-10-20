@@ -95,3 +95,4 @@ describe('chart axis helpers', () => {
         expect(niceCpuProcessMax(700)).toBe(1000)
     })
 })
+
