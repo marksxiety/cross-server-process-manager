@@ -1,6 +1,7 @@
 import { Check, Clock, Pause, RefreshCw, TriangleAlert, type LucideIcon } from "lucide-react";
 import { deriveEffectiveStatus } from "@/lib/process-status";
 import type { EffectiveStatusInput } from "@/lib/process-status";
+import { STATUS_CATALOG, STATUS_ORDER } from "@/lib/status-catalog";
 import type { EffectiveStatus, ProcessSummary } from "@/types/process";
 
 export type StatusVisual = {
@@ -14,9 +15,10 @@ export type StatusVisual = {
     ring: string;
 };
 
-export const STATUS_VISUALS: Record<EffectiveStatus, StatusVisual> = {
+type StatusVisualStyle = Omit<StatusVisual, "label">
+
+const STATUS_VISUAL_STYLES: Record<EffectiveStatus, StatusVisualStyle> = {
     errored: {
-        label: "Errored",
         icon: TriangleAlert,
         dot: "bg-red-500",
         pulse: true,
@@ -26,7 +28,6 @@ export const STATUS_VISUALS: Record<EffectiveStatus, StatusVisual> = {
         ring: "ring-red-200 dark:ring-red-800",
     },
     failed_exit: {
-        label: "Failed (Exit ≠ 0)",
         icon: TriangleAlert,
         dot: "bg-rose-500",
         pulse: true,
@@ -36,7 +37,6 @@ export const STATUS_VISUALS: Record<EffectiveStatus, StatusVisual> = {
         ring: "ring-rose-200 dark:ring-rose-800",
     },
     degraded: {
-        label: "Degraded",
         icon: TriangleAlert,
         dot: "bg-orange-500",
         pulse: true,
@@ -46,7 +46,6 @@ export const STATUS_VISUALS: Record<EffectiveStatus, StatusVisual> = {
         ring: "ring-orange-200 dark:ring-orange-800",
     },
     waiting_restart: {
-        label: "Waiting Restart",
         icon: RefreshCw,
         dot: "bg-amber-500",
         pulse: true,
@@ -56,7 +55,6 @@ export const STATUS_VISUALS: Record<EffectiveStatus, StatusVisual> = {
         ring: "ring-amber-200 dark:ring-amber-800",
     },
     transitioning: {
-        label: "Launching / Stopping",
         icon: RefreshCw,
         dot: "bg-sky-500",
         pulse: true,
@@ -66,7 +64,6 @@ export const STATUS_VISUALS: Record<EffectiveStatus, StatusVisual> = {
         ring: "ring-sky-200 dark:ring-sky-800",
     },
     stopped_manual: {
-        label: "Stopped",
         icon: Pause,
         dot: "bg-slate-500",
         pulse: false,
@@ -76,7 +73,6 @@ export const STATUS_VISUALS: Record<EffectiveStatus, StatusVisual> = {
         ring: "ring-slate-300 dark:ring-slate-700",
     },
     scheduled_idle: {
-        label: "Scheduled (Idle)",
         icon: Clock,
         dot: "bg-violet-500",
         pulse: false,
@@ -86,7 +82,6 @@ export const STATUS_VISUALS: Record<EffectiveStatus, StatusVisual> = {
         ring: "ring-violet-200 dark:ring-violet-900",
     },
     completed: {
-        label: "Completed",
         icon: Check,
         dot: "bg-teal-500",
         pulse: false,
@@ -96,7 +91,6 @@ export const STATUS_VISUALS: Record<EffectiveStatus, StatusVisual> = {
         ring: "ring-teal-200 dark:ring-teal-800",
     },
     online: {
-        label: "Online",
         icon: Check,
         dot: "bg-emerald-500",
         pulse: false,
@@ -105,7 +99,26 @@ export const STATUS_VISUALS: Record<EffectiveStatus, StatusVisual> = {
         border: "border-emerald-200 dark:border-emerald-800",
         ring: "ring-emerald-200 dark:ring-emerald-800",
     },
+    unknown: {
+        icon: TriangleAlert,
+        dot: "bg-slate-400",
+        pulse: false,
+        text: "text-slate-600 dark:text-slate-400",
+        surface: "bg-slate-100 dark:bg-slate-800",
+        border: "border-slate-300 dark:border-slate-700",
+        ring: "ring-slate-300 dark:ring-slate-700",
+    },
 };
+
+export const STATUS_VISUALS = Object.fromEntries(
+    STATUS_ORDER.map((status) => [
+        status,
+        {
+            label: STATUS_CATALOG[status].label,
+            ...STATUS_VISUAL_STYLES[status],
+        },
+    ]),
+) as Record<EffectiveStatus, StatusVisual>;
 
 export function getStatusVisual(
     input?: EffectiveStatusInput | null,
@@ -143,5 +156,7 @@ export function getStatusContext(process: StatusContextInput): string | null {
             return "Starting or stopping right now";
         case "degraded":
             return "Some instances are down";
+        case "unknown":
+            return "Status unavailable";
     }
 }
