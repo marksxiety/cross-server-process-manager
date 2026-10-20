@@ -43,6 +43,8 @@ export type MetricsRange =
 
 export type MetricsData = Partial<Record<ProcessMetricName, PrometheusSeries[]>>;
 
+export type MetricBasis = "server" | "process";
+
 export interface MetricChartSeries {
     id: string;
     name: string;
