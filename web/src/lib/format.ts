@@ -47,6 +47,32 @@ export function formatUptime(uptimeMs: number): string {
 }
 
 /**
+ * Formats how long ago a timestamp occurred relative to `now` (both in ms).
+ * Recent or future timestamps read as "just now" so clock skew never renders
+ * negative ages. Used for the metrics "last updated" status.
+ */
+export function formatRelativeTime(
+  timestamp: number | null | undefined,
+  now: number,
+): string {
+  if (typeof timestamp !== 'number' || !Number.isFinite(timestamp)) return EMPTY_VALUE
+  if (!Number.isFinite(now)) return EMPTY_VALUE
+
+  const elapsedSeconds = Math.floor((now - timestamp) / 1000)
+  if (elapsedSeconds < 5) return 'just now'
+
+  if (elapsedSeconds < 60) return `${elapsedSeconds}s ago`
+
+  const minutes = Math.floor(elapsedSeconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+
+  return `${Math.floor(hours / 24)}d ago`
+}
+
+/**
  * Formats a PM2 log timestamp prefix (ISO-ish local time, no timezone) for
  * display: `2026-09-19T10:29:08.123` -> `2026-09-19 10:29:08`. String-based on
  * purpose — the prefix is already local time, so no Date parsing is needed.
