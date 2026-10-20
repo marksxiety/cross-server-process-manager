@@ -65,7 +65,7 @@ function sampleValue(
         case "pm2_unstable_restarts_total":
             return (seed % 2) + Math.floor(elapsedMinutes / 45);
         case "pm2_status":
-            return seed % 9 === 0 ? 5 : 1;
+            return seed % 10;
     }
 }
 

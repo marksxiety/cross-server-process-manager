@@ -1,4 +1,7 @@
-import type { MetricChartSeries, PrometheusSeries } from "@/types/prometheus";
+import type {
+    MetricChartSeries,
+    PrometheusSeries,
+} from "@/types/prometheus";
 
 export interface MetricChartSeriesOptions {
     color: string | ((series: PrometheusSeries, index: number) => string);
@@ -76,3 +79,5 @@ export function toMetricChartSeries(
             };
         });
 }
+
+
