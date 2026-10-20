@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { formatUptime } from '@/lib/format'
 import {
   METRICS_RANGE_PRESETS,
   PROMETHEUS_RETENTION_MS,
@@ -22,6 +23,10 @@ type TimeRangePickerProps = {
   value: MetricsRange
   onChange: (range: MetricsRange) => void
 }
+
+const QUICK_CUSTOM_DURATIONS = METRICS_RANGE_PRESETS.filter((entry) =>
+  ['15m', '1h', '6h', '24h'].includes(entry.value),
+)
 
 function toLocalInputValue(timestamp: number): string {
   const offset = new Date(timestamp).getTimezoneOffset() * 60_000
@@ -56,9 +61,6 @@ export function TimeRangePicker({ value, onChange }: TimeRangePickerProps) {
 
   const isCustom = value.kind === 'absolute'
   const customLabel = absoluteRangeLabel(value)
-  const customTitle = isCustom
-    ? `Custom time range: ${customLabel}`
-    : 'Choose a custom time range'
 
   const openCustom = () => {
     const currentNow = Date.now()
@@ -75,6 +77,10 @@ export function TimeRangePicker({ value, onChange }: TimeRangePickerProps) {
   const fromValue = fromLocalInputValue(from)
   const toValue = fromLocalInputValue(to)
   const now = dialogNow
+  const durationMs =
+    fromValue !== null && toValue !== null && toValue > fromValue
+      ? toValue - fromValue
+      : null
 
   let validationError: string | null = null
   if (fromValue === null || toValue === null) {
@@ -100,71 +106,63 @@ export function TimeRangePicker({ value, onChange }: TimeRangePickerProps) {
 
   return (
     <>
-      <div className='space-y-1.5'>
-        <p className='text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground'>
-          Time range
-        </p>
-        <div className='flex items-center gap-2'>
-          <div
-            role='group'
-            aria-label='Time range presets'
-            className='flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto rounded-md bg-muted/60 p-0.5'
-          >
-            {METRICS_RANGE_PRESETS.map((entry) => {
-              const isActive =
-                value.kind === 'relative' &&
-                value.durationMs === entry.durationMs
+      <div
+        role='group'
+        aria-label='Time range'
+        className='flex min-w-fit flex-1 items-center gap-0.5 overflow-x-auto rounded-md bg-muted/60 p-0.5'
+      >
+        {METRICS_RANGE_PRESETS.map((entry) => {
+          const isActive =
+            value.kind === 'relative' && value.durationMs === entry.durationMs
 
-              return (
-                <Button
-                  key={entry.value}
-                  type='button'
-                  variant='ghost'
-                  size='sm'
-                  aria-pressed={isActive}
-                  aria-label={entry.label}
-                  onClick={() =>
-                    onChange({
-                      kind: 'relative',
-                      durationMs: entry.durationMs,
-                    })
-                  }
-                  className={cn(
-                    'h-8 min-w-8 shrink-0 px-1.5 text-[11px] font-medium lg:h-6',
-                    isActive
-                      ? 'bg-background text-foreground shadow-sm ring-1 ring-border hover:bg-background'
-                      : 'text-muted-foreground',
-                  )}
-                >
-                  {entry.shortLabel}
-                </Button>
-              )
-            })}
-          </div>
+          return (
+            <Button
+              key={entry.value}
+              type='button'
+              variant='ghost'
+              size='sm'
+              aria-pressed={isActive}
+              aria-label={entry.label}
+              onClick={() =>
+                onChange({
+                  kind: 'relative',
+                  durationMs: entry.durationMs,
+                })
+              }
+              className={cn(
+                'h-8 min-w-8 shrink-0 px-1.5 text-[11px] font-medium lg:h-6',
+                isActive
+                  ? 'bg-background text-foreground shadow-sm ring-1 ring-border hover:bg-background'
+                  : 'text-muted-foreground',
+              )}
+            >
+              {entry.shortLabel}
+            </Button>
+          )
+        })}
 
-          <Button
-            type='button'
-            variant='outline'
-            size='sm'
-            onClick={openCustom}
-            aria-label={customTitle}
-            title={customTitle}
-            className={cn(
-              'h-8 shrink-0 gap-1.5 px-2 text-[11px] lg:h-6',
-              isCustom &&
-                'border-foreground/25 bg-muted text-foreground hover:bg-muted',
-            )}
-          >
-            <Calendar strokeWidth={2} />
-            <span className='max-w-32 truncate lg:max-w-28'>
-              {customLabel}
-            </span>
-          </Button>
-        </div>
+        <Button
+          type='button'
+          variant='ghost'
+          size='sm'
+          aria-pressed={isCustom}
+          aria-label={isCustom ? customLabel : 'Choose a custom time range'}
+          title={customLabel}
+          onClick={openCustom}
+          className={cn(
+            'h-8 shrink-0 gap-1 px-2 text-[11px] font-medium lg:h-6',
+            isCustom
+              ? 'bg-background text-foreground shadow-sm ring-1 ring-border hover:bg-background'
+              : 'text-muted-foreground',
+          )}
+        >
+          <Calendar strokeWidth={2} />
+          Custom
+        </Button>
       </div>
 
       <Dialog open={customOpen} onOpenChange={setCustomOpen}>
-        <DialogContent>
+        <DialogContent className='sm:max-w-md'>
           <DialogHeader>
             <DialogTitle>Custom time range</DialogTitle>
             <DialogDescription>
@@ -172,7 +170,7 @@ export function TimeRangePicker({ value, onChange }: TimeRangePickerProps) {
             </DialogDescription>
           </DialogHeader>
 
-          <div className='grid gap-3'>
+          <div className='grid gap-3 sm:grid-cols-2'>
             <label className='grid gap-1.5 text-xs'>
               <span className='text-muted-foreground'>From</span>
               <Input
@@ -186,7 +184,20 @@ export function TimeRangePicker({ value, onChange }: TimeRangePickerProps) {
               />
             </label>
             <label className='grid gap-1.5 text-xs'>
-              <span className='text-muted-foreground'>To</span>
+              <span className='flex items-center justify-between text-muted-foreground'>
+                To
+                <button
+                  type='button'
+                  className='text-[10px] font-medium text-foreground/70 underline-offset-2 hover:text-foreground hover:underline'
+                  onClick={() => {
+                    const currentNow = Date.now()
+                    setDialogNow(currentNow)
+                    setTo(toLocalInputValue(currentNow))
+                  }}
+                >
+                  Now
+                </button>
+              </span>
               <Input
                 type='datetime-local'
                 size='xs'
@@ -197,6 +208,38 @@ export function TimeRangePicker({ value, onChange }: TimeRangePickerProps) {
                 onChange={(event) => setTo(event.target.value)}
               />
             </label>
+          </div>
+
+          <div className='space-y-2'>
+            <div className='flex flex-wrap items-center gap-1.5'>
+              <span className='text-[11px] text-muted-foreground'>Quick</span>
+              {QUICK_CUSTOM_DURATIONS.map((entry) => (
+                <Button
+                  key={entry.value}
+                  type='button'
+                  variant='outline'
+                  size='xs'
+                  onClick={() => {
+                    const currentNow = Date.now()
+                    setDialogNow(currentNow)
+                    setTo(toLocalInputValue(currentNow))
+                    setFrom(
+                      toLocalInputValue(currentNow - entry.durationMs),
+                    )
+                  }}
+                >
+                  {entry.shortLabel}
+                </Button>
+              ))}
+            </div>
+
+            <p className='text-[11px] text-muted-foreground'>
+              Duration:{' '}
+              <span className='font-medium text-foreground/80'>
+                {durationMs === null ? '—' : formatUptime(durationMs)}
+              </span>
+            </p>
+
             {validationError && (
               <p className='text-xs text-destructive'>{validationError}</p>
             )}
