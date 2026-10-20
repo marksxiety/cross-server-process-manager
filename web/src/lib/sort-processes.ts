@@ -1,4 +1,7 @@
-import type { ProcessStatus, ProcessSummary } from '@/types/process'
+import { deriveEffectiveStatus } from '@/lib/process-status'
+import type { EffectiveStatusInput } from '@/lib/process-status'
+import { STATUS_CATALOG } from '@/lib/status-catalog'
+import type { ProcessSummary } from '@/types/process'
 import type { RegisteredServer } from '@/types/server'
 
 export interface ProcessListItem {
@@ -26,48 +29,10 @@ export const SORT_KEYS = [
 export type ProcessSortKey = (typeof SORT_KEYS)[number]
 
 // Severity order: unhealthy processes surface above healthy ones for triage.
-// 1 = most severe, 7 = healthy.
-export function getSeverityRank(pm2_env: {
-  status: ProcessStatus
-  autorestart?: boolean
-  cron_restart?: string | null
-  exit_code?: number | null
-}): number {
-  const { status, autorestart, cron_restart, exit_code } = pm2_env
-  const isCronOrOneShot = autorestart === false || Boolean(cron_restart)
-
-  switch (status) {
-    // 1. CRITICAL: Unstable-restart limit exceeded; PM2 gave up
-    case 'errored':
-      return 1
-
-    case 'stopped':
-      if (isCronOrOneShot) {
-        // 2. CRITICAL: Cron/one-shot crashed (non-zero exit code)
-        if (exit_code !== undefined && exit_code !== null && exit_code !== 0) {
-          return 2
-        }
-        // 6. HEALTHY: Cron/one-shot finished cleanly or is idle between runs
-        return 6
-      }
-      // 3. HIGH: Long-running service that is stopped
-      return 3
-
-    // 4. MEDIUM: Process exited; backoff/restart timer running
-    case 'waiting restart':
-      return 4
-
-    // 5. INFO: Graceful stop or initial launch in progress
-    case 'stopping':
-    case 'launching':
-      return 5
-
-    // 7. HEALTHY
-    case 'online':
-    case 'one-launch-status':
-    default:
-      return 7
-  }
+// Ranks come from the shared status catalog so sorting matches the Dashboard
+// labels and the metrics chart order.
+export function getSeverityRank(input: EffectiveStatusInput): number {
+  return STATUS_CATALOG[deriveEffectiveStatus(input)].rank
 }
 
 export const DEFAULT_SORT_ORDER: readonly ProcessSortKey[] = [
