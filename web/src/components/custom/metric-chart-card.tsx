@@ -1,4 +1,5 @@
 import { lazy, Suspense, useMemo } from 'react'
+import type { ReactNode } from 'react'
 import type { EChartsCoreOption } from 'echarts/core'
 import { RefreshCw, TriangleAlert } from 'lucide-react'
 import {
@@ -40,6 +41,7 @@ type MetricChartCardProps = {
   status?: LoadStatus
   error?: ApiError | null
   onRetry?: () => void
+  action?: ReactNode
 }
 
 function ChartBodyLoading({
@@ -107,6 +109,7 @@ export function MetricChartCard({
   status,
   error,
   onRetry,
+  action,
 }: MetricChartCardProps) {
   const hasData = series.some((entry) => entry.points.length > 0)
   const loading = status === 'loading' || status === 'idle'
@@ -218,19 +221,24 @@ export function MetricChartCard({
       <CardHeader className='pb-1'>
         <CardTitle>{title}</CardTitle>
         {description && <CardDescription>{description}</CardDescription>}
-        {hasData && error && (
+        {(action || (hasData && error)) && (
           <CardAction>
-            <Button
-              type='button'
-              variant='ghost'
-              size='icon-xs'
-              className='text-destructive'
-              aria-label={`Retry ${title}`}
-              title={error.message}
-              onClick={onRetry}
-            >
-              <TriangleAlert strokeWidth={2} />
-            </Button>
+            <div className='flex items-center gap-1'>
+              {action}
+              {hasData && error && (
+                <Button
+                  type='button'
+                  variant='ghost'
+                  size='icon-xs'
+                  className='text-destructive'
+                  aria-label={`Retry ${title}`}
+                  title={error.message}
+                  onClick={onRetry}
+                >
+                  <TriangleAlert strokeWidth={2} />
+                </Button>
+              )}
+            </div>
           </CardAction>
         )}
       </CardHeader>
