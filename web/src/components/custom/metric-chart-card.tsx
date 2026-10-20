@@ -1,23 +1,29 @@
-import { useMemo } from 'react'
+import { lazy, Suspense, useMemo } from 'react'
 import type { EChartsCoreOption } from 'echarts/core'
+import { RefreshCw, TriangleAlert } from 'lucide-react'
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import { EChart } from '@/components/custom/echart'
+import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
 import type { ChartTheme } from '@/hooks/use-chart-theme'
 import { cn } from '@/lib/utils'
+import type { ApiError } from '@/types/api'
+import type { LoadStatus } from '@/types/dashboard'
+import type { MetricChartSeries } from '@/types/prometheus'
 
-export interface MetricChartSeries {
-  name: string
-  color: string
-  points: Array<[number, number | string]>
-  stepped?: boolean
-  filled?: boolean
-}
+export type { MetricChartSeries } from '@/types/prometheus'
+
+const LazyEChart = lazy(() =>
+  import('@/components/custom/echart').then((module) => ({
+    default: module.EChart,
+  })),
+)
 
 type MetricChartCardProps = {
   title: string
@@ -30,6 +36,60 @@ type MetricChartCardProps = {
   yAxisCategories?: string[]
   emptyLabel?: string
   className?: string
+  chartClassName?: string
+  status?: LoadStatus
+  error?: ApiError | null
+  onRetry?: () => void
+}
+
+function ChartBodyLoading({
+  label,
+  chartClassName,
+}: {
+  label: string
+  chartClassName?: string
+}) {
+  return (
+    <div
+      className={cn(
+        'flex items-center justify-center gap-2 rounded-md border border-dashed text-xs text-muted-foreground',
+        chartClassName ?? 'h-48',
+      )}
+    >
+      <Spinner className='size-4' />
+      {label}
+    </div>
+  )
+}
+
+function ChartBodyError({
+  error,
+  onRetry,
+  chartClassName,
+}: {
+  error: ApiError
+  onRetry?: () => void
+  chartClassName?: string
+}) {
+  return (
+    <div
+      className={cn(
+        'flex flex-col items-center justify-center gap-2 rounded-md border border-dashed px-4 text-center text-xs text-muted-foreground',
+        chartClassName ?? 'h-48',
+      )}
+    >
+      <TriangleAlert className='size-4 text-destructive' strokeWidth={2} />
+      <p className='line-clamp-2 max-w-full break-words' title={error.message}>
+        {error.message}
+      </p>
+      {onRetry && (
+        <Button type='button' variant='outline' size='xs' onClick={onRetry}>
+          <RefreshCw strokeWidth={2} />
+          Retry
+        </Button>
+      )}
+    </div>
+  )
 }
 
 export function MetricChartCard({
@@ -43,19 +103,27 @@ export function MetricChartCard({
   yAxisCategories,
   emptyLabel,
   className,
+  chartClassName,
+  status,
+  error,
+  onRetry,
 }: MetricChartCardProps) {
   const hasData = series.some((entry) => entry.points.length > 0)
+  const loading = status === 'loading' || status === 'idle'
 
   const option = useMemo<EChartsCoreOption>(() => {
     const showLegend = series.length > 1
 
     return {
-      animation: false,
+      animation: true,
+      animationDuration: 300,
+      animationDurationUpdate: 300,
+      animationEasingUpdate: 'cubicOut',
       grid: {
         left: 8,
         right: 14,
-        top: showLegend ? 30 : 12,
-        bottom: 6,
+        top: 12,
+        bottom: showLegend ? 42 : 6,
         containLabel: true,
       },
       tooltip: {
@@ -74,7 +142,9 @@ export function MetricChartCard({
       },
       legend: showLegend
         ? {
-            top: 0,
+            type: 'scroll',
+            bottom: 0,
+            left: 0,
             right: 0,
             itemWidth: 8,
             itemHeight: 8,
@@ -116,12 +186,17 @@ export function MetricChartCard({
             },
           },
       series: series.map((entry) => ({
+        id: entry.id,
         name: entry.name,
         type: 'line',
         data: entry.points,
         showSymbol: false,
         step: entry.stepped ? 'end' : false,
-        lineStyle: { width: 1.5, color: entry.color },
+        lineStyle: {
+          width: 1.5,
+          color: entry.color,
+          type: entry.dashed ? 'dashed' : 'solid',
+        },
         itemStyle: { color: entry.color },
         areaStyle: entry.filled
           ? { color: entry.color, opacity: 0.08 }
@@ -143,14 +218,58 @@ export function MetricChartCard({
       <CardHeader className='pb-1'>
         <CardTitle>{title}</CardTitle>
         {description && <CardDescription>{description}</CardDescription>}
+        {hasData && error && (
+          <CardAction>
+            <Button
+              type='button'
+              variant='ghost'
+              size='icon-xs'
+              className='text-destructive'
+              aria-label={`Retry ${title}`}
+              title={error.message}
+              onClick={onRetry}
+            >
+              <TriangleAlert strokeWidth={2} />
+            </Button>
+          </CardAction>
+        )}
       </CardHeader>
       <CardContent>
-        {hasData ? (
-          <EChart option={option} ariaLabel={`${title} chart`} />
-        ) : (
-          <div className='flex h-48 items-center justify-center rounded-md border border-dashed text-xs text-muted-foreground'>
+        {!hasData && loading ? (
+          <ChartBodyLoading
+            label={`Loading ${title}…`}
+            chartClassName={chartClassName}
+          />
+        ) : !hasData && error ? (
+          <ChartBodyError
+            error={error}
+            onRetry={onRetry}
+            chartClassName={chartClassName}
+          />
+        ) : !hasData ? (
+          <div
+            className={cn(
+              'flex items-center justify-center rounded-md border border-dashed text-xs text-muted-foreground',
+              chartClassName ?? 'h-48',
+            )}
+          >
             {emptyLabel ?? 'No data in this range.'}
           </div>
+        ) : (
+          <Suspense
+            fallback={
+              <ChartBodyLoading
+                label='Loading chart…'
+                chartClassName={chartClassName}
+              />
+            }
+          >
+            <LazyEChart
+              option={option}
+              ariaLabel={`${title} chart`}
+              className={chartClassName}
+            />
+          </Suspense>
         )}
       </CardContent>
     </Card>
