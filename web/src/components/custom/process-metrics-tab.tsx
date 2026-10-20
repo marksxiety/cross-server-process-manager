@@ -33,15 +33,17 @@ import {
   metricError,
 } from '@/lib/metric-status'
 import {
-  PM2_STATUS_LABELS,
   PROCESS_METRICS,
   formatMetricAxisValue,
   formatMetricValue,
   lastValue,
   normalizeCpu,
   normalizeMetricsRefreshMs,
-  statusLabel,
 } from '@/lib/prometheus'
+import {
+  STATUS_CHART_CATEGORIES,
+  statusLabelFromCode,
+} from '@/lib/status-catalog'
 import { useMetricsStore } from '@/stores/metrics.store'
 import type { ApiError } from '@/types/api'
 import type { LoadStatus } from '@/types/dashboard'
@@ -57,8 +59,6 @@ type ProcessMetricsTabProps = {
   overviewStatus: LoadStatus
   active: boolean
 }
-
-const STATUS_CATEGORIES = [...PM2_STATUS_LABELS]
 
 function metricValueFormatter(metric: ProcessMetricName) {
   return (value: number | string) => formatMetricValue(metric, Number(value))
@@ -363,16 +363,18 @@ export function ProcessMetricsTab({
                 title='Status'
                 description={metricDescription(
                   metrics.status.pm2_status,
-                  statusLast === null ? null : statusLabel(statusLast),
+                  statusLast === null
+                    ? null
+                    : statusLabelFromCode(statusLast),
                 )}
                 series={toMetricChartSeries(statusSeries, {
                   color: theme.series.status,
                   stepped: true,
-                  valueMapper: statusLabel,
+                  valueMapper: statusLabelFromCode,
                 })}
                 theme={theme}
                 valueFormatter={(value) => String(value)}
-                yAxisCategories={STATUS_CATEGORIES}
+                yAxisCategories={STATUS_CHART_CATEGORIES}
                 status={metrics.status.pm2_status}
                 error={metricError(metrics.errors, 'pm2_status')}
                 onRetry={metrics.refresh}
