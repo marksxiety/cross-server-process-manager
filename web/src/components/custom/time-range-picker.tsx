@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronDown, Clock } from 'lucide-react'
+import { Calendar } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -10,21 +10,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import {
-  findRangePreset,
   METRICS_RANGE_PRESETS,
   PROMETHEUS_RETENTION_MS,
 } from '@/lib/prometheus'
+import { cn } from '@/lib/utils'
 import type { MetricsRange } from '@/types/prometheus'
 
 type TimeRangePickerProps = {
@@ -52,11 +43,8 @@ function formatDateTime(timestamp: number): string {
   }).format(timestamp)
 }
 
-function rangeLabel(range: MetricsRange): string {
-  if (range.kind === 'relative') {
-    return findRangePreset(range.durationMs)?.label ?? 'Relative range'
-  }
-
+function absoluteRangeLabel(range: MetricsRange): string {
+  if (range.kind !== 'absolute') return 'Custom range'
   return `${formatDateTime(range.start)} – ${formatDateTime(range.end)}`
 }
 
@@ -66,8 +54,11 @@ export function TimeRangePicker({ value, onChange }: TimeRangePickerProps) {
   const [to, setTo] = useState('')
   const [dialogNow, setDialogNow] = useState(0)
 
-  const preset =
-    value.kind === 'relative' ? findRangePreset(value.durationMs) : undefined
+  const isCustom = value.kind === 'absolute'
+  const customLabel = absoluteRangeLabel(value)
+  const customTitle = isCustom
+    ? `Custom time range: ${customLabel}`
+    : 'Choose a custom time range'
 
   const openCustom = () => {
     const currentNow = Date.now()
@@ -109,54 +100,75 @@ export function TimeRangePicker({ value, onChange }: TimeRangePickerProps) {
 
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          render={
-            <Button
-              variant='outline'
-              size='sm'
-              className='max-w-full justify-between gap-2'
-              aria-label={`Time range: ${rangeLabel(value)}`}
-            />
-          }
-        >
-          <Clock strokeWidth={2} />
-          <span className='min-w-0 truncate'>{rangeLabel(value)}</span>
-          <ChevronDown strokeWidth={2} className='text-muted-foreground' />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align='start' className='w-56'>
-          <DropdownMenuRadioGroup
-            value={preset?.value}
-            onValueChange={(next) => {
-              if (typeof next !== 'string') return
-              const match = METRICS_RANGE_PRESETS.find(
-                (entry) => entry.value === next,
-              )
-              if (match) {
-                onChange({ kind: 'relative', durationMs: match.durationMs })
-              }
-            }}
+      <div className='space-y-1.5'>
+        <p className='text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground'>
+          Time range
+        </p>
+        <div className='flex items-center gap-2'>
+          <div
+            role='group'
+            aria-label='Time range presets'
+            className='flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto rounded-md bg-muted/60 p-0.5'
           >
-            {METRICS_RANGE_PRESETS.map((entry) => (
-              <DropdownMenuRadioItem key={entry.value} value={entry.value}>
-                {entry.label}
-              </DropdownMenuRadioItem>
-            ))}
-          </DropdownMenuRadioGroup>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={openCustom}>
-            <Clock strokeWidth={2} />
-            Custom range…
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+            {METRICS_RANGE_PRESETS.map((entry) => {
+              const isActive =
+                value.kind === 'relative' &&
+                value.durationMs === entry.durationMs
+
+              return (
+                <Button
+                  key={entry.value}
+                  type='button'
+                  variant='ghost'
+                  size='sm'
+                  aria-pressed={isActive}
+                  aria-label={entry.label}
+                  onClick={() =>
+                    onChange({
+                      kind: 'relative',
+                      durationMs: entry.durationMs,
+                    })
+                  }
+                  className={cn(
+                    'h-8 min-w-8 shrink-0 px-1.5 text-[11px] font-medium lg:h-6',
+                    isActive
+                      ? 'bg-background text-foreground shadow-sm ring-1 ring-border hover:bg-background'
+                      : 'text-muted-foreground',
+                  )}
+                >
+                  {entry.shortLabel}
+                </Button>
+              )
+            })}
+          </div>
+
+          <Button
+            type='button'
+            variant='outline'
+            size='sm'
+            onClick={openCustom}
+            aria-label={customTitle}
+            title={customTitle}
+            className={cn(
+              'h-8 shrink-0 gap-1.5 px-2 text-[11px] lg:h-6',
+              isCustom &&
+                'border-foreground/25 bg-muted text-foreground hover:bg-muted',
+            )}
+          >
+            <Calendar strokeWidth={2} />
+            <span className='max-w-32 truncate lg:max-w-28'>
+              {customLabel}
+            </span>
+          </Button>
+        </div>
+      </div>
 
       <Dialog open={customOpen} onOpenChange={setCustomOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Custom time range</DialogTitle>
             <DialogDescription>
-              Prometheus retains 15 days of metric history.
+              Times are local. Prometheus retains 15 days of metric history.
             </DialogDescription>
           </DialogHeader>
 
