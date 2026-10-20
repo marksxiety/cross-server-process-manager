@@ -21,13 +21,14 @@ const elapsed = (days: number, hours = 0, minutes = 0): number =>
     ((days * 24 + hours) * 60 + minutes) * MS_PER_MINUTE;
 
 const SERVER_TOTAL_MEMORY = 16 * GIB;
+const SERVER_CORES = 8;
 const INTERPRETER = "C:\\Program Files\\nodejs\\node.exe";
 const PM2_LOG_DIR = "C:\\Users\\Administrator\\.pm2\\logs";
 
 function overviewOf(cpuUsagePercent: number, memoryPercentUsed: number): SystemOverview {
     const usedBytes = Math.round((SERVER_TOTAL_MEMORY * memoryPercentUsed) / 100);
     return {
-        cpu: { usagePercent: cpuUsagePercent },
+        cpu: { usagePercent: cpuUsagePercent, cores: SERVER_CORES },
         memory: {
             totalBytes: SERVER_TOTAL_MEMORY,
             usedBytes,
