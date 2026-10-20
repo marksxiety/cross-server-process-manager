@@ -1,14 +1,23 @@
 import { PROMETHEUS_SERVER_LABEL } from "@/lib/prometheus";
 import type {
+    MetricsScope,
     ProcessMetricName,
     PrometheusPoint,
     PrometheusSeries,
-    PrometheusTarget,
     ResolvedMetricsRange,
 } from "@/types/prometheus";
 
 const MIB = 1_048_576;
 const MINUTE_MS = 60_000;
+
+const SERVER_PROCESSES = [
+    { name: "xpm-agent", namespace: "XPM" },
+    { name: "xpm-exporter", namespace: "XPM" },
+    { name: "xpm-server", namespace: "XPM" },
+    { name: "xpm-web", namespace: "XPM" },
+    { name: "api-gateway", namespace: "production" },
+    { name: "worker", namespace: "production" },
+];
 
 function hash(value: string): number {
     let result = 0;
@@ -56,16 +65,19 @@ function sampleValue(
         case "pm2_unstable_restarts_total":
             return (seed % 2) + Math.floor(elapsedMinutes / 45);
         case "pm2_status":
-            return 1;
+            return seed % 9 === 0 ? 5 : 1;
     }
 }
 
-export function resolveMetricsFixture(
+function seriesForProcess(
     metric: ProcessMetricName,
-    target: PrometheusTarget,
+    scope: MetricsScope,
     range: ResolvedMetricsRange,
-): PrometheusSeries[] {
-    const seed = hash(`${target.server}/${target.namespace}/${target.name}/${metric}`);
+    process: { name: string; namespace: string },
+): PrometheusSeries {
+    const seed = hash(
+        `${scope.server}/${process.namespace}/${process.name}/${metric}`,
+    );
     const stepMs = Math.max(1, range.step * 1000);
     const points: PrometheusPoint[] = [];
 
@@ -76,15 +88,27 @@ export function resolveMetricsFixture(
         });
     }
 
-    return [
-        {
-            metric: {
-                __name__: metric,
-                name: target.name,
-                namespace: target.namespace,
-                [PROMETHEUS_SERVER_LABEL]: target.server,
-            },
-            points,
+    return {
+        metric: {
+            __name__: metric,
+            name: process.name,
+            namespace: process.namespace,
+            [PROMETHEUS_SERVER_LABEL]: scope.server,
         },
-    ];
+        points,
+    };
+}
+
+export function resolveMetricsFixture(
+    metric: ProcessMetricName,
+    scope: MetricsScope,
+    range: ResolvedMetricsRange,
+): PrometheusSeries[] {
+    if (scope.kind === "process") {
+        return [seriesForProcess(metric, scope, range, scope)];
+    }
+
+    return SERVER_PROCESSES.filter(
+        (process) => !scope.namespace || process.namespace === scope.namespace,
+    ).map((process) => seriesForProcess(metric, scope, range, process));
 }
