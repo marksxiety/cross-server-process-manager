@@ -1,12 +1,11 @@
-import { Activity, RefreshCw } from 'lucide-react'
+import { Activity } from 'lucide-react'
 import { isPrometheusConfigured, toPrometheusApiError } from '@/api/services/prometheus.service'
 import { ErrorAlert } from '@/components/custom/error-alert'
 import {
   MetricChartCard,
   type MetricChartSeries,
 } from '@/components/custom/metric-chart-card'
-import { TimeRangePicker } from '@/components/custom/time-range-picker'
-import { Button } from '@/components/ui/button'
+import { MetricsToolbar } from '@/components/custom/metrics-toolbar'
 import {
   Card,
   CardDescription,
@@ -21,26 +20,18 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { formatBytes, formatPercent, memorySharePercent } from '@/lib/format'
 import { useChartTheme } from '@/hooks/use-chart-theme'
 import { useProcessMetrics } from '@/hooks/use-process-metrics'
 import {
-  DEFAULT_METRICS_REFRESH_MS,
   PM2_STATUS_LABELS,
   formatMetricAxisValue,
   formatMetricValue,
   lastValue,
+  normalizeMetricsRefreshMs,
   statusLabel,
 } from '@/lib/prometheus'
-import { cn } from '@/lib/utils'
 import { useMetricsStore } from '@/stores/metrics.store'
 import type {
   MetricsData,
@@ -56,14 +47,6 @@ type ProcessMetricsTabProps = {
   totalMemoryBytes: number | null
   active: boolean
 }
-
-const REFRESH_OPTIONS = [
-  { value: '0', label: 'Off' },
-  { value: '15000', label: '15s' },
-  { value: '30000', label: '30s' },
-  { value: '60000', label: '1m' },
-  { value: '300000', label: '5m' },
-]
 
 const STATUS_CATEGORIES = [...PM2_STATUS_LABELS]
 
@@ -129,11 +112,7 @@ export function ProcessMetricsTab({
   const setRefreshMs = useMetricsStore((state) => state.setRefreshMs)
   const theme = useChartTheme()
   const configured = isPrometheusConfigured()
-  const activeRefreshMs = REFRESH_OPTIONS.some(
-    (option) => Number(option.value) === refreshMs,
-  )
-    ? refreshMs
-    : DEFAULT_METRICS_REFRESH_MS
+  const activeRefreshMs = normalizeMetricsRefreshMs(refreshMs)
 
   const metrics = useProcessMetrics({
     server,
@@ -219,49 +198,16 @@ export function ProcessMetricsTab({
 
   return (
     <div className='flex min-h-0 flex-1 flex-col'>
-      <div className='flex shrink-0 flex-wrap items-center gap-2 border-b pb-3'>
-        <TimeRangePicker value={range} onChange={setRange} />
-        <span className='text-[11px] text-muted-foreground'>Auto</span>
-        <Select
-          items={REFRESH_OPTIONS}
-          value={String(activeRefreshMs)}
-          onValueChange={(value) => setRefreshMs(Number(value))}
-        >
-          <SelectTrigger
-            size='sm'
-            className='w-20'
-            aria-label='Auto-refresh interval'
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {REFRESH_OPTIONS.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Button
-          type='button'
-          variant='ghost'
-          size='icon-sm'
-          disabled={metrics.isRefreshing}
-          aria-label='Refresh metrics'
-          title='Refresh metrics'
-          onClick={metrics.refresh}
-        >
-          <RefreshCw
-            strokeWidth={2}
-            className={cn(metrics.isRefreshing && 'animate-spin')}
-          />
-        </Button>
-        <span className='text-[11px] text-muted-foreground'>
-          {metrics.lastUpdated === null
-            ? 'Never updated'
-            : `Updated ${new Date(metrics.lastUpdated).toLocaleTimeString()}`}
-        </span>
-      </div>
+      <MetricsToolbar
+        range={range}
+        refreshMs={activeRefreshMs}
+        lastUpdated={metrics.lastUpdated}
+        isRefreshing={metrics.isRefreshing}
+        hasError={metrics.error !== null}
+        onRangeChange={setRange}
+        onRefreshMsChange={setRefreshMs}
+        onRefresh={metrics.refresh}
+      />
 
       <ScrollArea className='min-h-0 flex-1'>
         <div className='space-y-3 py-3 px-3'>
