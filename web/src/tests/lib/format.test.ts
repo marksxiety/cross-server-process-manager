@@ -5,6 +5,7 @@ import {
   formatLogTimestamp,
   formatMetricValue,
   formatPercent,
+  formatRelativeTime,
   formatUptime,
   memorySharePercent,
 } from '../../lib/format'
@@ -55,6 +56,37 @@ describe('formatUptime', () => {
   test('floors partial units', () => {
     expect(formatUptime(59 * SECOND + 999)).toBe('59s')
     expect(formatUptime(2 * HOUR - 1)).toBe('1h 59m')
+  })
+})
+
+describe('formatRelativeTime', () => {
+  const now = 1_700_000_000_000
+
+  test('returns "just now" for recent and future timestamps', () => {
+    expect(formatRelativeTime(now - 4 * SECOND, now)).toBe('just now')
+    expect(formatRelativeTime(now, now)).toBe('just now')
+    expect(formatRelativeTime(now + 5 * SECOND, now)).toBe('just now')
+  })
+
+  test('formats seconds, minutes, hours and days', () => {
+    expect(formatRelativeTime(now - 8 * SECOND, now)).toBe('8s ago')
+    expect(formatRelativeTime(now - 5 * MINUTE, now)).toBe('5m ago')
+    expect(formatRelativeTime(now - 3 * HOUR, now)).toBe('3h ago')
+    expect(formatRelativeTime(now - 2 * DAY, now)).toBe('2d ago')
+  })
+
+  test('floors partial units', () => {
+    expect(formatRelativeTime(now - 59 * SECOND - 999, now)).toBe('59s ago')
+    expect(formatRelativeTime(now - 119 * SECOND, now)).toBe('1m ago')
+    expect(formatRelativeTime(now - 23 * HOUR - 59 * MINUTE, now)).toBe('23h ago')
+    expect(formatRelativeTime(now - DAY - 1, now)).toBe('1d ago')
+  })
+
+  test('returns an em dash for unusable timestamps or clock', () => {
+    expect(formatRelativeTime(null, now)).toBe('—')
+    expect(formatRelativeTime(undefined, now)).toBe('—')
+    expect(formatRelativeTime(Number.NaN, now)).toBe('—')
+    expect(formatRelativeTime(now, Number.NaN)).toBe('—')
   })
 })
 
