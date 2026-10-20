@@ -7,6 +7,7 @@ import {
 } from 'echarts/components'
 import * as echarts from 'echarts/core'
 import type { EChartsCoreOption } from 'echarts/core'
+import { LegacyGridContainLabel } from 'echarts/features'
 import { CanvasRenderer } from 'echarts/renderers'
 import { cn } from '@/lib/utils'
 
@@ -15,6 +16,7 @@ echarts.use([
   GridComponent,
   TooltipComponent,
   LegendComponent,
+  LegacyGridContainLabel,
   CanvasRenderer,
 ])
 
@@ -46,7 +48,10 @@ export function EChart({ option, ariaLabel, className }: EChartProps) {
   }, [])
 
   useEffect(() => {
-    chartRef.current?.setOption(option, { notMerge: true, lazyUpdate: true })
+    chartRef.current?.setOption(option, {
+      replaceMerge: ['series'],
+      lazyUpdate: true,
+    })
   }, [option])
 
   return (
