@@ -13,6 +13,10 @@ export interface PrometheusTarget {
     server: string;
 }
 
+export type MetricsScope =
+    | ({ kind: "process" } & PrometheusTarget)
+    | { kind: "server"; server: string; namespace?: string };
+
 export interface PrometheusPoint {
     /** Unix timestamp in milliseconds. */
     timestamp: number;
@@ -38,3 +42,13 @@ export type MetricsRange =
     | { kind: "absolute"; start: number; end: number };
 
 export type MetricsData = Partial<Record<ProcessMetricName, PrometheusSeries[]>>;
+
+export interface MetricChartSeries {
+    id: string;
+    name: string;
+    color: string;
+    points: Array<[number, number | string]>;
+    stepped?: boolean;
+    filled?: boolean;
+    dashed?: boolean;
+}
