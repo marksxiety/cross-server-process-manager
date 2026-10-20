@@ -31,17 +31,63 @@ export const PROCESS_METRICS: ProcessMetricName[] = [
 export interface MetricsRangePreset {
     value: string;
     label: string;
+    shortLabel: string;
     durationMs: number;
 }
 
 export const METRICS_RANGE_PRESETS: MetricsRangePreset[] = [
-    { value: "5m", label: "Last 5 minutes", durationMs: 5 * 60 * 1000 },
-    { value: "15m", label: "Last 15 minutes", durationMs: 15 * 60 * 1000 },
-    { value: "1h", label: "Last 1 hour", durationMs: 60 * 60 * 1000 },
-    { value: "6h", label: "Last 6 hours", durationMs: 6 * 60 * 60 * 1000 },
-    { value: "24h", label: "Last 24 hours", durationMs: 24 * 60 * 60 * 1000 },
-    { value: "7d", label: "Last 7 days", durationMs: 7 * 24 * 60 * 60 * 1000 },
+    {
+        value: "5m",
+        label: "Last 5 minutes",
+        shortLabel: "5m",
+        durationMs: 5 * 60 * 1000,
+    },
+    {
+        value: "15m",
+        label: "Last 15 minutes",
+        shortLabel: "15m",
+        durationMs: 15 * 60 * 1000,
+    },
+    {
+        value: "1h",
+        label: "Last 1 hour",
+        shortLabel: "1h",
+        durationMs: 60 * 60 * 1000,
+    },
+    {
+        value: "6h",
+        label: "Last 6 hours",
+        shortLabel: "6h",
+        durationMs: 6 * 60 * 60 * 1000,
+    },
+    {
+        value: "24h",
+        label: "Last 24 hours",
+        shortLabel: "24h",
+        durationMs: 24 * 60 * 60 * 1000,
+    },
+    {
+        value: "7d",
+        label: "Last 7 days",
+        shortLabel: "7d",
+        durationMs: 7 * 24 * 60 * 60 * 1000,
+    },
 ];
+
+export const METRICS_REFRESH_OPTIONS: { value: string; label: string }[] = [
+    { value: "0", label: "Off" },
+    { value: "15000", label: "15s" },
+    { value: "30000", label: "30s" },
+    { value: "60000", label: "1m" },
+    { value: "300000", label: "5m" },
+];
+
+export function normalizeMetricsRefreshMs(refreshMs: number): number {
+    const match = METRICS_REFRESH_OPTIONS.some(
+        (option) => Number(option.value) === refreshMs,
+    );
+    return match ? refreshMs : DEFAULT_METRICS_REFRESH_MS;
+}
 
 /** Status codes emitted by xpm-exporter. Never renumber or reuse them. */
 export const PM2_STATUS_LABELS = [
