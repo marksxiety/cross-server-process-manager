@@ -5,6 +5,7 @@ export interface ChartTheme {
   mutedText: string
   border: string
   tooltipBackground: string
+  palette: string[]
   series: {
     cpu: string
     memory: string
@@ -20,6 +21,20 @@ const FALLBACK_THEME: ChartTheme = {
   mutedText: '#737373',
   border: '#e5e5e5',
   tooltipBackground: '#ffffff',
+  palette: [
+    '#3b82f6',
+    '#8b5cf6',
+    '#06b6d4',
+    '#f59e0b',
+    '#ef4444',
+    '#22c55e',
+    '#ec4899',
+    '#f97316',
+    '#14b8a6',
+    '#6366f1',
+    '#84cc16',
+    '#eab308',
+  ],
   series: {
     cpu: '#3b82f6',
     memory: '#8b5cf6',
@@ -73,6 +88,7 @@ function readChartTheme(): ChartTheme {
       '--popover',
       FALLBACK_THEME.tooltipBackground,
     ),
+    palette: FALLBACK_THEME.palette,
     series: FALLBACK_THEME.series,
   }
 }
