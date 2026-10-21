@@ -22,6 +22,7 @@ import type { MetricsRange } from '@/types/prometheus'
 type TimeRangePickerProps = {
   value: MetricsRange
   onChange: (range: MetricsRange) => void
+  disabled?: boolean
 }
 
 const QUICK_CUSTOM_DURATIONS = METRICS_RANGE_PRESETS.filter((entry) =>
@@ -53,7 +54,11 @@ function absoluteRangeLabel(range: MetricsRange): string {
   return `${formatDateTime(range.start)} – ${formatDateTime(range.end)}`
 }
 
-export function TimeRangePicker({ value, onChange }: TimeRangePickerProps) {
+export function TimeRangePicker({
+  value,
+  onChange,
+  disabled = false,
+}: TimeRangePickerProps) {
   const [customOpen, setCustomOpen] = useState(false)
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
@@ -63,6 +68,8 @@ export function TimeRangePicker({ value, onChange }: TimeRangePickerProps) {
   const customLabel = absoluteRangeLabel(value)
 
   const openCustom = () => {
+    if (disabled) return
+
     const currentNow = Date.now()
     const end = value.kind === 'absolute' ? value.end : currentNow
     const start =
@@ -109,6 +116,7 @@ export function TimeRangePicker({ value, onChange }: TimeRangePickerProps) {
       <div
         role='group'
         aria-label='Time range'
+        aria-disabled={disabled || undefined}
         className='flex min-w-0 flex-1 items-center gap-0.5 rounded-md bg-muted/60 p-0.5'
       >
         <div className='flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto'>
@@ -124,6 +132,7 @@ export function TimeRangePicker({ value, onChange }: TimeRangePickerProps) {
                 size='sm'
                 aria-pressed={isActive}
                 aria-label={entry.label}
+                disabled={disabled}
                 onClick={() =>
                   onChange({
                     kind: 'relative',
@@ -150,6 +159,7 @@ export function TimeRangePicker({ value, onChange }: TimeRangePickerProps) {
           aria-pressed={isCustom}
           aria-label={isCustom ? customLabel : 'Choose a custom time range'}
           title={customLabel}
+          disabled={disabled}
           onClick={openCustom}
           className={cn(
             'h-8 shrink-0 gap-1 px-2 text-[11px] font-medium lg:h-6',
@@ -163,7 +173,7 @@ export function TimeRangePicker({ value, onChange }: TimeRangePickerProps) {
         </Button>
       </div>
 
-      <Dialog open={customOpen} onOpenChange={setCustomOpen}>
+      <Dialog open={customOpen && !disabled} onOpenChange={setCustomOpen}>
         <DialogContent className='sm:max-w-md'>
           <DialogHeader>
             <DialogTitle>Custom time range</DialogTitle>
