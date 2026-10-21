@@ -5,7 +5,7 @@ export interface UsageShares {
   other: number
 }
 
-export type UsageStatus = 'loading' | 'ready' | 'empty'
+export type UsageStatus = 'loading' | 'ready' | 'empty' | 'error'
 
 function clampPercent(value: number): number {
   if (!Number.isFinite(value)) return 0
@@ -71,6 +71,10 @@ export function resolveUsageStatus(
   metricStatus: LoadStatus,
   shares: UsageShares | null,
 ): UsageStatus {
+  if (overviewStatus === 'error' || metricStatus === 'error') {
+    return 'error'
+  }
+
   if (
     overviewStatus === 'idle' ||
     overviewStatus === 'loading' ||
@@ -80,11 +84,7 @@ export function resolveUsageStatus(
     return 'loading'
   }
 
-  if (
-    overviewStatus === 'error' ||
-    metricStatus === 'error' ||
-    shares === null
-  ) {
+  if (shares === null) {
     return 'empty'
   }
 
