@@ -1,8 +1,6 @@
-import { lazy, Suspense, useMemo } from 'react'
+import { Suspense } from 'react'
 import type { ReactNode } from 'react'
-import type { EChartsCoreOption } from 'echarts/core'
 import { RefreshCw, TriangleAlert } from 'lucide-react'
-import { buildLineOption } from '@/components/custom/metric-chart-options'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -13,39 +11,23 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
-import type { ChartTheme } from '@/hooks/use-chart-theme'
 import { cn } from '@/lib/utils'
 import type { ApiError } from '@/types/api'
-import type { LoadStatus } from '@/types/dashboard'
-import type { MetricChartSeries } from '@/types/prometheus'
 
-export type { MetricChartSeries } from '@/types/prometheus'
-
-const LazyEChart = lazy(() =>
-  import('@/components/custom/echart').then((module) => ({
-    default: module.EChart,
-  })),
-)
-
-type MetricChartCardBase = {
+export type ChartCardProps = {
   title: string
   description?: string
-  theme: ChartTheme
-  emptyLabel?: string
+  action?: ReactNode
   className?: string
   chartClassName?: string
-  status?: LoadStatus
+  loading?: boolean
+  hasData: boolean
   error?: ApiError | null
   onRetry?: () => void
-  action?: ReactNode
-}
-
-export type MetricChartCardProps = MetricChartCardBase & {
-  series: MetricChartSeries[]
-  valueFormatter: (value: number | string) => string
-  yAxisFormatter?: (value: number) => string
-  yAxisMax?: number
-  yAxisCategories?: string[]
+  emptyLabel?: string
+  loadingFallback?: ReactNode
+  emptyFallback?: ReactNode
+  children: ReactNode
 }
 
 function ChartBodyLoading({
@@ -98,37 +80,21 @@ function ChartBodyError({
   )
 }
 
-function hasChartData(props: MetricChartCardProps): boolean {
-  return props.series.some((entry) => entry.points.length > 0)
-}
-
-function buildOption(props: MetricChartCardProps): EChartsCoreOption {
-  return buildLineOption({
-    series: props.series,
-    theme: props.theme,
-    valueFormatter: props.valueFormatter,
-    yAxisFormatter: props.yAxisFormatter,
-    yAxisMax: props.yAxisMax,
-    yAxisCategories: props.yAxisCategories,
-  })
-}
-
-export function MetricChartCard(props: MetricChartCardProps) {
-  const {
-    title,
-    description,
-    emptyLabel,
-    className,
-    chartClassName,
-    status,
-    error,
-    onRetry,
-    action,
-  } = props
-  const hasData = hasChartData(props)
-  const loading = status === 'loading' || status === 'idle'
-  const option = useMemo(() => buildOption(props), [props])
-
+export function ChartCard({
+  title,
+  description,
+  action,
+  className,
+  chartClassName,
+  loading = false,
+  hasData,
+  error,
+  onRetry,
+  emptyLabel,
+  loadingFallback,
+  emptyFallback,
+  children,
+}: ChartCardProps) {
   return (
     <Card size='sm' className={cn(className)}>
       <CardHeader className='pb-1'>
@@ -157,10 +123,12 @@ export function MetricChartCard(props: MetricChartCardProps) {
       </CardHeader>
       <CardContent>
         {!hasData && loading ? (
-          <ChartBodyLoading
-            label={`Loading ${title}…`}
-            chartClassName={chartClassName}
-          />
+          loadingFallback ?? (
+            <ChartBodyLoading
+              label={`Loading ${title}…`}
+              chartClassName={chartClassName}
+            />
+          )
         ) : !hasData && error ? (
           <ChartBodyError
             error={error}
@@ -168,28 +136,28 @@ export function MetricChartCard(props: MetricChartCardProps) {
             chartClassName={chartClassName}
           />
         ) : !hasData ? (
-          <div
-            className={cn(
-              'flex items-center justify-center rounded-md border border-dashed text-xs text-muted-foreground',
-              chartClassName ?? 'h-48',
-            )}
-          >
-            {emptyLabel ?? 'No data in this range.'}
-          </div>
+          emptyFallback ?? (
+            <div
+              className={cn(
+                'flex items-center justify-center rounded-md border border-dashed text-xs text-muted-foreground',
+                chartClassName ?? 'h-48',
+              )}
+            >
+              {emptyLabel ?? 'No data in this range.'}
+            </div>
+          )
         ) : (
           <Suspense
             fallback={
-              <ChartBodyLoading
-                label='Loading chart…'
-                chartClassName={chartClassName}
-              />
+              loadingFallback ?? (
+                <ChartBodyLoading
+                  label='Loading chart…'
+                  chartClassName={chartClassName}
+                />
+              )
             }
           >
-            <LazyEChart
-              option={option}
-              ariaLabel={`${title} chart`}
-              className={chartClassName}
-            />
+            {children}
           </Suspense>
         )}
       </CardContent>

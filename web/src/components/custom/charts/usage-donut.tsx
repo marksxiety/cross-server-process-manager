@@ -1,26 +1,14 @@
-import { lazy, memo, Suspense, useMemo } from 'react'
+import { useMemo } from 'react'
 import type { EChartsCoreOption } from 'echarts/core'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
 import type { ChartTheme } from '@/hooks/use-chart-theme'
-import {
-  formatUsagePercent,
-  type UsageStatus,
-} from '@/lib/server-usage'
-import { cn } from '@/lib/utils'
+import { formatUsagePercent } from '@/lib/server-usage'
+import { EChart } from './echart'
 
-const LazyEChart = lazy(() =>
-  import('@/components/custom/echart').then((module) => ({
-    default: module.EChart,
-  })),
-)
-
-type ServerUsageDonutProps = {
-  title: string
+export type UsageDonutProps = {
   theme: ChartTheme
-  pm2: number | null
-  other: number | null
-  status: UsageStatus
+  pm2: number
+  other: number
+  ariaLabel: string
   className?: string
 }
 
@@ -104,65 +92,24 @@ function buildOption(
   }
 }
 
-function DonutSkeleton() {
-  return (
-    <div className='flex h-48 flex-col items-center justify-center gap-3'>
-      <Skeleton className='size-28 rounded-full' />
-      <div className='flex gap-2'>
-        <Skeleton className='h-2.5 w-14' />
-        <Skeleton className='h-2.5 w-14' />
-        <Skeleton className='h-2.5 w-10' />
-      </div>
-    </div>
-  )
-}
-
-function DonutEmpty() {
-  return (
-    <div className='flex h-48 items-center justify-center rounded-md border border-dashed px-4 text-center text-xs text-muted-foreground'>
-      No data available
-    </div>
-  )
-}
-
-export const ServerUsageDonut = memo(function ServerUsageDonut({
-  title,
+export function UsageDonut({
   theme,
   pm2,
   other,
-  status,
+  ariaLabel,
   className,
-}: ServerUsageDonutProps) {
-  const resolvedStatus =
-    status === 'ready' && (pm2 === null || other === null) ? 'empty' : status
+}: UsageDonutProps) {
   const option = useMemo(
-    () =>
-      resolvedStatus === 'ready' && pm2 !== null && other !== null
-        ? buildOption(theme, pm2, other)
-        : null,
-    [other, pm2, resolvedStatus, theme],
+    () => buildOption(theme, pm2, other),
+    [other, pm2, theme],
   )
 
   return (
-    <Card size='sm' className={cn('h-full', className)}>
-      <CardHeader className='pb-1'>
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {resolvedStatus === 'loading' ? (
-          <DonutSkeleton />
-        ) : resolvedStatus === 'empty' || option === null ? (
-          <DonutEmpty />
-        ) : (
-          <Suspense fallback={<DonutSkeleton />}>
-            <LazyEChart
-              option={option}
-              ariaLabel={`${title} usage chart`}
-              replaceSeries={false}
-            />
-          </Suspense>
-        )}
-      </CardContent>
-    </Card>
+    <EChart
+      option={option}
+      ariaLabel={ariaLabel}
+      className={className}
+      replaceSeries={false}
+    />
   )
-})
+}

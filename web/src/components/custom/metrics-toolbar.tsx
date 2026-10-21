@@ -19,6 +19,7 @@ type MetricsToolbarProps = {
   onRangeChange: (range: MetricsRange) => void
   onRefreshMsChange: (refreshMs: number) => void
   onRefresh: () => void
+  layout?: 'inline' | 'stacked'
 }
 
 export function MetricsToolbar({
@@ -28,16 +29,38 @@ export function MetricsToolbar({
   onRangeChange,
   onRefreshMsChange,
   onRefresh,
+  layout = 'inline',
 }: MetricsToolbarProps) {
+  const isStacked = layout === 'stacked'
+
   return (
     <section
       aria-label='Metrics controls'
       className='shrink-0 rounded-lg bg-muted/30 p-2.5 ring-1 ring-border/60'
     >
-      <div className='flex flex-wrap items-center gap-2'>
-        <TimeRangePicker value={range} onChange={onRangeChange} />
+      <div
+        className={cn(
+          'flex gap-2',
+          isStacked ? 'flex-col' : 'flex-wrap items-center',
+        )}
+      >
+        {/* Time range picker */}
+        <div
+          className={cn(
+            'min-w-0',
+            isStacked ? 'w-full' : 'w-full lg:w-auto lg:flex-auto',
+          )}
+        >
+          <TimeRangePicker value={range} onChange={onRangeChange} />
+        </div>
 
-        <div className='ml-auto flex shrink-0 items-center gap-1.5'>
+        {/* Refresh controls */}
+        <div
+          className={cn(
+            'flex items-center gap-1.5',
+            isStacked ? 'w-full' : 'w-full lg:w-auto lg:shrink-0',
+          )}
+        >
           <Select
             items={METRICS_REFRESH_OPTIONS}
             value={String(refreshMs)}
@@ -45,7 +68,10 @@ export function MetricsToolbar({
           >
             <SelectTrigger
               size='sm'
-              className='w-24'
+              className={cn(
+                'min-w-0 flex-1',
+                !isStacked && 'lg:w-24 lg:flex-none',
+              )}
               aria-label='Auto-refresh interval'
             >
               <Timer strokeWidth={2} className='text-muted-foreground' />
@@ -67,7 +93,7 @@ export function MetricsToolbar({
             disabled={isRefreshing}
             aria-label='Refresh metrics'
             onClick={onRefresh}
-            className='h-8 gap-1.5 px-2 text-[11px] lg:h-6'
+            className='h-8 shrink-0 gap-1.5 px-2 text-[11px] lg:h-6'
           >
             <RefreshCw
               strokeWidth={2}

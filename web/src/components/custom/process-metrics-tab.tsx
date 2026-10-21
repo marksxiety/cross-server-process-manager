@@ -1,7 +1,7 @@
 import { Activity } from 'lucide-react'
 import { isPrometheusConfigured } from '@/api/services/prometheus.service'
 import { MetricBasisSwitch } from '@/components/custom/metric-basis-switch'
-import { MetricChartCard } from '@/components/custom/metric-chart-card'
+import { LineChartCard } from '@/components/custom/charts'
 import { MetricsToolbar } from '@/components/custom/metrics-toolbar'
 import {
   Card,
@@ -296,6 +296,7 @@ export function ProcessMetricsTab({
           onRangeChange={setRange}
           onRefreshMsChange={setRefreshMs}
           onRefresh={metrics.refresh}
+          layout='stacked'
         />
       </div>
 
@@ -317,7 +318,7 @@ export function ProcessMetricsTab({
             </Empty>
           ) : (
             <div className='space-y-3'>
-              <MetricChartCard
+              <LineChartCard
                 title='CPU'
                 description={cpuDescription}
                 series={cpuChartSeries}
@@ -337,7 +338,7 @@ export function ProcessMetricsTab({
                 }
               />
 
-              <MetricChartCard
+              <LineChartCard
                 title='Memory'
                 description={memoryDescription}
                 series={memoryChartSeries}
@@ -357,7 +358,7 @@ export function ProcessMetricsTab({
                 }
               />
 
-              <MetricChartCard
+              <LineChartCard
                 title='Status'
                 description={metricDescription(
                   metrics.status.pm2_status,
@@ -378,7 +379,7 @@ export function ProcessMetricsTab({
                 onRetry={metrics.refresh}
               />
 
-              <MetricChartCard
+              <LineChartCard
                 title='Restarts'
                 description={metricDescription(
                   restartsStatus,
@@ -406,7 +407,7 @@ export function ProcessMetricsTab({
                 onRetry={metrics.refresh}
               />
 
-              <MetricChartCard
+              <LineChartCard
                 title='Uptime'
                 description={metricDescription(
                   metrics.status.pm2_uptime,

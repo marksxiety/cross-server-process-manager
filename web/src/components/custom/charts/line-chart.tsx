@@ -1,17 +1,23 @@
+import { useMemo } from 'react'
 import type { EChartsCoreOption } from 'echarts/core'
 import type { ChartTheme } from '@/hooks/use-chart-theme'
 import type { MetricChartSeries } from '@/types/prometheus'
+import { EChart } from './echart'
 
-export interface LineChartOptionInput {
+export type LineChartProps = {
   series: MetricChartSeries[]
   theme: ChartTheme
   valueFormatter: (value: number | string) => string
   yAxisFormatter?: (value: number) => string
   yAxisMax?: number
   yAxisCategories?: string[]
+  ariaLabel: string
+  className?: string
 }
 
-export function buildLineOption({
+type LineChartOptionInput = Omit<LineChartProps, 'ariaLabel' | 'className'>
+
+function buildLineOption({
   series,
   theme,
   valueFormatter,
@@ -169,4 +175,39 @@ function escapeHtml(value: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;')
+}
+
+export function LineChart({
+  series,
+  theme,
+  valueFormatter,
+  yAxisFormatter,
+  yAxisMax,
+  yAxisCategories,
+  ariaLabel,
+  className,
+}: LineChartProps) {
+  const option = useMemo(
+    () =>
+      buildLineOption({
+        series,
+        theme,
+        valueFormatter,
+        yAxisFormatter,
+        yAxisMax,
+        yAxisCategories,
+      }),
+    [
+      series,
+      theme,
+      valueFormatter,
+      yAxisFormatter,
+      yAxisMax,
+      yAxisCategories,
+    ],
+  )
+
+  return (
+    <EChart option={option} ariaLabel={ariaLabel} className={className} />
+  )
 }

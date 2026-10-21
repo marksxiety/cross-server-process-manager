@@ -23,7 +23,7 @@ echarts.use([
   CanvasRenderer,
 ])
 
-type EChartProps = {
+export type EChartProps = {
   option: EChartsCoreOption
   ariaLabel: string
   className?: string

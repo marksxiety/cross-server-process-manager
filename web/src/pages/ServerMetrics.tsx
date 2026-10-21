@@ -2,11 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { Activity, ArrowLeft, Search, ServerOff } from 'lucide-react'
 import { isPrometheusConfigured } from '@/api/services/prometheus.service'
+import {
+  LineChartCard,
+  UsageDonutCard,
+} from '@/components/custom/charts'
 import { ErrorAlert } from '@/components/custom/error-alert'
 import { MetricBasisSwitch } from '@/components/custom/metric-basis-switch'
-import { MetricChartCard } from '@/components/custom/metric-chart-card'
 import { MetricsToolbar } from '@/components/custom/metrics-toolbar'
-import { ServerUsageDonut } from '@/components/custom/server-usage-donut'
 import { Button } from '@/components/ui/button'
 import {
   Empty,
@@ -513,14 +515,14 @@ export function ServerMetrics() {
       </div>
 
       <div className='mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2'>
-        <ServerUsageDonut
+        <UsageDonutCard
           title='CPU'
           theme={theme}
           pm2={cpuShares?.pm2 ?? null}
           other={cpuShares?.other ?? null}
           status={cpuUsageStatus}
         />
-        <ServerUsageDonut
+        <UsageDonutCard
           title='Memory'
           theme={theme}
           pm2={memoryShares?.pm2 ?? null}
@@ -545,7 +547,7 @@ export function ServerMetrics() {
         </Empty>
       ) : (
       <div className='mt-4 grid grid-cols-1 gap-3 xl:grid-cols-2'>
-        <MetricChartCard
+        <LineChartCard
           title='CPU'
           description={cpuDescription}
           series={cpuChartSeries}
@@ -566,7 +568,7 @@ export function ServerMetrics() {
           }
         />
 
-        <MetricChartCard
+        <LineChartCard
           title='Memory'
           description={memoryDescription}
           series={memoryChartSeries}
@@ -587,7 +589,7 @@ export function ServerMetrics() {
           }
         />
 
-        <MetricChartCard
+        <LineChartCard
           title='Status'
           description={metricDescription(
             metrics.status.pm2_status,
@@ -608,7 +610,7 @@ export function ServerMetrics() {
           onRetry={metrics.refresh}
         />
 
-        <MetricChartCard
+        <LineChartCard
           title='Uptime'
           description={metricDescription(
             metrics.status.pm2_uptime,

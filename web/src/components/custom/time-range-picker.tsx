@@ -109,37 +109,39 @@ export function TimeRangePicker({ value, onChange }: TimeRangePickerProps) {
       <div
         role='group'
         aria-label='Time range'
-        className='flex min-w-fit flex-1 items-center gap-0.5 overflow-x-auto rounded-md bg-muted/60 p-0.5'
+        className='flex min-w-0 flex-1 items-center gap-0.5 rounded-md bg-muted/60 p-0.5'
       >
-        {METRICS_RANGE_PRESETS.map((entry) => {
-          const isActive =
-            value.kind === 'relative' && value.durationMs === entry.durationMs
+        <div className='flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto'>
+          {METRICS_RANGE_PRESETS.map((entry) => {
+            const isActive =
+              value.kind === 'relative' && value.durationMs === entry.durationMs
 
-          return (
-            <Button
-              key={entry.value}
-              type='button'
-              variant='ghost'
-              size='sm'
-              aria-pressed={isActive}
-              aria-label={entry.label}
-              onClick={() =>
-                onChange({
-                  kind: 'relative',
-                  durationMs: entry.durationMs,
-                })
-              }
-              className={cn(
-                'h-8 min-w-8 shrink-0 px-1.5 text-[11px] font-medium lg:h-6',
-                isActive
-                  ? 'bg-background text-foreground shadow-sm ring-1 ring-border hover:bg-background'
-                  : 'text-muted-foreground',
-              )}
-            >
-              {entry.shortLabel}
-            </Button>
-          )
-        })}
+            return (
+              <Button
+                key={entry.value}
+                type='button'
+                variant='ghost'
+                size='sm'
+                aria-pressed={isActive}
+                aria-label={entry.label}
+                onClick={() =>
+                  onChange({
+                    kind: 'relative',
+                    durationMs: entry.durationMs,
+                  })
+                }
+                className={cn(
+                  'h-8 min-w-8 shrink-0 px-1.5 text-[11px] font-medium lg:h-6',
+                  isActive
+                    ? 'bg-background text-foreground shadow-sm ring-1 ring-border hover:bg-background'
+                    : 'text-muted-foreground',
+                )}
+              >
+                {entry.shortLabel}
+              </Button>
+            )
+          })}
+        </div>
 
         <Button
           type='button'
