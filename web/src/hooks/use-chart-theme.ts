@@ -14,6 +14,11 @@ export interface ChartTheme {
     unstable: string
     status: string
   }
+  usage: {
+    pm2: string
+    other: string
+    free: string
+  }
 }
 
 const FALLBACK_THEME: ChartTheme = {
@@ -42,6 +47,11 @@ const FALLBACK_THEME: ChartTheme = {
     restarts: '#f59e0b',
     unstable: '#ef4444',
     status: '#22c55e',
+  },
+  usage: {
+    pm2: '#8b5cf6',
+    other: '#a1a1aa',
+    free: '#e4e4e0',
   },
 }
 
@@ -90,6 +100,11 @@ function readChartTheme(): ChartTheme {
     ),
     palette: FALLBACK_THEME.palette,
     series: FALLBACK_THEME.series,
+    usage: {
+      pm2: FALLBACK_THEME.usage.pm2,
+      other: FALLBACK_THEME.usage.other,
+      free: readColor(styles, '--border', FALLBACK_THEME.usage.free),
+    },
   }
 }
 
