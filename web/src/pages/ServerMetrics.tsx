@@ -231,6 +231,17 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
     metrics.status.pm2_memory,
     memoryShares,
   )
+  // The donuts need both the Prometheus metric and the agent overview, so a
+  // failure in either one is reported on the card.
+  const overviewError = serverEntry?.requestError ?? null
+  const cpuUsageError =
+    metricError(metrics.errors, 'pm2_cpu') ?? overviewError
+  const memoryUsageError =
+    metricError(metrics.errors, 'pm2_memory') ?? overviewError
+  const retryUsage = () => {
+    void metrics.refresh()
+    if (server) void refreshServer(server)
+  }
 
   const metricsLoading = metrics.isRefreshing && visibleProcessCount === 0
   const hasError = Object.keys(metrics.errors).length > 0
@@ -240,12 +251,17 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
   )
   const showEmptyState =
     allSettled && visibleProcessCount === 0 && !hasError
-  const showInitialLoader = isMetricsInitialLoad({
-    enabled: metricsEnabled,
-    status: metrics.status,
-    errors: metrics.errors,
-    data: metrics.data,
-  })
+  // The page loader only covers the very first load. Once the page has loaded
+  // it stays mounted, so an auto refresh is reported by the charts themselves.
+  const isPageLoaded = metrics.hasLoaded
+  const showInitialLoader =
+    !isPageLoaded &&
+    isMetricsInitialLoad({
+      enabled: metricsEnabled,
+      status: metrics.status,
+      errors: metrics.errors,
+      data: metrics.data,
+    })
 
   const cpuServerPending =
     overviewStatus === 'loading' || overviewStatus === 'idle'
@@ -489,28 +505,6 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
         </div>
       </div>
 
-      <div className='mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2'>
-        <UsageDonutCard
-          title='CPU'
-          theme={theme}
-          pm2={cpuShares?.pm2 ?? null}
-          other={cpuShares?.other ?? null}
-          status={cpuUsageStatus}
-        />
-        <UsageDonutCard
-          title='Memory'
-          theme={theme}
-          pm2={memoryShares?.pm2 ?? null}
-          other={memoryShares?.other ?? null}
-          status={memoryUsageStatus}
-          action={
-            <span className='text-xs text-muted-foreground'>
-              Host RAM {hostRamLabel}
-            </span>
-          }
-        />
-      </div>
-
       {showEmptyState ? (
         <Empty className='mt-4'>
           <EmptyHeader>
@@ -526,92 +520,120 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
           </EmptyHeader>
         </Empty>
       ) : (
-      <div className='mt-4 grid grid-cols-1 gap-3 xl:grid-cols-2'>
-        <LineChartCard
-          title='CPU'
-          description={cpuDescription}
-          series={cpuChartSeries}
-          theme={theme}
-          valueFormatter={formatCpuValue}
-          yAxisFormatter={cpuAxisFormatter}
-          yAxisMax={cpuAxisMax}
-          chartClassName='h-56'
-          status={cpuCardStatus}
-          error={cpuCardError}
-          onRetry={metrics.refresh}
-          action={
-            <MetricBasisSwitch
-              label='CPU basis'
-              value={cpuBasis}
-              onChange={setCpuBasis}
+        <>
+          <div className='mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2'>
+            <UsageDonutCard
+              title='CPU'
+              theme={theme}
+              pm2={cpuShares?.pm2 ?? null}
+              other={cpuShares?.other ?? null}
+              status={cpuUsageStatus}
+              error={cpuUsageError}
+              onRetry={retryUsage}
             />
-          }
-        />
-
-        <LineChartCard
-          title='Memory'
-          description={memoryDescription}
-          series={memoryChartSeries}
-          theme={theme}
-          valueFormatter={memoryValueFormatter}
-          yAxisFormatter={memoryAxisFormatter}
-          yAxisMax={memoryAxisMax}
-          chartClassName='h-56'
-          status={memoryCardStatus}
-          error={memoryCardError}
-          onRetry={metrics.refresh}
-          action={
-            <MetricBasisSwitch
-              label='Memory basis'
-              value={memoryBasis}
-              onChange={setMemoryBasis}
+            <UsageDonutCard
+              title='Memory'
+              theme={theme}
+              pm2={memoryShares?.pm2 ?? null}
+              other={memoryShares?.other ?? null}
+              status={memoryUsageStatus}
+              error={memoryUsageError}
+              onRetry={retryUsage}
+              action={
+                <span className='text-xs text-muted-foreground'>
+                  Host RAM {hostRamLabel}
+                </span>
+              }
             />
-          }
-        />
+          </div>
 
-        <LineChartCard
-          title='Status'
-          description={metricDescription(
-            metrics.status.pm2_status,
-            statusSummary(statusCounts),
-          )}
-          series={toMetricChartSeries(statusSeries, {
-            color: colorFor,
-            stepped: true,
-            label: formatSeriesLabel,
-            valueMapper: statusLabelFromCode,
-          })}
-          theme={theme}
-          valueFormatter={(value) => String(value)}
-          yAxisCategories={STATUS_CHART_CATEGORIES}
-          chartClassName='h-56'
-          status={metrics.status.pm2_status}
-          error={metricError(metrics.errors, 'pm2_status')}
-          onRetry={metrics.refresh}
-        />
+          <div className='mt-4 grid grid-cols-1 gap-3 xl:grid-cols-2'>
+            <LineChartCard
+              title='CPU'
+              description={cpuDescription}
+              series={cpuChartSeries}
+              theme={theme}
+              valueFormatter={formatCpuValue}
+              yAxisFormatter={cpuAxisFormatter}
+              yAxisMax={cpuAxisMax}
+              chartClassName='h-56'
+              status={cpuCardStatus}
+              error={cpuCardError}
+              onRetry={metrics.refresh}
+              action={
+                <MetricBasisSwitch
+                  label='CPU basis'
+                  value={cpuBasis}
+                  onChange={setCpuBasis}
+                />
+              }
+            />
 
-        <LineChartCard
-          title='Uptime'
-          description={metricDescription(
-            metrics.status.pm2_uptime,
-            uptimeSeries.length === 0
-              ? null
-              : processCountLabel(uptimeSeries.length),
-          )}
-          series={toMetricChartSeries(uptimeSeries, {
-            color: colorFor,
-            filled: true,
-            label: formatSeriesLabel,
-          })}
-          theme={theme}
-          valueFormatter={formatUptimeValue}
-          yAxisFormatter={formatUptimeAxis}
-          chartClassName='h-56'
-          status={metrics.status.pm2_uptime}
-          error={metricError(metrics.errors, 'pm2_uptime')}
-          onRetry={metrics.refresh}
-        />
-      </div>
+            <LineChartCard
+              title='Memory'
+              description={memoryDescription}
+              series={memoryChartSeries}
+              theme={theme}
+              valueFormatter={memoryValueFormatter}
+              yAxisFormatter={memoryAxisFormatter}
+              yAxisMax={memoryAxisMax}
+              chartClassName='h-56'
+              status={memoryCardStatus}
+              error={memoryCardError}
+              onRetry={metrics.refresh}
+              action={
+                <MetricBasisSwitch
+                  label='Memory basis'
+                  value={memoryBasis}
+                  onChange={setMemoryBasis}
+                />
+              }
+            />
+
+            <LineChartCard
+              title='Status'
+              description={metricDescription(
+                metrics.status.pm2_status,
+                statusSummary(statusCounts),
+              )}
+              series={toMetricChartSeries(statusSeries, {
+                color: colorFor,
+                stepped: true,
+                label: formatSeriesLabel,
+                valueMapper: statusLabelFromCode,
+              })}
+              theme={theme}
+              valueFormatter={(value) => String(value)}
+              yAxisCategories={STATUS_CHART_CATEGORIES}
+              chartClassName='h-56'
+              status={metrics.status.pm2_status}
+              error={metricError(metrics.errors, 'pm2_status')}
+              onRetry={metrics.refresh}
+            />
+
+            <LineChartCard
+              title='Uptime'
+              description={metricDescription(
+                metrics.status.pm2_uptime,
+                uptimeSeries.length === 0
+                  ? null
+                  : processCountLabel(uptimeSeries.length),
+              )}
+              series={toMetricChartSeries(uptimeSeries, {
+                color: colorFor,
+                filled: true,
+                label: formatSeriesLabel,
+              })}
+              theme={theme}
+              valueFormatter={formatUptimeValue}
+              yAxisFormatter={formatUptimeAxis}
+              chartClassName='h-56'
+              status={metrics.status.pm2_uptime}
+              error={metricError(metrics.errors, 'pm2_uptime')}
+              onRetry={metrics.refresh}
+            />
+          </div>
+        </>
       )}
     </div>
   )
