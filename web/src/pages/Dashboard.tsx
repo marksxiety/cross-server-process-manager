@@ -70,7 +70,7 @@ import type { ProcessSortKey } from '@/lib/sort-processes'
 import { getStatusContext, getStatusVisual } from '@/lib/status-styles'
 import { DASHBOARD_AUTO_REFRESH_MS } from '@/lib/swr'
 import { cn } from '@/lib/utils'
-import { useDashboardStore } from '@/stores/dashboard.store'
+import { useDashboardStore, useProcessesStatus } from '@/stores/dashboard.store'
 import { logKey, useProcessLogsStore } from '@/stores/process-logs.store'
 import type { ApiError } from '@/types/api'
 import type { ProcessCommand, ProcessSummary } from '@/types/process'
@@ -124,6 +124,7 @@ export function Dashboard() {
   const deleteProcess = useDashboardStore((state) => state.deleteProcess)
   const sortOrder = useDashboardStore((state) => state.sortOrder)
   const setSortOrder = useDashboardStore((state) => state.setSortOrder)
+  const processesStatus = useProcessesStatus()
 
   const [selected, setSelected] = useState<{
     server: RegisteredServer
@@ -271,14 +272,21 @@ export function Dashboard() {
     [sortedProcessItems],
   )
 
-  const isLoadingProcesses = servers.some(
-    (server) => processesByServer[server.server]?.status === 'loading',
-  )
-
   // The centered loader only takes over while nothing has arrived yet; once a
   // single server reports its processes the grid wins and shows what is there.
   const showProcessesLoader =
-    isLoadingProcesses && sortedProcessItems.length === 0
+    (processesStatus === 'loading' || processesStatus === 'idle') &&
+    sortedProcessItems.length === 0
+
+  // Servers whose agent could not be reached. Their processes are unknown, so
+  // the area reports the failure instead of claiming there are none.
+  const unreachableServerNames = useMemo(
+    () =>
+      servers
+        .filter((server) => processesByServer[server.server]?.status === 'error')
+        .map((server) => server.server),
+    [servers, processesByServer],
+  )
 
   const processGridRef = useRef<HTMLDivElement | null>(null)
   useFlipReorder({ containerRef: processGridRef, orderSignature })
@@ -487,6 +495,20 @@ export function Dashboard() {
                 title='Loading processes…'
                 description='Fetching processes from the registered servers…'
               />
+            ) : processesStatus === 'error' ? (
+              <Empty className='mt-4'>
+                <EmptyHeader>
+                  <EmptyMedia variant='icon'>
+                    <ServerOff strokeWidth={2} />
+                  </EmptyMedia>
+                  <EmptyTitle>No available processes</EmptyTitle>
+                  <EmptyDescription>
+                    {unreachableServerNames.length === servers.length
+                      ? 'Cannot access the registered servers.'
+                      : `Cannot access ${unreachableServerNames.join(', ')}.`}
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
             ) : query !== '' ? (
               <Empty className='mt-4'>
                 <EmptyHeader>
