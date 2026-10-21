@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { Activity, ArrowLeft, Search, ServerOff } from 'lucide-react'
 import { isPrometheusConfigured } from '@/api/services/prometheus.service'
@@ -6,6 +6,7 @@ import { ErrorAlert } from '@/components/custom/error-alert'
 import { MetricBasisSwitch } from '@/components/custom/metric-basis-switch'
 import { MetricChartCard } from '@/components/custom/metric-chart-card'
 import { MetricsToolbar } from '@/components/custom/metrics-toolbar'
+import { ServerUsageDonut } from '@/components/custom/server-usage-donut'
 import { Button } from '@/components/ui/button'
 import {
   Empty,
@@ -55,6 +56,11 @@ import {
   STATUS_ORDER,
   statusLabelFromCode,
 } from '@/lib/status-catalog'
+import {
+  cpuUsageShares,
+  memoryUsageShares,
+  resolveUsageStatus,
+} from '@/lib/server-usage'
 import { useDashboardStore } from '@/stores/dashboard.store'
 import { useMetricsStore } from '@/stores/metrics.store'
 import type { ApiError } from '@/types/api'
@@ -93,15 +99,6 @@ function processCountLabel(count: number): string {
   return `${count} ${count === 1 ? 'process' : 'processes'}`
 }
 
-function SummaryStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className='rounded-md bg-muted/40 px-3 py-2'>
-      <p className='text-[11px] text-muted-foreground'>{label}</p>
-      <p className='mt-0.5 text-sm font-medium'>{value}</p>
-    </div>
-  )
-}
-
 export function ServerMetrics() {
   const { serverName = '' } = useParams<{ serverName: string }>()
   const range = useMetricsStore((state) => state.range)
@@ -121,6 +118,7 @@ export function ServerMetrics() {
   const registryError = useDashboardStore((state) => state.requestError)
   const processesByServer = useDashboardStore((state) => state.processesByServer)
   const load = useDashboardStore((state) => state.load)
+  const refreshServer = useDashboardStore((state) => state.refreshServer)
 
   const [namespace, setNamespace] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
@@ -141,6 +139,23 @@ export function ServerMetrics() {
     refreshMs: activeRefreshMs,
     enabled: configured && serverName !== '',
   })
+
+  const lastOverviewRefresh = useRef<number | null>(null)
+
+  useEffect(() => {
+    lastOverviewRefresh.current = null
+  }, [serverName])
+
+  useEffect(() => {
+    if (!server || metrics.lastUpdated === null) return
+    if (lastOverviewRefresh.current === metrics.lastUpdated) return
+
+    const isInitial = lastOverviewRefresh.current === null
+    lastOverviewRefresh.current = metrics.lastUpdated
+
+    if (isInitial) return
+    void refreshServer(server)
+  }, [metrics.lastUpdated, refreshServer, server])
 
   const namespaces = useMemo(() => {
     const values = new Set<string>()
@@ -167,9 +182,6 @@ export function ServerMetrics() {
   const cpuSeries = filterMetric(metrics.data.pm2_cpu)
   const memorySeries = filterMetric(metrics.data.pm2_memory)
   const statusSeries = filterMetric(metrics.data.pm2_status)
-  const unstableSeries = filterMetric(
-    metrics.data.pm2_unstable_restarts_total,
-  )
   const uptimeSeries = filterMetric(metrics.data.pm2_uptime)
 
   const colorLabels = new Set<string>()
@@ -194,17 +206,36 @@ export function ServerMetrics() {
     cpuSeries,
     memorySeries,
     statusSeries,
-    unstableSeries,
     uptimeSeries,
   ]) {
     for (const series of seriesList) visibleLabels.add(formatSeriesLabel(series))
   }
   const visibleProcessCount = visibleLabels.size
 
+  const overview = serverEntry?.overview ?? null
   const cpuTotalRaw = sumLastValues(cpuSeries)
   const memoryTotalRaw = sumLastValues(memorySeries)
   const statusCounts = countByStatus(statusSeries)
-  const unstableTotal = sumLastValues(unstableSeries)
+  const cpuShares = cpuUsageShares(
+    cpuTotalRaw,
+    overview?.cpu.usagePercent ?? null,
+    overview?.cpu.cores ?? null,
+  )
+  const memoryShares = memoryUsageShares(
+    memoryTotalRaw,
+    overview?.memory.usedBytes ?? null,
+    overview?.memory.totalBytes ?? null,
+  )
+  const cpuUsageStatus = resolveUsageStatus(
+    overviewStatus,
+    metrics.status.pm2_cpu,
+    cpuShares,
+  )
+  const memoryUsageStatus = resolveUsageStatus(
+    overviewStatus,
+    metrics.status.pm2_memory,
+    memoryShares,
+  )
 
   const metricsLoading = metrics.isRefreshing && visibleProcessCount === 0
   const hasError = Object.keys(metrics.errors).length > 0
@@ -412,7 +443,13 @@ export function ServerMetrics() {
               Server metrics · {serverName}
             </h1>
             <p className='text-xs text-muted-foreground'>
-              {server ? `${server.host}:${server.port}` : 'Loading server details…'}
+              {server
+                ? `${server.host}:${server.port} · Host RAM ${
+                    totalMemoryBytes === null
+                      ? '—'
+                      : formatBytes(totalMemoryBytes)
+                  }`
+                : 'Loading server details…'}
             </p>
           </div>
 
@@ -420,49 +457,12 @@ export function ServerMetrics() {
             <MetricsToolbar
               range={range}
               refreshMs={activeRefreshMs}
-              lastUpdated={metrics.lastUpdated}
               isRefreshing={metrics.isRefreshing}
-              hasError={hasError}
               onRangeChange={setRange}
               onRefreshMsChange={setRefreshMs}
               onRefresh={metrics.refresh}
             />
           </div>
-        </div>
-
-        <div className='grid grid-cols-2 gap-2 sm:grid-cols-4'>
-          <SummaryStat
-            label='CPU total (PM2)'
-            value={
-              cpuTotalRaw === null ? '—' : formatPercent(cpuTotalRaw, 1)
-            }
-          />
-          <SummaryStat
-            label='Memory total'
-            value={
-              memoryServerPercent === null
-                ? memoryTotalRaw === null
-                  ? '—'
-                  : formatBytes(memoryTotalRaw)
-                : `${formatPercent(memoryServerPercent, 1)} (${formatBytes(
-                    memoryTotalRaw ?? 0,
-                  )})`
-            }
-          />
-          <SummaryStat
-            label='Host RAM'
-            value={
-              totalMemoryBytes === null
-                ? '—'
-                : formatBytes(totalMemoryBytes)
-            }
-          />
-          <SummaryStat
-            label='Unstable restarts'
-            value={
-              unstableTotal === null ? '—' : String(Math.trunc(unstableTotal))
-            }
-          />
         </div>
       </div>
 
@@ -510,6 +510,25 @@ export function ServerMetrics() {
             />
           </div>
         </div>
+      </div>
+
+      <div className='mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2'>
+        <ServerUsageDonut
+          title='CPU'
+          label='of server CPU'
+          theme={theme}
+          pm2={cpuShares?.pm2 ?? null}
+          other={cpuShares?.other ?? null}
+          status={cpuUsageStatus}
+        />
+        <ServerUsageDonut
+          title='Memory'
+          label='of host RAM'
+          theme={theme}
+          pm2={memoryShares?.pm2 ?? null}
+          other={memoryShares?.other ?? null}
+          status={memoryUsageStatus}
+        />
       </div>
 
       {showEmptyState ? (
