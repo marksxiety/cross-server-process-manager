@@ -515,7 +515,6 @@ export function ServerMetrics() {
       <div className='mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2'>
         <ServerUsageDonut
           title='CPU'
-          label='of server CPU'
           theme={theme}
           pm2={cpuShares?.pm2 ?? null}
           other={cpuShares?.other ?? null}
@@ -523,7 +522,6 @@ export function ServerMetrics() {
         />
         <ServerUsageDonut
           title='Memory'
-          label='of host RAM'
           theme={theme}
           pm2={memoryShares?.pm2 ?? null}
           other={memoryShares?.other ?? null}
