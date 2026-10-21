@@ -41,8 +41,10 @@ import { Spinner } from '@/components/ui/spinner'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from '@/components/ui/toast'
 import { ErrorAlert } from '@/components/custom/error-alert'
+import { PageLoader } from '@/components/custom/page-loader'
 import { processService } from '@/api/services/process.service'
 import { errorCodeLabel, toApiError } from '@/lib/error-code'
+import { metricsLoadingDescription } from '@/lib/metrics-loading'
 import { isProcessInactive } from '@/lib/process-status'
 import {
   formatBytes,
@@ -995,10 +997,13 @@ export function ProcessDetails({
         <TabsContent value='metrics' className='flex min-h-0 flex-1 flex-col pt-4'>
           <Suspense
             fallback={
-              <div className='flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground'>
-                <Spinner className='size-4' />
-                Loading metrics…
-              </div>
+              <PageLoader
+                className='min-h-[40vh]'
+                title='Loading metrics…'
+                description={metricsLoadingDescription(
+                  `${process.name} on ${server.server}`,
+                )}
+              />
             }
           >
             <ProcessMetricsTab
