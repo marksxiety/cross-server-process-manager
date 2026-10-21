@@ -142,6 +142,14 @@ export function buildSelectorForScope(
     return buildServerSelector(metric, scope);
 }
 
+export function seriesIdentity(metric: Record<string, string>): string {
+    return Object.keys(metric)
+        .filter((key) => key !== "__name__")
+        .sort()
+        .map((key) => `${key}="${metric[key]}"`)
+        .join(",");
+}
+
 export function formatSeriesLabel(series: PrometheusSeries): string {
     const name = series.metric.name ?? "unknown";
     const namespace = series.metric.namespace;
