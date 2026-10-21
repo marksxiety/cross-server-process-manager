@@ -292,9 +292,7 @@ export function ProcessMetricsTab({
         <MetricsToolbar
           range={range}
           refreshMs={activeRefreshMs}
-          lastUpdated={metrics.lastUpdated}
           isRefreshing={metrics.isRefreshing}
-          hasError={hasError}
           onRangeChange={setRange}
           onRefreshMsChange={setRefreshMs}
           onRefresh={metrics.refresh}
