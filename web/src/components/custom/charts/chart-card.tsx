@@ -39,13 +39,14 @@ function ChartBodyLoading({
 }) {
   return (
     <div
+      role='status'
       className={cn(
-        'flex items-center justify-center gap-2 rounded-md border border-dashed text-xs text-muted-foreground',
+        'flex flex-col items-center justify-center gap-2 rounded-md border border-dashed text-xs text-muted-foreground',
         chartClassName ?? 'h-48',
       )}
     >
-      <Spinner className='size-4' />
-      {label}
+      <Spinner className='size-5' aria-hidden='true' />
+      <span>{label}</span>
     </div>
   )
 }
