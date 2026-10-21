@@ -105,9 +105,17 @@ describe('resolveUsageStatus', () => {
     expect(resolveUsageStatus('success', 'idle', shares)).toBe('loading')
   })
 
-  test('reports empty for errors or missing shares', () => {
-    expect(resolveUsageStatus('error', 'success', shares)).toBe('empty')
-    expect(resolveUsageStatus('success', 'error', shares)).toBe('empty')
+  test('reports an error when either source failed', () => {
+    expect(resolveUsageStatus('error', 'success', shares)).toBe('error')
+    expect(resolveUsageStatus('success', 'error', shares)).toBe('error')
+  })
+
+  test('reports an error even while the other source is still pending', () => {
+    expect(resolveUsageStatus('error', 'loading', shares)).toBe('error')
+    expect(resolveUsageStatus('loading', 'error', shares)).toBe('error')
+  })
+
+  test('reports empty when both sources succeeded without shares', () => {
     expect(resolveUsageStatus('success', 'success', null)).toBe('empty')
   })
 
