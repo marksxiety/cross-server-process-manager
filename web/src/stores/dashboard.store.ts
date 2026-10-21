@@ -54,6 +54,22 @@ type PersistedDashboardState = Pick<
     "servers" | "serversFetchedAt" | "sortOrder"
 >;
 
+/**
+ * Aggregates the per-server sync state into a single status: "loading" while a
+ * server is still answering, "error" once a server could not be reached (its
+ * processes are unknown, not absent) and "success" when every server answered.
+ * Used by Dashboard.tsx to tell an unreachable server apart from an empty one.
+ */
+export function resolveProcessesStatus(
+    entries: Record<string, ServerProcesses>
+): LoadStatus {
+    const statuses = Object.values(entries).map((entry) => entry.status);
+    if (statuses.length === 0) return "idle";
+    if (statuses.includes("loading")) return "loading";
+    if (statuses.includes("error")) return "error";
+    return "success";
+}
+
 export const useDashboardStore = create<DashboardState>()(
     persist(
         (set, get) => {
@@ -427,3 +443,11 @@ export const useDashboardStore = create<DashboardState>()(
         }
     )
 );
+
+/**
+ * The aggregated sync status of every registered server. Returns a primitive so
+ * it stays a stable snapshot for the store subscription. Used by Dashboard.tsx.
+ */
+export function useProcessesStatus(): LoadStatus {
+    return useDashboardStore((state) => resolveProcessesStatus(state.processesByServer));
+}
