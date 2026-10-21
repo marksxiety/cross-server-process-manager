@@ -453,15 +453,14 @@ export function Dashboard() {
               >
                 {sortedProcessItems.map((item) => {
                   const key = processItemKey(item)
+                  const overview = processesByServer[item.server.server]?.overview
                   return (
                     <div key={key} data-flip-key={key} className='grid'>
                       <ProcessCard
                         process={item.process}
                         serverLabel={`${item.server.server} · ${item.server.host}:${item.server.port}`}
-                        totalMemoryBytes={
-                          processesByServer[item.server.server]?.overview?.memory.totalBytes ??
-                          null
-                        }
+                        totalMemoryBytes={overview?.memory.totalBytes ?? null}
+                        cpuCores={overview?.cpu.cores ?? null}
                         onSelect={() => {
                           setSelected({
                             server: item.server,
