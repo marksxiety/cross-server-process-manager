@@ -2,6 +2,7 @@ import { Activity } from 'lucide-react'
 import { isPrometheusConfigured } from '@/api/services/prometheus.service'
 import { MetricBasisSwitch } from '@/components/custom/metric-basis-switch'
 import { LineChartCard } from '@/components/custom/charts'
+import { PageLoader } from '@/components/custom/page-loader'
 import { MetricsToolbar } from '@/components/custom/metrics-toolbar'
 import {
   Card,
@@ -32,6 +33,10 @@ import {
   metricDescription,
   metricError,
 } from '@/lib/metric-status'
+import {
+  isMetricsInitialLoad,
+  metricsLoadingDescription,
+} from '@/lib/metrics-loading'
 import {
   PROCESS_METRICS,
   formatMetricAxisValue,
@@ -268,6 +273,12 @@ export function ProcessMetricsTab({
   )
   const showEmptyState =
     allSettled && !hasAnyData(metrics.data) && !hasError
+  const showInitialLoader = isMetricsInitialLoad({
+    enabled: configured && active,
+    status: metrics.status,
+    errors: metrics.errors,
+    data: metrics.data,
+  })
 
   if (!configured) {
     return (
@@ -297,12 +308,21 @@ export function ProcessMetricsTab({
           onRefreshMsChange={setRefreshMs}
           onRefresh={metrics.refresh}
           layout='stacked'
+          disabled={showInitialLoader}
         />
       </div>
 
       <ScrollArea className='min-h-0 flex-1'>
         <div className='px-3 py-3'>
-          {showEmptyState ? (
+          {showInitialLoader ? (
+            <PageLoader
+              className='min-h-[40vh]'
+              title='Loading metrics…'
+              description={metricsLoadingDescription(
+                `${process.name} on ${server.server}`,
+              )}
+            />
+          ) : showEmptyState ? (
             <Empty>
               <EmptyHeader>
                 <EmptyMedia variant='icon'>
