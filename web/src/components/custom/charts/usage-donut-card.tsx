@@ -1,4 +1,5 @@
 import { lazy, memo } from 'react'
+import type { ReactNode } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { ChartTheme } from '@/hooks/use-chart-theme'
 import type { UsageStatus } from '@/lib/server-usage'
@@ -17,6 +18,7 @@ export type UsageDonutCardProps = {
   pm2: number | null
   other: number | null
   status: UsageStatus
+  action?: ReactNode
   className?: string
 }
 
@@ -47,6 +49,7 @@ export const UsageDonutCard = memo(function UsageDonutCard({
   pm2,
   other,
   status,
+  action,
   className,
 }: UsageDonutCardProps) {
   const resolvedStatus =
@@ -56,6 +59,7 @@ export const UsageDonutCard = memo(function UsageDonutCard({
   return (
     <ChartCard
       title={title}
+      action={action}
       className={cn('h-full', className)}
       loading={resolvedStatus === 'loading'}
       hasData={hasData}
