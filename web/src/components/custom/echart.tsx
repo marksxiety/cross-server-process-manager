@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react'
-import { LineChart } from 'echarts/charts'
+import { LineChart, PieChart } from 'echarts/charts'
 import {
   GridComponent,
   LegendComponent,
+  TitleComponent,
   TooltipComponent,
 } from 'echarts/components'
 import * as echarts from 'echarts/core'
@@ -13,9 +14,11 @@ import { cn } from '@/lib/utils'
 
 echarts.use([
   LineChart,
+  PieChart,
   GridComponent,
   TooltipComponent,
   LegendComponent,
+  TitleComponent,
   LegacyGridContainLabel,
   CanvasRenderer,
 ])
@@ -24,9 +27,15 @@ type EChartProps = {
   option: EChartsCoreOption
   ariaLabel: string
   className?: string
+  replaceSeries?: boolean
 }
 
-export function EChart({ option, ariaLabel, className }: EChartProps) {
+export function EChart({
+  option,
+  ariaLabel,
+  className,
+  replaceSeries = true,
+}: EChartProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const chartRef = useRef<ReturnType<typeof echarts.init> | null>(null)
 
@@ -48,11 +57,13 @@ export function EChart({ option, ariaLabel, className }: EChartProps) {
   }, [])
 
   useEffect(() => {
-    chartRef.current?.setOption(option, {
-      replaceMerge: ['series'],
-      lazyUpdate: true,
-    })
-  }, [option])
+    chartRef.current?.setOption(
+      option,
+      replaceSeries
+        ? { replaceMerge: ['series'], lazyUpdate: true }
+        : { lazyUpdate: true },
+    )
+  }, [option, replaceSeries])
 
   return (
     <div
