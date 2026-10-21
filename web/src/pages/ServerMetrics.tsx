@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router'
-import { Activity, ArrowLeft, Search, ServerOff } from 'lucide-react'
+import { Link } from 'react-router'
+import { Activity, Search, ServerOff } from 'lucide-react'
 import { isPrometheusConfigured } from '@/api/services/prometheus.service'
 import {
   LineChartCard,
@@ -8,7 +8,7 @@ import {
 } from '@/components/custom/charts'
 import { ErrorAlert } from '@/components/custom/error-alert'
 import { MetricBasisSwitch } from '@/components/custom/metric-basis-switch'
-import { MetricsToolbar } from '@/components/custom/metrics-toolbar'
+import { PageLoader } from '@/components/custom/page-loader'
 import { Button } from '@/components/ui/button'
 import {
   Empty,
@@ -28,7 +28,6 @@ import {
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { useChartTheme } from '@/hooks/use-chart-theme'
-import { useServerMetrics } from '@/hooks/use-server-metrics'
 import { formatBytes, formatPercent, memorySharePercent } from '@/lib/format'
 import {
   maxNumericValue,
@@ -42,6 +41,10 @@ import {
   metricError,
 } from '@/lib/metric-status'
 import {
+  isMetricsInitialLoad,
+  metricsLoadingDescription,
+} from '@/lib/metrics-loading'
+import {
   PROCESS_METRICS,
   countByStatus,
   filterSeries,
@@ -49,7 +52,6 @@ import {
   formatMetricValue,
   formatSeriesLabel,
   normalizeCpu,
-  normalizeMetricsRefreshMs,
   sumLastValues,
 } from '@/lib/prometheus'
 import {
@@ -65,6 +67,7 @@ import {
 } from '@/lib/server-usage'
 import { useDashboardStore } from '@/stores/dashboard.store'
 import { useMetricsStore } from '@/stores/metrics.store'
+import type { MetricsRangeResult } from '@/hooks/use-metrics-range'
 import type { ApiError } from '@/types/api'
 import type { LoadStatus } from '@/types/dashboard'
 import type {
@@ -101,46 +104,36 @@ function processCountLabel(count: number): string {
   return `${count} ${count === 1 ? 'process' : 'processes'}`
 }
 
-export function ServerMetrics() {
-  const { serverName = '' } = useParams<{ serverName: string }>()
-  const range = useMetricsStore((state) => state.range)
-  const setRange = useMetricsStore((state) => state.setRange)
-  const refreshMs = useMetricsStore((state) => state.refreshMs)
-  const setRefreshMs = useMetricsStore((state) => state.setRefreshMs)
+export type ServerMetricsProps = {
+  serverName: string
+  metrics: MetricsRangeResult
+}
+
+export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
   const cpuBasis = useMetricsStore((state) => state.cpuBasis)
   const setCpuBasis = useMetricsStore((state) => state.setCpuBasis)
   const memoryBasis = useMetricsStore((state) => state.memoryBasis)
   const setMemoryBasis = useMetricsStore((state) => state.setMemoryBasis)
   const theme = useChartTheme()
   const configured = isPrometheusConfigured()
-  const activeRefreshMs = normalizeMetricsRefreshMs(refreshMs)
+  const metricsEnabled = configured && serverName !== ''
 
   const servers = useDashboardStore((state) => state.servers)
   const serversStatus = useDashboardStore((state) => state.serversStatus)
   const registryError = useDashboardStore((state) => state.requestError)
   const processesByServer = useDashboardStore((state) => state.processesByServer)
-  const load = useDashboardStore((state) => state.load)
   const refreshServer = useDashboardStore((state) => state.refreshServer)
 
   const [namespace, setNamespace] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
-
-  useEffect(() => {
-    void load()
-  }, [load])
 
   const server = servers.find((entry) => entry.server === serverName)
   const serverEntry = server ? processesByServer[server.server] : undefined
   const overviewStatus = serverEntry?.status ?? 'idle'
   const cpuCores = serverEntry?.overview?.cpu.cores ?? null
   const totalMemoryBytes = serverEntry?.overview?.memory.totalBytes ?? null
-
-  const metrics = useServerMetrics({
-    serverName,
-    range,
-    refreshMs: activeRefreshMs,
-    enabled: configured && serverName !== '',
-  })
+  const hostRamLabel =
+    totalMemoryBytes === null ? '—' : formatBytes(totalMemoryBytes)
 
   const lastOverviewRefresh = useRef<number | null>(null)
 
@@ -247,6 +240,12 @@ export function ServerMetrics() {
   )
   const showEmptyState =
     allSettled && visibleProcessCount === 0 && !hasError
+  const showInitialLoader = isMetricsInitialLoad({
+    enabled: metricsEnabled,
+    status: metrics.status,
+    errors: metrics.errors,
+    data: metrics.data,
+  })
 
   const cpuServerPending =
     overviewStatus === 'loading' || overviewStatus === 'idle'
@@ -428,46 +427,22 @@ export function ServerMetrics() {
     )
   }
 
+  if (showInitialLoader) {
+    return (
+      <div className='min-w-0'>
+        {registryError && <ErrorAlert error={registryError} className='mb-3' />}
+
+        <PageLoader
+          className='min-h-[50vh]'
+          title='Loading metrics…'
+          description={metricsLoadingDescription(serverName)}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className='min-w-0'>
-      <div className='mb-4 space-y-2'>
-        <Link
-          to='/'
-          className='inline-flex w-fit items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground'
-        >
-          <ArrowLeft className='size-3.5' strokeWidth={2} />
-          Dashboard
-        </Link>
-
-        <div className='flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between'>
-          <div className='min-w-0'>
-            <h1 className='text-lg font-semibold tracking-tight sm:text-xl'>
-              Server metrics · {serverName}
-            </h1>
-            <p className='text-xs text-muted-foreground'>
-              {server
-                ? `${server.host}:${server.port} · Host RAM ${
-                    totalMemoryBytes === null
-                      ? '—'
-                      : formatBytes(totalMemoryBytes)
-                  }`
-                : 'Loading server details…'}
-            </p>
-          </div>
-
-          <div className='w-full lg:w-auto lg:shrink-0'>
-            <MetricsToolbar
-              range={range}
-              refreshMs={activeRefreshMs}
-              isRefreshing={metrics.isRefreshing}
-              onRangeChange={setRange}
-              onRefreshMsChange={setRefreshMs}
-              onRefresh={metrics.refresh}
-            />
-          </div>
-        </div>
-      </div>
-
       {registryError && <ErrorAlert error={registryError} className='mb-3' />}
 
       <div className='mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3'>
@@ -528,6 +503,11 @@ export function ServerMetrics() {
           pm2={memoryShares?.pm2 ?? null}
           other={memoryShares?.other ?? null}
           status={memoryUsageStatus}
+          action={
+            <span className='text-xs text-muted-foreground'>
+              Host RAM {hostRamLabel}
+            </span>
+          }
         />
       </div>
 
