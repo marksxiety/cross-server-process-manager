@@ -1,9 +1,9 @@
 import { lazy, memo } from 'react'
 import type { ReactNode } from 'react'
-import { Skeleton } from '@/components/ui/skeleton'
 import type { ChartTheme } from '@/hooks/use-chart-theme'
 import type { UsageStatus } from '@/lib/server-usage'
 import { cn } from '@/lib/utils'
+import type { ApiError } from '@/types/api'
 import { ChartCard } from './chart-card'
 
 const LazyUsageDonut = lazy(() =>
@@ -18,29 +18,10 @@ export type UsageDonutCardProps = {
   pm2: number | null
   other: number | null
   status: UsageStatus
+  error?: ApiError | null
+  onRetry?: () => void
   action?: ReactNode
   className?: string
-}
-
-function DonutSkeleton() {
-  return (
-    <div className='flex h-48 flex-col items-center justify-center gap-3'>
-      <Skeleton className='size-28 rounded-full' />
-      <div className='flex gap-2'>
-        <Skeleton className='h-2.5 w-14' />
-        <Skeleton className='h-2.5 w-14' />
-        <Skeleton className='h-2.5 w-10' />
-      </div>
-    </div>
-  )
-}
-
-function DonutEmpty() {
-  return (
-    <div className='flex h-48 items-center justify-center rounded-md border border-dashed px-4 text-center text-xs text-muted-foreground'>
-      No data available
-    </div>
-  )
 }
 
 export const UsageDonutCard = memo(function UsageDonutCard({
@@ -49,6 +30,8 @@ export const UsageDonutCard = memo(function UsageDonutCard({
   pm2,
   other,
   status,
+  error,
+  onRetry,
   action,
   className,
 }: UsageDonutCardProps) {
@@ -63,8 +46,8 @@ export const UsageDonutCard = memo(function UsageDonutCard({
       className={cn('h-full', className)}
       loading={resolvedStatus === 'loading'}
       hasData={hasData}
-      loadingFallback={<DonutSkeleton />}
-      emptyFallback={<DonutEmpty />}
+      error={error}
+      onRetry={onRetry}
     >
       <LazyUsageDonut
         theme={theme}
