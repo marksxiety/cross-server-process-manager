@@ -273,12 +273,17 @@ export function ProcessMetricsTab({
   )
   const showEmptyState =
     allSettled && !hasAnyData(metrics.data) && !hasError
-  const showInitialLoader = isMetricsInitialLoad({
-    enabled: configured && active,
-    status: metrics.status,
-    errors: metrics.errors,
-    data: metrics.data,
-  })
+  // The page loader only covers the very first load. Once the tab has loaded it
+  // stays mounted, so an auto refresh is reported by the charts themselves.
+  const isPageLoaded = metrics.hasLoaded
+  const showInitialLoader =
+    !isPageLoaded &&
+    isMetricsInitialLoad({
+      enabled: configured && active,
+      status: metrics.status,
+      errors: metrics.errors,
+      data: metrics.data,
+    })
 
   if (!configured) {
     return (
