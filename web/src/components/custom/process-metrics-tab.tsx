@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/empty'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useChartTheme } from '@/hooks/use-chart-theme'
+import { useMetricChartSeries } from '@/hooks/use-metric-chart-series'
 import { useProcessMetrics } from '@/hooks/use-process-metrics'
 import { formatBytes, formatPercent, memorySharePercent } from '@/lib/format'
 import {
@@ -26,7 +27,6 @@ import {
   niceCpuProcessMax,
   nicePercentMax,
   percentAxisFormatter,
-  toMetricChartSeries,
 } from '@/lib/metric-chart'
 import {
   combineStatus,
@@ -114,6 +114,7 @@ export function ProcessMetricsTab({
     refreshMs: activeRefreshMs,
     enabled: configured && active,
   })
+  const toChartSeries = useMetricChartSeries(metrics)
 
   const cpuSeries = metrics.data.pm2_cpu
   const memorySeries = metrics.data.pm2_memory
@@ -154,13 +155,13 @@ export function ProcessMetricsTab({
       : metricError(metrics.errors, 'pm2_cpu')
   const cpuChartSeries = cpuBasisIsServer
     ? cpuServerReady
-      ? toMetricChartSeries(cpuSeries, {
+      ? toChartSeries(cpuSeries, {
           color: theme.series.cpu,
           filled: true,
           valueMapper: (value) => normalizeCpu(value, cpuCores),
         })
       : []
-    : toMetricChartSeries(cpuSeries, {
+    : toChartSeries(cpuSeries, {
         color: theme.series.cpu,
         filled: true,
       })
@@ -214,14 +215,14 @@ export function ProcessMetricsTab({
       : null
   const memoryChartSeries = memoryBasisIsServer
     ? memoryServerReady
-      ? toMetricChartSeries(memorySeries, {
+      ? toChartSeries(memorySeries, {
           color: theme.series.memory,
           filled: true,
           valueMapper: (value) =>
             memorySharePercent(value, totalMemoryBytes) ?? 0,
         })
       : []
-    : toMetricChartSeries(memorySeries, {
+    : toChartSeries(memorySeries, {
         color: theme.series.memory,
         filled: true,
       })
@@ -391,7 +392,7 @@ export function ProcessMetricsTab({
                     ? null
                     : statusLabelFromCode(statusLast),
                 )}
-                series={toMetricChartSeries(statusSeries, {
+                series={toChartSeries(statusSeries, {
                   color: theme.series.status,
                   stepped: true,
                   valueMapper: statusLabelFromCode,
@@ -413,12 +414,12 @@ export function ProcessMetricsTab({
                     : `${restartsLast ?? 0} total · ${unstableLast ?? 0} unstable`,
                 )}
                 series={[
-                  ...toMetricChartSeries(restartsSeries, {
+                  ...toChartSeries(restartsSeries, {
                     color: theme.series.restarts,
                     stepped: true,
                     label: () => 'Total',
                   }),
-                  ...toMetricChartSeries(unstableSeries, {
+                  ...toChartSeries(unstableSeries, {
                     color: theme.series.unstable,
                     stepped: true,
                     label: () => 'Unstable',
@@ -438,7 +439,7 @@ export function ProcessMetricsTab({
                   metrics.status.pm2_uptime,
                   uptimeLast === null ? null : formatUptimeValue(uptimeLast),
                 )}
-                series={toMetricChartSeries(uptimeSeries, {
+                series={toChartSeries(uptimeSeries, {
                   color: theme.series.uptime,
                   filled: true,
                 })}
