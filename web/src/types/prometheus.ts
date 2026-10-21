@@ -49,7 +49,7 @@ export interface MetricChartSeries {
     id: string;
     name: string;
     color: string;
-    points: Array<[number, number | string]>;
+    points: Array<[number, number | string | null]>;
     stepped?: boolean;
     filled?: boolean;
     dashed?: boolean;
