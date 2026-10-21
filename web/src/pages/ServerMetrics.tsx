@@ -28,13 +28,13 @@ import {
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { useChartTheme } from '@/hooks/use-chart-theme'
+import { useMetricChartSeries } from '@/hooks/use-metric-chart-series'
 import { formatBytes, formatPercent, memorySharePercent } from '@/lib/format'
 import {
   maxNumericValue,
   niceCpuProcessMax,
   nicePercentMax,
   percentAxisFormatter,
-  toMetricChartSeries,
 } from '@/lib/metric-chart'
 import {
   metricDescription,
@@ -115,6 +115,7 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
   const memoryBasis = useMetricsStore((state) => state.memoryBasis)
   const setMemoryBasis = useMetricsStore((state) => state.setMemoryBasis)
   const theme = useChartTheme()
+  const toChartSeries = useMetricChartSeries(metrics)
   const configured = isPrometheusConfigured()
   const metricsEnabled = configured && serverName !== ''
 
@@ -286,14 +287,14 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
       : metricError(metrics.errors, 'pm2_cpu')
   const cpuChartSeries = cpuBasisIsServer
     ? cpuServerReady
-      ? toMetricChartSeries(cpuSeries, {
+      ? toChartSeries(cpuSeries, {
           color: colorFor,
           filled: true,
           label: formatSeriesLabel,
           valueMapper: (value) => normalizeCpu(value, cpuCores),
         })
       : []
-    : toMetricChartSeries(cpuSeries, {
+    : toChartSeries(cpuSeries, {
         color: colorFor,
         filled: true,
         label: formatSeriesLabel,
@@ -349,7 +350,7 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
       : null
   const memoryChartSeries = memoryBasisIsServer
     ? memoryServerReady
-      ? toMetricChartSeries(memorySeries, {
+      ? toChartSeries(memorySeries, {
           color: colorFor,
           filled: true,
           label: formatSeriesLabel,
@@ -357,7 +358,7 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
             memorySharePercent(value, totalMemoryBytes) ?? 0,
         })
       : []
-    : toMetricChartSeries(memorySeries, {
+    : toChartSeries(memorySeries, {
         color: colorFor,
         filled: true,
         label: formatSeriesLabel,
@@ -596,7 +597,7 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
                 metrics.status.pm2_status,
                 statusSummary(statusCounts),
               )}
-              series={toMetricChartSeries(statusSeries, {
+              series={toChartSeries(statusSeries, {
                 color: colorFor,
                 stepped: true,
                 label: formatSeriesLabel,
@@ -619,7 +620,7 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
                   ? null
                   : processCountLabel(uptimeSeries.length),
               )}
-              series={toMetricChartSeries(uptimeSeries, {
+              series={toChartSeries(uptimeSeries, {
                 color: colorFor,
                 filled: true,
                 label: formatSeriesLabel,
