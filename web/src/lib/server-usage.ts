@@ -29,6 +29,16 @@ export function cpuUsageShares(
   return { pm2, other }
 }
 
+export function serverCpuShare(
+  cpuPercentOfOneCore: number,
+  cores: number | null,
+): number | null {
+  if (!Number.isFinite(cpuPercentOfOneCore)) return null
+  if (cores === null || !Number.isFinite(cores) || cores <= 0) return null
+
+  return clampPercent(cpuPercentOfOneCore / cores)
+}
+
 export function memoryUsageShares(
   pm2Bytes: number | null,
   hostUsedBytes: number | null,
