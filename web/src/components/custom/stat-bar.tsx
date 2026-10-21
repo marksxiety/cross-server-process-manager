@@ -19,7 +19,7 @@ export function StatBar({ label, value, tone, disabled = false }: StatBarProps) 
       <div className='mb-0.5 flex justify-between text-xs uppercase tracking-wide text-muted-foreground'>
         <span>{label}</span>
         <span className={cn('font-semibold', toneTextClasses[effectiveTone])}>
-          {value.toFixed(0)}%
+          {value > 0 && value < 1 ? '<1%' : `${value.toFixed(0)}%`}
         </span>
       </div>
       <Progress
