@@ -18,6 +18,7 @@ import {
   parseMatrixResult,
   PROMETHEUS_RETENTION_MS,
   resolveMetricsRange,
+  seriesIdentity,
   sumLastValues,
 } from '../../lib/prometheus'
 import { statusLabelFromCode } from '../../lib/status-catalog'
@@ -99,6 +100,20 @@ describe('buildSelectorForScope', () => {
     expect(
       buildSelectorForScope('pm2_cpu', { kind: 'server', server: 'MYPC' }),
     ).toBe('pm2_cpu{app="MYPC"}')
+  })
+})
+
+describe('seriesIdentity', () => {
+  test('keys a series by its labels without the metric name', () => {
+    expect(
+      seriesIdentity({ __name__: 'pm2_cpu', namespace: 'XPM', name: 'api' }),
+    ).toBe('name="api",namespace="XPM"')
+  })
+
+  test('separates series that differ by any label', () => {
+    expect(
+      seriesIdentity({ name: 'api', namespace: 'XPM', pm_id: '0' }),
+    ).not.toBe(seriesIdentity({ name: 'api', namespace: 'XPM', pm_id: '1' }))
   })
 })
 
