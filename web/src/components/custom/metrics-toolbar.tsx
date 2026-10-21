@@ -20,6 +20,7 @@ type MetricsToolbarProps = {
   onRefreshMsChange: (refreshMs: number) => void
   onRefresh: () => void
   layout?: 'inline' | 'stacked'
+  disabled?: boolean
 }
 
 export function MetricsToolbar({
@@ -30,6 +31,7 @@ export function MetricsToolbar({
   onRefreshMsChange,
   onRefresh,
   layout = 'inline',
+  disabled = false,
 }: MetricsToolbarProps) {
   const isStacked = layout === 'stacked'
 
@@ -51,7 +53,11 @@ export function MetricsToolbar({
             isStacked ? 'w-full' : 'w-full lg:w-auto lg:flex-auto',
           )}
         >
-          <TimeRangePicker value={range} onChange={onRangeChange} />
+          <TimeRangePicker
+            value={range}
+            onChange={onRangeChange}
+            disabled={disabled}
+          />
         </div>
 
         {/* Refresh controls */}
@@ -65,6 +71,7 @@ export function MetricsToolbar({
             items={METRICS_REFRESH_OPTIONS}
             value={String(refreshMs)}
             onValueChange={(value) => onRefreshMsChange(Number(value))}
+            disabled={disabled}
           >
             <SelectTrigger
               size='sm'
@@ -73,6 +80,7 @@ export function MetricsToolbar({
                 !isStacked && 'lg:w-24 lg:flex-none',
               )}
               aria-label='Auto-refresh interval'
+              disabled={disabled}
             >
               <Timer strokeWidth={2} className='text-muted-foreground' />
               <SelectValue />
@@ -90,7 +98,7 @@ export function MetricsToolbar({
             type='button'
             variant='outline'
             size='sm'
-            disabled={isRefreshing}
+            disabled={isRefreshing || disabled}
             aria-label='Refresh metrics'
             onClick={onRefresh}
             className='h-8 shrink-0 gap-1.5 px-2 text-[11px] lg:h-6'
