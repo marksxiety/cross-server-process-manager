@@ -23,13 +23,19 @@ type UseMetricsRangeOptions = {
 }
 
 export interface MetricsRangeResult {
-  data: MetricsData
-  status: Record<ProcessMetricName, LoadStatus>
-  errors: Partial<Record<ProcessMetricName, PrometheusError>>
-  isRefreshing: boolean
-  range: ResolvedMetricsRange | null
-  lastUpdated: number | null
-  refresh: () => void
+  data: MetricsData;
+  status: Record<ProcessMetricName, LoadStatus>;
+  errors: Partial<Record<ProcessMetricName, PrometheusError>>;
+  isRefreshing: boolean;
+  range: ResolvedMetricsRange | null;
+  lastUpdated: number | null;
+  /**
+   * True once a load for the current scope has settled. Later refreshes keep
+   * it true so the page stays mounted and each chart shows its own loading
+   * state instead of the page-level loader.
+   */
+  hasLoaded: boolean;
+  refresh: () => void;
 }
 
 function statusMap(status: LoadStatus): Record<ProcessMetricName, LoadStatus> {
@@ -56,6 +62,7 @@ export function useMetricsRange({
     Partial<Record<ProcessMetricName, PrometheusError>>
   >({})
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [hasLoaded, setHasLoaded] = useState(false)
   const [resolvedRange, setResolvedRange] = useState<ResolvedMetricsRange | null>(
     null,
   )
@@ -97,6 +104,7 @@ export function useMetricsRange({
 
       setIsRefreshing(false)
       setResolvedRange(nextRange)
+      setHasLoaded(true)
       if (successCount > 0) setLastUpdated(Date.now())
     }
 
@@ -114,7 +122,10 @@ export function useMetricsRange({
       })
       setIsRefreshing(true)
 
-      if (scopeChanged) setData({})
+      if (scopeChanged) {
+        setData({})
+        setHasLoaded(false)
+      }
 
       for (const metric of PROCESS_METRICS) {
         void queryRange(metric, currentScope, nextRange, controller.signal)
@@ -190,6 +201,7 @@ export function useMetricsRange({
     isRefreshing,
     range: resolvedRange,
     lastUpdated,
+    hasLoaded,
     refresh,
   }
 }
