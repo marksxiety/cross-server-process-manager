@@ -57,6 +57,7 @@ import { Separator } from '@/components/ui/separator'
 import { Spinner } from '@/components/ui/spinner'
 import { toast } from '@/components/ui/toast'
 import { ErrorAlert } from '@/components/custom/error-alert'
+import { PageLoader } from '@/components/custom/page-loader'
 import { ProcessCard } from '@/components/custom/process-card'
 import { ProcessDetails } from '@/components/custom/process-details'
 import { ServerHeader } from '@/components/custom/server-header'
@@ -274,6 +275,11 @@ export function Dashboard() {
     (server) => processesByServer[server.server]?.status === 'loading',
   )
 
+  // The centered loader only takes over while nothing has arrived yet; once a
+  // single server reports its processes the grid wins and shows what is there.
+  const showProcessesLoader =
+    isLoadingProcesses && sortedProcessItems.length === 0
+
   const processGridRef = useRef<HTMLDivElement | null>(null)
   useFlipReorder({ containerRef: processGridRef, orderSignature })
 
@@ -314,10 +320,11 @@ export function Dashboard() {
         </div>
 
         {serversStatus === 'loading' && (
-          <div className='mt-4 flex items-center gap-2 text-sm text-muted-foreground'>
-            <Spinner className='size-4' />
-            Loading servers…
-          </div>
+          <PageLoader
+            className='min-h-[40vh]'
+            title='Loading servers…'
+            description='Fetching the registered servers…'
+          />
         )}
         {registryRequestError && (
           <ErrorAlert error={registryRequestError} className='mt-4' />
@@ -365,9 +372,11 @@ export function Dashboard() {
             <div className='mt-6 space-y-3'>
               <div className='flex items-center gap-3'>
                 <p className='shrink-0 text-xs font-medium text-muted-foreground'>
-                  {`Processes (${sortedProcessItems.length}${
-                    query !== '' ? `/${processItems.length}` : ''
-                  })`}
+                  {showProcessesLoader
+                    ? 'Loading…'
+                    : `Processes (${sortedProcessItems.length}${
+                        query !== '' ? `/${processItems.length}` : ''
+                      })`}
                 </p>
                 <Separator className='flex-1' />
               </div>
@@ -472,11 +481,12 @@ export function Dashboard() {
                   )
                 })}
               </div>
-            ) : isLoadingProcesses ? (
-              <div className='mt-4 flex items-center gap-2 text-sm text-muted-foreground'>
-                <Spinner className='size-4' />
-                Loading processes…
-              </div>
+            ) : showProcessesLoader ? (
+              <PageLoader
+                className='min-h-[40vh]'
+                title='Loading processes…'
+                description='Fetching processes from the registered servers…'
+              />
             ) : query !== '' ? (
               <Empty className='mt-4'>
                 <EmptyHeader>
