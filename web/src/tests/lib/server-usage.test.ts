@@ -4,6 +4,7 @@ import {
   formatUsagePercent,
   memoryUsageShares,
   resolveUsageStatus,
+  serverCpuShare,
 } from '../../lib/server-usage'
 
 describe('formatUsagePercent', () => {
@@ -40,6 +41,23 @@ describe('cpuUsageShares', () => {
 
   test('caps PM2 at 100 percent of the server', () => {
     expect(cpuUsageShares(1600, 60, 8)).toEqual({ pm2: 100, other: 0 })
+  })
+})
+
+describe('serverCpuShare', () => {
+  test('normalizes a process CPU percentage to the server', () => {
+    expect(serverCpuShare(200, 8)).toBe(25)
+    expect(serverCpuShare(1, 8)).toBe(0.125)
+  })
+
+  test('caps the server share at 100', () => {
+    expect(serverCpuShare(1600, 8)).toBe(100)
+  })
+
+  test('returns null without a valid core count', () => {
+    expect(serverCpuShare(80, null)).toBeNull()
+    expect(serverCpuShare(80, 0)).toBeNull()
+    expect(serverCpuShare(Number.NaN, 8)).toBeNull()
   })
 })
 
