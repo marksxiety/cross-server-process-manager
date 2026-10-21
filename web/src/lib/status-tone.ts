@@ -1,9 +1,10 @@
+import { serverCpuShare } from "@/lib/server-usage";
 import type { ServerProcesses } from "@/types/dashboard";
 import type { Tone } from "@/types/tone";
 
 const PERCENT_WARNING_THRESHOLD = 70;
 const PERCENT_DANGER_THRESHOLD = 90;
-const PROCESS_CPU_WARNING_THRESHOLD = 80;
+const SERVER_PROCESS_CPU_WARNING_THRESHOLD = 80;
 
 export const toneIconClasses: Record<Tone, string> = {
     success: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
@@ -44,10 +45,18 @@ export function serverTone(entry: ServerProcesses | undefined): Tone {
     if (entry.status === "error") return "danger";
 
     const memoryTone = entry.overview ? percentTone(entry.overview.memory.percentUsed) : "success";
+    const cores = entry.overview?.cpu.cores ?? null;
 
     if (entry.processes.some((process) => process.status === "errored")) return "danger";
     if (memoryTone === "danger") return "danger";
-    if (entry.processes.some((process) => process.cpu > PROCESS_CPU_WARNING_THRESHOLD)) return "warning";
+    if (
+        entry.processes.some((process) => {
+            const share = serverCpuShare(process.cpu, cores);
+            return share !== null && share >= SERVER_PROCESS_CPU_WARNING_THRESHOLD;
+        })
+    ) {
+        return "warning";
+    }
     if (memoryTone === "warning") return "warning";
     return "success";
 }
