@@ -92,6 +92,7 @@ function buildLineOption({
       data: entry.points,
       encode: { x: 0, y: 1 },
       showSymbol: false,
+      connectNulls: false,
       step: entry.stepped ? 'end' : false,
       lineStyle: {
         width: 1.5,
@@ -154,6 +155,7 @@ function formatLineTooltip(
       value?: unknown
     }
     const raw = Array.isArray(entry.value) ? entry.value[1] : entry.value
+    if (raw === null || raw === undefined) continue
     const formatted = valueFormatter(raw as number | string)
 
     rows.push(
