@@ -65,6 +65,7 @@ import {
   basicRegistrationFields,
   type RegistrationField,
 } from '@/lib/process-registration'
+import { serverCpuShare } from '@/lib/server-usage'
 import { getStatusVisual } from '@/lib/status-styles'
 import { percentTone, toneProgressClasses, toneSurfaceClasses } from '@/lib/status-tone'
 import { cn } from '@/lib/utils'
@@ -455,14 +456,16 @@ function ConfigTab({
 function OverviewTab({
   data,
   totalMemoryBytes,
+  cpuCores,
 }: {
   data: ProcessDescribe
   totalMemoryBytes: number | null
+  cpuCores: number | null
 }) {
   const { summary, describe, metrics } = data
   const metricEntries = Object.entries(metrics)
   const memoryShare = memorySharePercent(summary.memory, totalMemoryBytes)
-  const cpuKnown = Number.isFinite(summary.cpu)
+  const cpuShare = serverCpuShare(summary.cpu, cpuCores)
   const inactive = isProcessInactive(summary)
 
   return (
@@ -488,8 +491,9 @@ function OverviewTab({
         <div className='mt-3 grid grid-cols-2 gap-3'>
           <StatTile
             label='CPU'
-            value={cpuKnown ? `${summary.cpu}%` : '—'}
-            progress={cpuKnown ? summary.cpu : null}
+            value={cpuShare === null ? '—' : formatPercent(cpuShare)}
+            sub={cpuShare === null ? undefined : 'of server'}
+            progress={cpuShare}
             disabled={inactive}
           />
           <StatTile
@@ -981,6 +985,7 @@ export function ProcessDetails({
                 <OverviewTab
                   data={data}
                   totalMemoryBytes={totalMemoryBytes}
+                  cpuCores={cpuCores}
                 />
               )}
             </WithDescribe>
