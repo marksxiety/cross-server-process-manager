@@ -43,6 +43,7 @@ export function ServerMetricsRoute() {
   }, [load])
 
   const server = servers.find((entry) => entry.server === serverName)
+  const isPageLoaded = metrics.hasLoaded
   const isInitialLoad = isMetricsInitialLoad({
     enabled: metricsEnabled,
     status: metrics.status,
@@ -58,7 +59,7 @@ export function ServerMetricsRoute() {
         port={server?.port ?? null}
         isRefreshing={metrics.isRefreshing}
         onRefresh={metrics.refresh}
-        disabled={isInitialLoad}
+        disabled={!isPageLoaded && isInitialLoad}
       />
 
       <Suspense
