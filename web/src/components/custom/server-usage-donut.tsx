@@ -17,7 +17,6 @@ const LazyEChart = lazy(() =>
 
 type ServerUsageDonutProps = {
   title: string
-  label: string
   theme: ChartTheme
   pm2: number | null
   other: number | null
@@ -29,7 +28,6 @@ function buildOption(
   theme: ChartTheme,
   pm2: number,
   other: number,
-  label: string,
 ): EChartsCoreOption {
   const free = Math.max(0, 100 - pm2 - other)
 
@@ -40,18 +38,12 @@ function buildOption(
     animationEasingUpdate: 'cubicOut',
     title: {
       text: formatUsagePercent(pm2),
-      subtext: label,
       left: 'center',
       top: '38%',
-      itemGap: 4,
       textStyle: {
         fontSize: 28,
         fontWeight: 'bold',
         color: theme.text,
-      },
-      subtextStyle: {
-        fontSize: 12,
-        color: theme.mutedText,
       },
     },
     tooltip: {
@@ -135,7 +127,6 @@ function DonutEmpty() {
 
 export const ServerUsageDonut = memo(function ServerUsageDonut({
   title,
-  label,
   theme,
   pm2,
   other,
@@ -147,9 +138,9 @@ export const ServerUsageDonut = memo(function ServerUsageDonut({
   const option = useMemo(
     () =>
       resolvedStatus === 'ready' && pm2 !== null && other !== null
-        ? buildOption(theme, pm2, other, label)
+        ? buildOption(theme, pm2, other)
         : null,
-    [label, other, pm2, resolvedStatus, theme],
+    [other, pm2, resolvedStatus, theme],
   )
 
   return (
