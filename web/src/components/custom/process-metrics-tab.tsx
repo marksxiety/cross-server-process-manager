@@ -1,7 +1,10 @@
 import { Activity } from 'lucide-react'
 import { isPrometheusConfigured } from '@/api/services/prometheus.service'
 import { MetricBasisSwitch } from '@/components/custom/metric-basis-switch'
-import { LineChartCard } from '@/components/custom/charts'
+import {
+  LineChartCard,
+  StatusTimelineCard,
+} from '@/components/custom/charts'
 import { PageLoader } from '@/components/custom/page-loader'
 import { MetricsToolbar } from '@/components/custom/metrics-toolbar'
 import {
@@ -21,6 +24,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { useChartTheme } from '@/hooks/use-chart-theme'
 import { useMetricChartSeries } from '@/hooks/use-metric-chart-series'
 import { useProcessMetrics } from '@/hooks/use-process-metrics'
+import { useStatusTimeline } from '@/hooks/use-status-timeline'
 import { formatBytes, formatPercent, memorySharePercent } from '@/lib/format'
 import {
   maxNumericValue,
@@ -41,14 +45,13 @@ import {
   PROCESS_METRICS,
   formatMetricAxisValue,
   formatMetricValue,
+  formatSeriesLabel,
   lastValue,
   normalizeCpu,
   normalizeMetricsRefreshMs,
+  seriesIdentity,
 } from '@/lib/prometheus'
-import {
-  STATUS_CHART_CATEGORIES,
-  statusLabelFromCode,
-} from '@/lib/status-catalog'
+import { statusLabelFromCode } from '@/lib/status-catalog'
 import { useMetricsStore } from '@/stores/metrics.store'
 import type { ApiError } from '@/types/api'
 import type { LoadStatus } from '@/types/dashboard'
@@ -119,6 +122,15 @@ export function ProcessMetricsTab({
   const cpuSeries = metrics.data.pm2_cpu
   const memorySeries = metrics.data.pm2_memory
   const statusSeries = metrics.data.pm2_status
+  const timelineProcesses = (statusSeries ?? []).map((series) => ({
+    label: formatSeriesLabel(series),
+    identity: seriesIdentity(series.metric),
+  }))
+  const timelineData = useStatusTimeline(
+    metrics,
+    statusSeries ?? [],
+    timelineProcesses,
+  )
   const restartsSeries = metrics.data.pm2_restarts_total
   const unstableSeries = metrics.data.pm2_unstable_restarts_total
   const uptimeSeries = metrics.data.pm2_uptime
@@ -384,7 +396,7 @@ export function ProcessMetricsTab({
                 }
               />
 
-              <LineChartCard
+              <StatusTimelineCard
                 title='Status'
                 description={metricDescription(
                   metrics.status.pm2_status,
@@ -392,14 +404,8 @@ export function ProcessMetricsTab({
                     ? null
                     : statusLabelFromCode(statusLast),
                 )}
-                series={toChartSeries(statusSeries, {
-                  color: theme.series.status,
-                  stepped: true,
-                  valueMapper: statusLabelFromCode,
-                })}
+                data={timelineData}
                 theme={theme}
-                valueFormatter={(value) => String(value)}
-                yAxisCategories={STATUS_CHART_CATEGORIES}
                 status={metrics.status.pm2_status}
                 error={metricError(metrics.errors, 'pm2_status')}
                 onRetry={metrics.refresh}
