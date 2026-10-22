@@ -1,3 +1,5 @@
+import type { EffectiveStatus } from "@/types/process";
+
 export type ProcessMetricName =
     | "pm2_cpu"
     | "pm2_memory"
@@ -53,4 +55,41 @@ export interface MetricChartSeries {
     stepped?: boolean;
     filled?: boolean;
     dashed?: boolean;
+}
+
+export type StatusTimelineKind = EffectiveStatus | "no_data";
+
+export interface StatusTimelineProcess {
+    label: string;
+    identity: string;
+}
+
+export interface StatusTimelineLane {
+    id: string;
+    label: string;
+    index: number;
+}
+
+export interface StatusTimelineSegment {
+    laneId: string;
+    laneIndex: number;
+    kind: StatusTimelineKind;
+    code: number | null;
+    start: number;
+    end: number;
+}
+
+export interface StatusTimelineRestart {
+    laneId: string;
+    laneIndex: number;
+    timestamp: number;
+}
+
+export interface StatusTimelineData {
+    lanes: StatusTimelineLane[];
+    segments: StatusTimelineSegment[];
+    restarts: StatusTimelineRestart[];
+    start: number;
+    end: number;
+    stepMs: number | null;
 }
