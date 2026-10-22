@@ -531,6 +531,7 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
               status={cpuUsageStatus}
               error={cpuUsageError}
               onRetry={retryUsage}
+              className='h-full'
             />
             <UsageDonutCard
               title='Memory'
@@ -540,6 +541,7 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
               status={memoryUsageStatus}
               error={memoryUsageError}
               onRetry={retryUsage}
+              className='h-full'
               action={
                 <span className='text-xs text-muted-foreground'>
                   Host RAM {hostRamLabel}
