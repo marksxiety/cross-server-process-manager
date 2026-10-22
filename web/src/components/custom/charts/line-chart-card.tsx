@@ -1,10 +1,9 @@
 import { lazy } from 'react'
-import type { ReactNode } from 'react'
 import type { ChartTheme } from '@/hooks/use-chart-theme'
-import type { ApiError } from '@/types/api'
 import type { LoadStatus } from '@/types/dashboard'
 import type { MetricChartSeries } from '@/types/prometheus'
 import { ChartCard } from './chart-card'
+import type { ChartCardBaseProps } from './chart-card'
 
 const LazyLineChart = lazy(() =>
   import('./line-chart').then((module) => ({
@@ -12,17 +11,9 @@ const LazyLineChart = lazy(() =>
   })),
 )
 
-export type LineChartCardProps = {
-  title: string
-  description?: string
+export type LineChartCardProps = ChartCardBaseProps & {
   theme: ChartTheme
-  emptyLabel?: string
-  className?: string
-  chartClassName?: string
   status?: LoadStatus
-  error?: ApiError | null
-  onRetry?: () => void
-  action?: ReactNode
   series: MetricChartSeries[]
   valueFormatter: (value: number | string) => string
   yAxisFormatter?: (value: number) => string
@@ -32,36 +23,23 @@ export type LineChartCardProps = {
 
 export function LineChartCard({
   title,
-  description,
-  theme,
-  emptyLabel,
-  className,
   chartClassName,
-  status,
-  error,
-  onRetry,
-  action,
   series,
+  theme,
   valueFormatter,
   yAxisFormatter,
   yAxisMax,
   yAxisCategories,
+  ...cardProps
 }: LineChartCardProps) {
   const hasData = series.some((entry) => entry.points.length > 0)
-  const loading = status === 'loading' || status === 'idle'
 
   return (
     <ChartCard
       title={title}
-      description={description}
-      action={action}
-      className={className}
       chartClassName={chartClassName}
-      loading={loading}
       hasData={hasData}
-      error={error}
-      onRetry={onRetry}
-      emptyLabel={emptyLabel}
+      {...cardProps}
     >
       <LazyLineChart
         series={series}
