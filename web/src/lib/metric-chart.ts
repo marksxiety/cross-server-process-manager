@@ -17,7 +17,7 @@ export interface MetricChartSeriesOptions {
     restarts?: RestartTimestamps;
 }
 
-const GAP_STEP_FACTOR = 1.5;
+export const GAP_STEP_FACTOR = 1.5;
 
 type ChartPoint = [number, number | string | null];
 
