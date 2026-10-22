@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import type { EChartsCoreOption } from 'echarts/core'
 import type { ChartTheme } from '@/hooks/use-chart-theme'
+import { escapeHtml } from '@/lib/format'
 import type { MetricChartSeries } from '@/types/prometheus'
 import { EChart } from './echart'
 
@@ -168,15 +169,6 @@ function formatLineTooltip(
   return [escapeHtml(title), ...rows]
     .filter((line) => line !== '')
     .join('<br/>')
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
 }
 
 export function LineChart({
