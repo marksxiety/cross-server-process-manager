@@ -13,6 +13,15 @@ const YEAR = 365 * DAY
  * up through years — with one secondary unit for precision (e.g. "2y 3mo",
  * "5d 4h").
  */
+export function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 export function formatUptime(uptimeMs: number): string {
   if (!Number.isFinite(uptimeMs) || uptimeMs <= 0) return EMPTY_VALUE
 
