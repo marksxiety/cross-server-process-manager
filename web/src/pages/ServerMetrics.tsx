@@ -4,6 +4,7 @@ import { Activity, Search, ServerOff } from 'lucide-react'
 import { isPrometheusConfigured } from '@/api/services/prometheus.service'
 import {
   LineChartCard,
+  StatusTimelineCard,
   UsageDonutCard,
 } from '@/components/custom/charts'
 import { ErrorAlert } from '@/components/custom/error-alert'
@@ -29,6 +30,7 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { useChartTheme } from '@/hooks/use-chart-theme'
 import { useMetricChartSeries } from '@/hooks/use-metric-chart-series'
+import { useStatusTimeline } from '@/hooks/use-status-timeline'
 import { formatBytes, formatPercent, memorySharePercent } from '@/lib/format'
 import {
   maxNumericValue,
@@ -52,13 +54,12 @@ import {
   formatMetricValue,
   formatSeriesLabel,
   normalizeCpu,
+  seriesIdentity,
   sumLastValues,
 } from '@/lib/prometheus'
 import {
   STATUS_CATALOG,
-  STATUS_CHART_CATEGORIES,
   STATUS_ORDER,
-  statusLabelFromCode,
 } from '@/lib/status-catalog'
 import {
   cpuUsageShares,
@@ -181,12 +182,18 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
   const uptimeSeries = filterMetric(metrics.data.pm2_uptime)
 
   const colorLabels = new Set<string>()
+  const processIdentities = new Map<string, string>()
   for (const seriesList of Object.values(metrics.data)) {
     for (const series of filterSeries(seriesList ?? [], {
       namespace: activeNamespace === 'all' ? undefined : activeNamespace,
       query,
     })) {
-      colorLabels.add(formatSeriesLabel(series))
+      const label = formatSeriesLabel(series)
+      colorLabels.add(label)
+
+      if (!processIdentities.has(label)) {
+        processIdentities.set(label, seriesIdentity(series.metric))
+      }
     }
   }
   const colorMap = new Map<string, string>()
@@ -207,6 +214,20 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
     for (const series of seriesList) visibleLabels.add(formatSeriesLabel(series))
   }
   const visibleProcessCount = visibleLabels.size
+
+  const statusLabels = new Set(statusSeries.map(formatSeriesLabel))
+  const timelineProcesses = [
+    ...statusLabels,
+    ...[...visibleLabels].filter((label) => !statusLabels.has(label)).sort(),
+  ].map((label) => ({
+    label,
+    identity: processIdentities.get(label) ?? label,
+  }))
+  const timelineData = useStatusTimeline(
+    metrics,
+    statusSeries,
+    timelineProcesses,
+  )
 
   const overview = serverEntry?.overview ?? null
   const cpuTotalRaw = sumLastValues(cpuSeries)
@@ -593,21 +614,14 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
               }
             />
 
-            <LineChartCard
+            <StatusTimelineCard
               title='Status'
               description={metricDescription(
                 metrics.status.pm2_status,
                 statusSummary(statusCounts),
               )}
-              series={toChartSeries(statusSeries, {
-                color: colorFor,
-                stepped: true,
-                label: formatSeriesLabel,
-                valueMapper: statusLabelFromCode,
-              })}
+              data={timelineData}
               theme={theme}
-              valueFormatter={(value) => String(value)}
-              yAxisCategories={STATUS_CHART_CATEGORIES}
               chartClassName='h-56'
               status={metrics.status.pm2_status}
               error={metricError(metrics.errors, 'pm2_status')}
