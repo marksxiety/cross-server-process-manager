@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { LineChart, PieChart } from 'echarts/charts'
+import { CustomChart, LineChart, PieChart } from 'echarts/charts'
 import {
   GridComponent,
   LegendComponent,
@@ -13,6 +13,7 @@ import { CanvasRenderer } from 'echarts/renderers'
 import { cn } from '@/lib/utils'
 
 echarts.use([
+  CustomChart,
   LineChart,
   PieChart,
   GridComponent,
