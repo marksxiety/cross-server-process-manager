@@ -1,10 +1,8 @@
-import { lazy, memo } from 'react'
-import type { ReactNode } from 'react'
+import { lazy } from 'react'
 import type { ChartTheme } from '@/hooks/use-chart-theme'
 import type { UsageStatus } from '@/lib/server-usage'
-import { cn } from '@/lib/utils'
-import type { ApiError } from '@/types/api'
 import { ChartCard } from './chart-card'
+import type { ChartCardBaseProps } from './chart-card'
 
 const LazyUsageDonut = lazy(() =>
   import('./usage-donut').then((module) => ({
@@ -12,49 +10,39 @@ const LazyUsageDonut = lazy(() =>
   })),
 )
 
-export type UsageDonutCardProps = {
-  title: string
+export type UsageDonutCardProps = ChartCardBaseProps & {
   theme: ChartTheme
   pm2: number | null
   other: number | null
   status: UsageStatus
-  error?: ApiError | null
-  onRetry?: () => void
-  action?: ReactNode
-  className?: string
 }
 
-export const UsageDonutCard = memo(function UsageDonutCard({
+export function UsageDonutCard({
   title,
   theme,
   pm2,
   other,
   status,
-  error,
-  onRetry,
-  action,
-  className,
+  chartClassName,
+  ...cardProps
 }: UsageDonutCardProps) {
-  const resolvedStatus =
-    status === 'ready' && (pm2 === null || other === null) ? 'empty' : status
-  const hasData = resolvedStatus === 'ready'
+  const hasData = pm2 !== null && other !== null
 
   return (
     <ChartCard
       title={title}
-      action={action}
-      className={cn('h-full', className)}
-      loading={resolvedStatus === 'loading'}
+      status={status}
+      chartClassName={chartClassName}
       hasData={hasData}
-      error={error}
-      onRetry={onRetry}
+      {...cardProps}
     >
       <LazyUsageDonut
         theme={theme}
         pm2={pm2 ?? 0}
         other={other ?? 0}
         ariaLabel={`${title} usage chart`}
+        className={chartClassName}
       />
     </ChartCard>
   )
-})
+}
