@@ -11,20 +11,27 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
+import type { UsageStatus } from '@/lib/server-usage'
 import { cn } from '@/lib/utils'
 import type { ApiError } from '@/types/api'
+import type { LoadStatus } from '@/types/dashboard'
 
-export type ChartCardProps = {
+export type ChartCardStatus = LoadStatus | UsageStatus
+
+export type ChartCardBaseProps = {
   title: string
   description?: string
   action?: ReactNode
   className?: string
   chartClassName?: string
-  loading?: boolean
-  hasData: boolean
+  emptyLabel?: string
   error?: ApiError | null
   onRetry?: () => void
-  emptyLabel?: string
+}
+
+export type ChartCardProps = ChartCardBaseProps & {
+  status?: ChartCardStatus
+  hasData: boolean
   loadingFallback?: ReactNode
   emptyFallback?: ReactNode
   children: ReactNode
@@ -87,7 +94,7 @@ export function ChartCard({
   action,
   className,
   chartClassName,
-  loading = false,
+  status,
   hasData,
   error,
   onRetry,
@@ -96,6 +103,8 @@ export function ChartCard({
   emptyFallback,
   children,
 }: ChartCardProps) {
+  const loading = status === 'idle' || status === 'loading'
+
   return (
     <Card size='sm' className={cn(className)}>
       <CardHeader className='pb-1'>
