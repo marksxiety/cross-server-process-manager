@@ -1,5 +1,16 @@
 import { useEffect, useState } from 'react'
 
+export type ThresholdState = 'ok' | 'warn' | 'critical'
+
+export interface ThresholdColors {
+  /** Ring zone color when this state is active. */
+  color: string
+  /** Dimmed ring zone (inactive) and chip background. */
+  soft: string
+  /** Text color on top of `soft` and for the big number. */
+  text: string
+}
+
 export interface ChartTheme {
   text: string
   mutedText: string
@@ -19,6 +30,19 @@ export interface ChartTheme {
     other: string
     free: string
   }
+  threshold: Record<ThresholdState, ThresholdColors>
+}
+
+const LIGHT_THRESHOLD: ChartTheme['threshold'] = {
+  ok: { color: '#22c55e', soft: '#bbf7d0', text: '#15803d' },
+  warn: { color: '#f59e0b', soft: '#fde68a', text: '#b45309' },
+  critical: { color: '#ef4444', soft: '#fecaca', text: '#b91c1c' },
+}
+
+const DARK_THRESHOLD: ChartTheme['threshold'] = {
+  ok: { color: '#22c55e', soft: '#14532d', text: '#4ade80' },
+  warn: { color: '#f59e0b', soft: '#78350f', text: '#fbbf24' },
+  critical: { color: '#ef4444', soft: '#7f1d1d', text: '#f87171' },
 }
 
 const FALLBACK_THEME: ChartTheme = {
@@ -53,6 +77,7 @@ const FALLBACK_THEME: ChartTheme = {
     other: '#a1a1aa',
     free: '#e4e4e0',
   },
+  threshold: LIGHT_THRESHOLD,
 }
 
 let colorContext: CanvasRenderingContext2D | null | undefined
@@ -87,7 +112,9 @@ function readColor(
 function readChartTheme(): ChartTheme {
   if (typeof document === 'undefined') return FALLBACK_THEME
 
-  const styles = getComputedStyle(document.documentElement)
+  const root = document.documentElement
+  const styles = getComputedStyle(root)
+  const isDark = root.classList.contains('dark')
 
   return {
     text: readColor(styles, '--foreground', FALLBACK_THEME.text),
@@ -105,6 +132,7 @@ function readChartTheme(): ChartTheme {
       other: FALLBACK_THEME.usage.other,
       free: readColor(styles, '--border', FALLBACK_THEME.usage.free),
     },
+    threshold: isDark ? DARK_THRESHOLD : LIGHT_THRESHOLD,
   }
 }
 
