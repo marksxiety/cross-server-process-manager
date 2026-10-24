@@ -1,9 +1,11 @@
 import { describe, expect, test } from 'vitest'
 import {
+    buildProcessStyleMap,
     maxNumericValue,
     niceCpuProcessMax,
     nicePercentMax,
     percentAxisFormatter,
+    processStyleFor,
     toMetricChartSeries,
 } from '../../lib/metric-chart'
 import { seriesIdentity } from '../../lib/prometheus'
@@ -143,6 +145,63 @@ describe('chart breaks', () => {
             [0, 1],
             [60_000, 2],
         ])
+    })
+})
+
+describe('process style map', () => {
+    test('assigns palette colors by sorted process label', () => {
+        const api = series('api', [1])
+        const worker = series('worker', [1])
+        const palette = ['#a', '#b', '#c']
+
+        const styles = buildProcessStyleMap([[worker, api]], palette)
+
+        expect(styles.get('XPM · api')).toEqual({
+            color: '#a',
+            dashPattern: undefined,
+        })
+        expect(styles.get('XPM · worker')).toEqual({
+            color: '#b',
+            dashPattern: undefined,
+        })
+    })
+
+    test('keeps a process style stable while filtering', () => {
+        const api = series('api', [1])
+        const worker = series('worker', [1])
+        const palette = ['#a', '#b']
+
+        const styles = buildProcessStyleMap([[worker, api], [api]], palette)
+
+        expect(
+            processStyleFor(worker, styles, { color: '#fallback' }),
+        ).toEqual({ color: '#b', dashPattern: undefined })
+        expect(
+            processStyleFor(series('unknown', [1]), styles, {
+                color: '#fallback',
+            }),
+        ).toEqual({ color: '#fallback' })
+    })
+
+    test('advances the dash pattern after each palette cycle', () => {
+        const processes = Array.from({ length: 9 }, (_, index) =>
+            series(`p${index}`, [1]),
+        )
+        const palette = Array.from({ length: 8 }, (_, index) => `#${index + 1}`)
+
+        const styles = buildProcessStyleMap([processes], palette, [
+            undefined,
+            [6, 3],
+        ])
+
+        expect(styles.get('XPM · p0')).toEqual({
+            color: '#1',
+            dashPattern: undefined,
+        })
+        expect(styles.get('XPM · p8')).toEqual({
+            color: '#1',
+            dashPattern: [6, 3],
+        })
     })
 })
 
