@@ -21,6 +21,49 @@
     --color-chart-3: var(--chart-3);
     --color-chart-2: var(--chart-2);
     --color-chart-1: var(--chart-1);
+    --color-status-errored: var(--status-errored);
+    --color-status-errored-surface: var(--status-errored-surface);
+    --color-status-errored-text: var(--status-errored-text);
+    --color-status-errored-border: var(--status-errored-border);
+    --color-status-errored-track: var(--status-errored-track);
+    --color-status-failed-exit: var(--status-failed-exit);
+    --color-status-failed-exit-surface: var(--status-failed-exit-surface);
+    --color-status-failed-exit-text: var(--status-failed-exit-text);
+    --color-status-failed-exit-border: var(--status-failed-exit-border);
+    --color-status-degraded: var(--status-degraded);
+    --color-status-degraded-surface: var(--status-degraded-surface);
+    --color-status-degraded-text: var(--status-degraded-text);
+    --color-status-degraded-border: var(--status-degraded-border);
+    --color-status-waiting-restart: var(--status-waiting-restart);
+    --color-status-waiting-restart-surface: var(--status-waiting-restart-surface);
+    --color-status-waiting-restart-text: var(--status-waiting-restart-text);
+    --color-status-waiting-restart-border: var(--status-waiting-restart-border);
+    --color-status-waiting-restart-track: var(--status-waiting-restart-track);
+    --color-status-transitioning: var(--status-transitioning);
+    --color-status-transitioning-surface: var(--status-transitioning-surface);
+    --color-status-transitioning-text: var(--status-transitioning-text);
+    --color-status-transitioning-border: var(--status-transitioning-border);
+    --color-status-stopped-manual: var(--status-stopped-manual);
+    --color-status-stopped-manual-surface: var(--status-stopped-manual-surface);
+    --color-status-stopped-manual-text: var(--status-stopped-manual-text);
+    --color-status-stopped-manual-border: var(--status-stopped-manual-border);
+    --color-status-scheduled-idle: var(--status-scheduled-idle);
+    --color-status-scheduled-idle-surface: var(--status-scheduled-idle-surface);
+    --color-status-scheduled-idle-text: var(--status-scheduled-idle-text);
+    --color-status-scheduled-idle-border: var(--status-scheduled-idle-border);
+    --color-status-completed: var(--status-completed);
+    --color-status-completed-surface: var(--status-completed-surface);
+    --color-status-completed-text: var(--status-completed-text);
+    --color-status-completed-border: var(--status-completed-border);
+    --color-status-online: var(--status-online);
+    --color-status-online-surface: var(--status-online-surface);
+    --color-status-online-text: var(--status-online-text);
+    --color-status-online-border: var(--status-online-border);
+    --color-status-online-track: var(--status-online-track);
+    --color-status-unknown: var(--status-unknown);
+    --color-status-unknown-surface: var(--status-unknown-surface);
+    --color-status-unknown-text: var(--status-unknown-text);
+    --color-status-unknown-border: var(--status-unknown-border);
     --color-ring: var(--ring);
     --color-input: var(--input);
     --color-border: var(--border);
@@ -82,6 +125,70 @@
     --sidebar-accent-foreground: oklch(0.205 0 0);
     --sidebar-border: oklch(0.922 0 0);
     --sidebar-ring: oklch(0.708 0 0);
+
+    /* Status color roles: base accent, card surface, text, border/ring, donut track. */
+    --status-errored: oklch(50.5% 0.213 27.518);
+    --status-errored-surface: oklch(88.5% 0.062 18.334);
+    --status-errored-text: oklch(44.4% 0.177 26.899);
+    --status-errored-border: oklch(70.4% 0.191 22.216);
+    --status-errored-track: oklch(88.5% 0.062 18.334);
+
+    --status-failed-exit: oklch(51.4% 0.222 16.935);
+    --status-failed-exit-surface: oklch(89.2% 0.058 10.001);
+    --status-failed-exit-text: oklch(45.5% 0.188 13.697);
+    --status-failed-exit-border: oklch(71.2% 0.194 13.428);
+
+    --status-degraded: oklch(64.6% 0.222 41.116);
+    --status-degraded-surface: oklch(95.4% 0.038 75.164);
+    --status-degraded-text: oklch(47% 0.157 37.304);
+    --status-degraded-border: oklch(83.7% 0.128 66.29);
+
+    --status-waiting-restart: oklch(66.6% 0.179 58.318);
+    --status-waiting-restart-surface: oklch(96.2% 0.059 95.617);
+    --status-waiting-restart-text: oklch(47.3% 0.137 46.201);
+    --status-waiting-restart-border: oklch(87.9% 0.169 91.605);
+    --status-waiting-restart-track: oklch(92.4% 0.12 95.746);
+
+    --status-transitioning: oklch(58.8% 0.158 241.966);
+    --status-transitioning-surface: oklch(95.1% 0.026 236.824);
+    --status-transitioning-text: oklch(44.3% 0.11 240.79);
+    --status-transitioning-border: oklch(82.8% 0.111 230.318);
+
+    --status-stopped-manual: oklch(44.6% 0.043 257.281);
+    --status-stopped-manual-surface: oklch(96.8% 0.007 247.896);
+    --status-stopped-manual-text: oklch(27.9% 0.041 260.031);
+    --status-stopped-manual-border: oklch(86.9% 0.022 252.894);
+
+    --status-scheduled-idle: oklch(54.1% 0.281 293.009);
+    --status-scheduled-idle-surface: oklch(94.3% 0.029 294.588);
+    --status-scheduled-idle-text: oklch(43.2% 0.232 292.759);
+    --status-scheduled-idle-border: oklch(81.1% 0.111 293.571);
+
+    --status-completed: oklch(60% 0.118 184.704);
+    --status-completed-surface: oklch(95.3% 0.051 180.801);
+    --status-completed-text: oklch(43.7% 0.078 188.216);
+    --status-completed-border: oklch(85.5% 0.138 181.071);
+
+    --status-online: oklch(59.6% 0.145 163.225);
+    --status-online-surface: oklch(95% 0.052 163.051);
+    --status-online-text: oklch(43.2% 0.095 166.913);
+    --status-online-border: oklch(84.5% 0.143 164.978);
+    --status-online-track: oklch(90.5% 0.093 164.15);
+
+    --status-unknown: oklch(55.4% 0.046 257.417);
+    --status-unknown-surface: oklch(92.9% 0.013 255.508);
+    --status-unknown-text: oklch(37.2% 0.044 257.287);
+    --status-unknown-border: oklch(70.4% 0.04 256.788);
+
+    /* Categorical line palette: 8 contrast-safe colors for light mode. */
+    --chart-series-1: #155dfc;
+    --chart-series-2: #e17100;
+    --chart-series-3: #00a63e;
+    --chart-series-4: #c800de;
+    --chart-series-5: #0092b8;
+    --chart-series-6: #e7000b;
+    --chart-series-7: #4f39f6;
+    --chart-series-8: #e60076;
 }
 
 .dark {
@@ -117,6 +224,69 @@
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(1 0 0 / 10%);
     --sidebar-ring: oklch(0.556 0 0);
+
+    --status-errored: oklch(63.7% 0.237 25.331);
+    --status-errored-surface: oklch(25.8% 0.092 26.042);
+    --status-errored-text: oklch(70.4% 0.191 22.216);
+    --status-errored-border: oklch(44.4% 0.177 26.899);
+    --status-errored-track: oklch(39.6% 0.141 25.723);
+
+    --status-failed-exit: oklch(64.5% 0.246 16.439);
+    --status-failed-exit-surface: oklch(27.1% 0.105 12.094);
+    --status-failed-exit-text: oklch(71.2% 0.194 13.428);
+    --status-failed-exit-border: oklch(45.5% 0.188 13.697);
+
+    --status-degraded: oklch(70.5% 0.213 47.604);
+    --status-degraded-surface: oklch(26.6% 0.079 36.259);
+    --status-degraded-text: oklch(75% 0.183 55.934);
+    --status-degraded-border: oklch(47% 0.157 37.304);
+
+    --status-waiting-restart: oklch(76.9% 0.188 70.08);
+    --status-waiting-restart-surface: oklch(27.9% 0.077 45.635);
+    --status-waiting-restart-text: oklch(82.8% 0.189 84.429);
+    --status-waiting-restart-border: oklch(47.3% 0.137 46.201);
+    --status-waiting-restart-track: oklch(41.4% 0.112 45.904);
+
+    --status-transitioning: oklch(68.5% 0.169 237.323);
+    --status-transitioning-surface: oklch(29.3% 0.066 243.157);
+    --status-transitioning-text: oklch(74.6% 0.16 232.661);
+    --status-transitioning-border: oklch(44.3% 0.11 240.79);
+
+    --status-stopped-manual: oklch(55.4% 0.046 257.417);
+    --status-stopped-manual-surface: oklch(27.9% 0.041 260.031);
+    --status-stopped-manual-text: oklch(70.4% 0.04 256.788);
+    --status-stopped-manual-border: oklch(37.2% 0.044 257.287);
+
+    --status-scheduled-idle: oklch(60.6% 0.25 292.717);
+    --status-scheduled-idle-surface: oklch(28.3% 0.141 291.089);
+    --status-scheduled-idle-text: oklch(70.2% 0.183 293.541);
+    --status-scheduled-idle-border: oklch(38% 0.189 293.745);
+
+    --status-completed: oklch(70.4% 0.14 182.503);
+    --status-completed-surface: oklch(27.7% 0.046 192.524);
+    --status-completed-text: oklch(77.7% 0.152 181.912);
+    --status-completed-border: oklch(43.7% 0.078 188.216);
+
+    --status-online: oklch(69.6% 0.17 162.48);
+    --status-online-surface: oklch(26.2% 0.051 172.552);
+    --status-online-text: oklch(76.5% 0.177 163.223);
+    --status-online-border: oklch(43.2% 0.095 166.913);
+    --status-online-track: oklch(37.8% 0.077 168.94);
+
+    --status-unknown: oklch(70.4% 0.04 256.788);
+    --status-unknown-surface: oklch(27.9% 0.041 260.031);
+    --status-unknown-text: oklch(70.4% 0.04 256.788);
+    --status-unknown-border: oklch(37.2% 0.044 257.287);
+
+    /* Categorical line palette: brighter variants for dark mode. */
+    --chart-series-1: #51a2ff;
+    --chart-series-2: #ffb900;
+    --chart-series-3: #05df72;
+    --chart-series-4: #ed6aff;
+    --chart-series-5: #00d3f2;
+    --chart-series-6: #ff6467;
+    --chart-series-7: #7c86ff;
+    --chart-series-8: #fb64b6;
 }
 
 @layer base {
