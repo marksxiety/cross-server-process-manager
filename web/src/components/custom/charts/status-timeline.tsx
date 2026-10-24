@@ -7,7 +7,6 @@ import type {
 import type { EChartsCoreOption } from 'echarts/core'
 import type { ChartTheme } from '@/hooks/use-chart-theme'
 import { escapeHtml, formatUptime } from '@/lib/format'
-import { STATUS_CHART_COLORS } from '@/lib/status-chart'
 import { STATUS_CATALOG, STATUS_ORDER } from '@/lib/status-catalog'
 import type {
   StatusTimelineData,
@@ -166,7 +165,7 @@ function buildStatusTimelineOption({
     series.push({
       type: 'custom',
       name: STATUS_CATALOG[status].label,
-      itemStyle: { color: STATUS_CHART_COLORS[status] },
+      itemStyle: { color: theme.status[status] },
       encode: { x: [1, 2], y: 0 },
       data: segments.map((segment) => ({
         value: [segment.laneIndex, segment.start, segment.end],
@@ -228,6 +227,10 @@ function buildStatusTimelineOption({
 
   return {
     animation: false,
+    aria: {
+      enabled: true,
+      decal: { show: true },
+    },
     grid: {
       left: 8,
       right: 14,
