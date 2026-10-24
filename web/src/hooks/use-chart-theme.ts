@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { STATUS_COLOR_VAR, STATUS_TEXT_COLOR_VAR } from '@/lib/status-chart'
+import type { EffectiveStatus } from '@/types/process'
 
 export type ThresholdState = 'ok' | 'warn' | 'critical'
 
@@ -16,7 +18,9 @@ export interface ChartTheme {
   mutedText: string
   border: string
   tooltipBackground: string
+  reducedMotion: boolean
   palette: string[]
+  status: Record<EffectiveStatus, string>
   series: {
     cpu: string
     memory: string
@@ -33,16 +37,50 @@ export interface ChartTheme {
   threshold: Record<ThresholdState, ThresholdColors>
 }
 
-const LIGHT_THRESHOLD: ChartTheme['threshold'] = {
-  ok: { color: '#22c55e', soft: '#bbf7d0', text: '#15803d' },
-  warn: { color: '#f59e0b', soft: '#fde68a', text: '#b45309' },
-  critical: { color: '#ef4444', soft: '#fecaca', text: '#b91c1c' },
+const THRESHOLD_STATUS: Record<ThresholdState, EffectiveStatus> = {
+  ok: 'online',
+  warn: 'waiting_restart',
+  critical: 'errored',
 }
 
-const DARK_THRESHOLD: ChartTheme['threshold'] = {
-  ok: { color: '#22c55e', soft: '#14532d', text: '#4ade80' },
-  warn: { color: '#f59e0b', soft: '#78350f', text: '#fbbf24' },
-  critical: { color: '#ef4444', soft: '#7f1d1d', text: '#f87171' },
+const THRESHOLD_TRACK_VAR: Record<ThresholdState, string> = {
+  ok: '--status-online-track',
+  warn: '--status-waiting-restart-track',
+  critical: '--status-errored-track',
+}
+
+const THRESHOLD_STATES: ThresholdState[] = ['ok', 'warn', 'critical']
+
+const PALETTE_SIZE = 8
+
+const FALLBACK_PALETTE = [
+  '#155dfc',
+  '#e17100',
+  '#00a63e',
+  '#c800de',
+  '#0092b8',
+  '#e7000b',
+  '#4f39f6',
+  '#e60076',
+]
+
+const FALLBACK_STATUS: Record<EffectiveStatus, string> = {
+  errored: '#ef4444',
+  failed_exit: '#f43f5e',
+  degraded: '#f97316',
+  waiting_restart: '#f59e0b',
+  transitioning: '#0ea5e9',
+  stopped_manual: '#64748b',
+  scheduled_idle: '#8b5cf6',
+  completed: '#14b8a6',
+  online: '#10b981',
+  unknown: '#94a3b8',
+}
+
+const FALLBACK_THRESHOLD: ChartTheme['threshold'] = {
+  ok: { color: '#10b981', soft: '#a7f3d0', text: '#065f46' },
+  warn: { color: '#f59e0b', soft: '#fde68a', text: '#b45309' },
+  critical: { color: '#ef4444', soft: '#fecaca', text: '#b91c1c' },
 }
 
 const FALLBACK_THEME: ChartTheme = {
@@ -50,20 +88,9 @@ const FALLBACK_THEME: ChartTheme = {
   mutedText: '#737373',
   border: '#e5e5e5',
   tooltipBackground: '#ffffff',
-  palette: [
-    '#3b82f6',
-    '#8b5cf6',
-    '#06b6d4',
-    '#f59e0b',
-    '#ef4444',
-    '#22c55e',
-    '#ec4899',
-    '#f97316',
-    '#14b8a6',
-    '#6366f1',
-    '#84cc16',
-    '#eab308',
-  ],
+  reducedMotion: false,
+  palette: FALLBACK_PALETTE,
+  status: FALLBACK_STATUS,
   series: {
     cpu: '#3b82f6',
     memory: '#8b5cf6',
@@ -77,7 +104,7 @@ const FALLBACK_THEME: ChartTheme = {
     other: '#a1a1aa',
     free: '#e4e4e0',
   },
-  threshold: LIGHT_THRESHOLD,
+  threshold: FALLBACK_THRESHOLD,
 }
 
 let colorContext: CanvasRenderingContext2D | null | undefined
@@ -109,12 +136,66 @@ function readColor(
   return normalizeColor(styles.getPropertyValue(property), fallback)
 }
 
+function readPalette(styles: CSSStyleDeclaration): string[] {
+  return Array.from({ length: PALETTE_SIZE }, (_, index) =>
+    readColor(
+      styles,
+      `--chart-series-${index + 1}`,
+      FALLBACK_PALETTE[index] ?? FALLBACK_PALETTE[0]!,
+    ),
+  )
+}
+
+function readStatusColors(styles: CSSStyleDeclaration): ChartTheme['status'] {
+  return Object.fromEntries(
+    (Object.keys(STATUS_COLOR_VAR) as EffectiveStatus[]).map((status) => [
+      status,
+      readColor(styles, STATUS_COLOR_VAR[status], FALLBACK_STATUS[status]),
+    ]),
+  ) as ChartTheme['status']
+}
+
+function prefersReducedMotion(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  )
+}
+
+function readThresholdColors(
+  styles: CSSStyleDeclaration,
+  status: ChartTheme['status'],
+): ChartTheme['threshold'] {
+  return Object.fromEntries(
+    THRESHOLD_STATES.map((state) => {
+      const statusKey = THRESHOLD_STATUS[state]
+
+      return [
+        state,
+        {
+          color: status[statusKey],
+          soft: readColor(
+            styles,
+            THRESHOLD_TRACK_VAR[state],
+            FALLBACK_THRESHOLD[state].soft,
+          ),
+          text: readColor(
+            styles,
+            STATUS_TEXT_COLOR_VAR[statusKey],
+            FALLBACK_THRESHOLD[state].text,
+          ),
+        },
+      ]
+    }),
+  ) as ChartTheme['threshold']
+}
+
 function readChartTheme(): ChartTheme {
   if (typeof document === 'undefined') return FALLBACK_THEME
 
-  const root = document.documentElement
-  const styles = getComputedStyle(root)
-  const isDark = root.classList.contains('dark')
+  const styles = getComputedStyle(document.documentElement)
+  const status = readStatusColors(styles)
 
   return {
     text: readColor(styles, '--foreground', FALLBACK_THEME.text),
@@ -125,14 +206,16 @@ function readChartTheme(): ChartTheme {
       '--popover',
       FALLBACK_THEME.tooltipBackground,
     ),
-    palette: FALLBACK_THEME.palette,
+    reducedMotion: prefersReducedMotion(),
+    palette: readPalette(styles),
+    status,
     series: FALLBACK_THEME.series,
     usage: {
       pm2: FALLBACK_THEME.usage.pm2,
       other: FALLBACK_THEME.usage.other,
       free: readColor(styles, '--border', FALLBACK_THEME.usage.free),
     },
-    threshold: isDark ? DARK_THRESHOLD : LIGHT_THRESHOLD,
+    threshold: readThresholdColors(styles, status),
   }
 }
 
@@ -145,7 +228,18 @@ export function useChartTheme(): ChartTheme {
       attributes: true,
       attributeFilter: ['class'],
     })
-    return () => observer.disconnect()
+
+    const motion =
+      typeof window.matchMedia === 'function'
+        ? window.matchMedia('(prefers-reduced-motion: reduce)')
+        : null
+    const onMotionChange = () => setTheme(readChartTheme())
+    motion?.addEventListener('change', onMotionChange)
+
+    return () => {
+      observer.disconnect()
+      motion?.removeEventListener('change', onMotionChange)
+    }
   }, [])
 
   return theme
