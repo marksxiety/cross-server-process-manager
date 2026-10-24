@@ -4,15 +4,24 @@ import type { EffectiveStatusInput } from "@/lib/process-status";
 import { STATUS_CATALOG, STATUS_ORDER } from "@/lib/status-catalog";
 import type { EffectiveStatus, ProcessSummary } from "@/types/process";
 
+export type StatusSeverity =
+    | "calm"
+    | "neutral"
+    | "watch"
+    | "notice"
+    | "critical";
+
 export type StatusVisual = {
     label: string;
     icon: LucideIcon;
+    severity: StatusSeverity;
     dot: string;
     pulse: boolean;
     text: string;
     surface: string;
     border: string;
     ring: string;
+    badge: string;
 };
 
 type StatusVisualStyle = Omit<StatusVisual, "label">
@@ -20,93 +29,113 @@ type StatusVisualStyle = Omit<StatusVisual, "label">
 const STATUS_VISUAL_STYLES: Record<EffectiveStatus, StatusVisualStyle> = {
     errored: {
         icon: TriangleAlert,
-        dot: "bg-red-500",
+        severity: "critical",
+        dot: "bg-status-errored",
         pulse: true,
-        text: "text-red-700 dark:text-red-400",
-        surface: "bg-red-50 dark:bg-red-950",
-        border: "border-red-200 dark:border-red-800",
-        ring: "ring-red-200 dark:ring-red-800",
+        text: "text-status-errored-text",
+        surface: "bg-status-errored-surface",
+        border: "border-status-errored-border",
+        ring: "ring-status-errored-border",
+        badge: "bg-card border-status-errored-border text-status-errored-text",
     },
     failed_exit: {
         icon: TriangleAlert,
-        dot: "bg-rose-500",
+        severity: "critical",
+        dot: "bg-status-failed-exit",
         pulse: true,
-        text: "text-rose-700 dark:text-rose-400",
-        surface: "bg-rose-50 dark:bg-rose-950",
-        border: "border-rose-200 dark:border-rose-800",
-        ring: "ring-rose-200 dark:ring-rose-800",
+        text: "text-status-failed-exit-text",
+        surface: "bg-status-failed-exit-surface",
+        border: "border-status-failed-exit-border",
+        ring: "ring-status-failed-exit-border",
+        badge: "bg-card border-status-failed-exit-border text-status-failed-exit-text",
     },
     degraded: {
         icon: TriangleAlert,
-        dot: "bg-orange-500",
+        severity: "notice",
+        dot: "bg-status-degraded",
         pulse: true,
-        text: "text-orange-700 dark:text-orange-400",
-        surface: "bg-orange-50 dark:bg-orange-950",
-        border: "border-orange-200 dark:border-orange-800",
-        ring: "ring-orange-200 dark:ring-orange-800",
+        text: "text-status-degraded-text",
+        surface: "bg-status-degraded-surface",
+        border: "border-status-degraded-border",
+        ring: "ring-status-degraded-border",
+        badge: "bg-card border-status-degraded-border text-status-degraded-text",
     },
     waiting_restart: {
         icon: RefreshCw,
-        dot: "bg-amber-500",
+        severity: "notice",
+        dot: "bg-status-waiting-restart",
         pulse: true,
-        text: "text-amber-700 dark:text-amber-400",
-        surface: "bg-amber-50 dark:bg-amber-950",
-        border: "border-amber-200 dark:border-amber-800",
-        ring: "ring-amber-200 dark:ring-amber-800",
+        text: "text-status-waiting-restart-text",
+        surface: "bg-status-waiting-restart-surface",
+        border: "border-status-waiting-restart-border",
+        ring: "ring-status-waiting-restart-border",
+        badge: "bg-card border-status-waiting-restart-border text-status-waiting-restart-text",
     },
     transitioning: {
         icon: RefreshCw,
-        dot: "bg-sky-500",
+        severity: "notice",
+        dot: "bg-status-transitioning",
         pulse: true,
-        text: "text-sky-700 dark:text-sky-400",
-        surface: "bg-sky-50 dark:bg-sky-950",
-        border: "border-sky-200 dark:border-sky-800",
-        ring: "ring-sky-200 dark:ring-sky-800",
+        text: "text-status-transitioning-text",
+        surface: "bg-status-transitioning-surface",
+        border: "border-status-transitioning-border",
+        ring: "ring-status-transitioning-border",
+        badge: "bg-card border-status-transitioning-border text-status-transitioning-text",
     },
     stopped_manual: {
         icon: Pause,
-        dot: "bg-slate-500",
+        severity: "neutral",
+        dot: "bg-status-stopped-manual",
         pulse: false,
-        text: "text-slate-700 dark:text-slate-400",
-        surface: "bg-slate-100 dark:bg-slate-800",
-        border: "border-slate-300 dark:border-slate-700",
-        ring: "ring-slate-300 dark:ring-slate-700",
+        text: "text-status-stopped-manual-text",
+        surface: "bg-status-stopped-manual-surface",
+        border: "border-status-stopped-manual-border",
+        ring: "ring-status-stopped-manual-border",
+        badge: "bg-card border-status-stopped-manual-border text-status-stopped-manual-text",
     },
     scheduled_idle: {
         icon: Clock,
-        dot: "bg-violet-500",
+        severity: "calm",
+        dot: "bg-status-scheduled-idle",
         pulse: false,
-        text: "text-violet-700 dark:text-violet-400",
-        surface: "bg-violet-50 dark:bg-violet-950",
-        border: "border-violet-200 dark:border-violet-900",
-        ring: "ring-violet-200 dark:ring-violet-900",
+        text: "text-status-scheduled-idle-text",
+        surface: "bg-status-scheduled-idle-surface",
+        border: "border-status-scheduled-idle-border",
+        ring: "ring-status-scheduled-idle-border",
+        badge: "bg-card border-status-scheduled-idle-border text-status-scheduled-idle-text",
     },
     completed: {
         icon: Check,
-        dot: "bg-teal-500",
+        severity: "calm",
+        dot: "bg-status-completed",
         pulse: false,
-        text: "text-teal-700 dark:text-teal-400",
-        surface: "bg-teal-50 dark:bg-teal-950",
-        border: "border-teal-200 dark:border-teal-800",
-        ring: "ring-teal-200 dark:ring-teal-800",
+        text: "text-status-completed-text",
+        surface: "bg-status-completed-surface",
+        border: "border-status-completed-border",
+        ring: "ring-status-completed-border",
+        badge: "bg-card border-status-completed-border text-status-completed-text",
     },
     online: {
         icon: Check,
-        dot: "bg-emerald-500",
+        severity: "calm",
+        dot: "bg-status-online",
         pulse: false,
-        text: "text-emerald-700 dark:text-emerald-400",
-        surface: "bg-emerald-50 dark:bg-emerald-950",
-        border: "border-emerald-200 dark:border-emerald-800",
-        ring: "ring-emerald-200 dark:ring-emerald-800",
+        text: "text-status-online-text",
+        surface: "bg-status-online-surface",
+        border: "border-status-online-border",
+        ring: "ring-status-online-border",
+        badge: "bg-card border-status-online-border text-status-online-text",
     },
     unknown: {
         icon: TriangleAlert,
-        dot: "bg-slate-400",
+        severity: "watch",
+        dot: "bg-status-unknown",
         pulse: false,
-        text: "text-slate-600 dark:text-slate-400",
-        surface: "bg-slate-100 dark:bg-slate-800",
-        border: "border-slate-300 dark:border-slate-700",
-        ring: "ring-slate-300 dark:ring-slate-700",
+        text: "text-status-unknown-text",
+        surface: "bg-status-unknown-surface",
+        border: "border-status-unknown-border",
+        ring: "ring-status-unknown-border",
+        badge: "bg-card border-status-unknown-border text-status-unknown-text",
     },
 };
 
