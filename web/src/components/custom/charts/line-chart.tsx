@@ -29,7 +29,7 @@ function buildLineOption({
   const showLegend = series.length > 1
 
   return {
-    animation: true,
+    animation: !theme.reducedMotion,
     animationDuration: 300,
     animationDurationUpdate: 300,
     animationEasingUpdate: 'cubicOut',
@@ -57,9 +57,9 @@ function buildLineOption({
           bottom: 0,
           left: 0,
           right: 0,
-          itemWidth: 8,
+          itemWidth: 14,
           itemHeight: 8,
-          icon: 'roundRect',
+          icon: 'line',
           textStyle: { color: theme.mutedText, fontSize: 10 },
         }
       : undefined,
@@ -98,7 +98,7 @@ function buildLineOption({
       lineStyle: {
         width: 1.5,
         color: entry.color,
-        type: entry.dashed ? 'dashed' : 'solid',
+        type: entry.dashPattern ?? (entry.dashed ? 'dashed' : 'solid'),
       },
       itemStyle: { color: entry.color },
       areaStyle: entry.filled
