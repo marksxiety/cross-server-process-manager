@@ -66,16 +66,16 @@ export function ProcessCard({
       onClick={onSelect}
       onKeyDown={handleKeyDown}
       className={cn(
-        'h-full cursor-pointer transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+        'h-full cursor-pointer transition-shadow focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
         visual.surface,
         visual.ring,
-        'hover:bg-accent/40',
+        'hover:ring-2 hover:ring-foreground/15',
       )}
     >
       <CardHeader>
         <CardTitle className='flex min-w-0 items-center gap-2'>
           <StatusDot process={process} />
-          <span className={cn('min-w-0 flex-1 truncate', visual.text)}>
+          <span className='min-w-0 flex-1 truncate text-foreground'>
             {process.name}
           </span>
           <Badge
@@ -91,10 +91,7 @@ export function ProcessCard({
           </CardDescription>
         )}
         <CardAction>
-          <Badge
-            variant='outline'
-            className={cn('border', visual.surface, visual.text, visual.border)}
-          >
+          <Badge variant='outline' className={cn('border', visual.badge)}>
             {visual.label}
           </Badge>
         </CardAction>
