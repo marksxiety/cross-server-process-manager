@@ -69,7 +69,7 @@ import {
 } from '@/lib/process-registration'
 import { serverCpuShare } from '@/lib/server-usage'
 import { getStatusVisual } from '@/lib/status-styles'
-import { percentTone, toneProgressClasses, toneSurfaceClasses } from '@/lib/status-tone'
+import { percentTone, toneProgressClasses, toneSurfaceClasses, toneTextClasses } from '@/lib/status-tone'
 import { cn } from '@/lib/utils'
 import {
   LOGS_DEFAULT_TAIL,
@@ -138,9 +138,9 @@ function statToneClasses(tone: Tone): string {
 }
 
 function statLabelClasses(tone: Tone): string {
-  if (tone === 'danger') return 'text-destructive'
-  if (tone === 'warning') return 'text-amber-600 dark:text-amber-400'
-  return 'text-muted-foreground'
+  if (tone === 'danger') return toneTextClasses.danger
+  if (tone === 'warning') return toneTextClasses.warning
+  return toneTextClasses.neutral
 }
 
 // ---------------------------------------------------------------------------
