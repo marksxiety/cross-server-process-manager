@@ -16,7 +16,7 @@ export function StatusDot({
             className={cn(
                 "h-1.5 w-1.5 shrink-0 rounded-full",
                 visual.dot,
-                visual.pulse && "animate-pulse",
+                visual.pulse && "animate-pulse motion-reduce:animate-none",
                 className,
             )}
         />
