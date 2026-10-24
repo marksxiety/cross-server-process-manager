@@ -55,6 +55,7 @@ export interface MetricChartSeries {
     stepped?: boolean;
     filled?: boolean;
     dashed?: boolean;
+    dashPattern?: number[];
 }
 
 export type StatusTimelineKind = EffectiveStatus | "no_data";
