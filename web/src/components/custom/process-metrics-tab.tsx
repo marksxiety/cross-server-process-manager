@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { Activity } from 'lucide-react'
 import { isPrometheusConfigured } from '@/api/services/prometheus.service'
 import { MetricBasisSwitch } from '@/components/custom/metric-basis-switch'
@@ -27,10 +28,12 @@ import { useProcessMetrics } from '@/hooks/use-process-metrics'
 import { useStatusTimeline } from '@/hooks/use-status-timeline'
 import { formatBytes, formatPercent, memorySharePercent } from '@/lib/format'
 import {
+  buildProcessStyleMap,
   maxNumericValue,
   niceCpuProcessMax,
   nicePercentMax,
   percentAxisFormatter,
+  processStyleFor,
 } from '@/lib/metric-chart'
 import {
   combineStatus,
@@ -55,7 +58,11 @@ import { statusLabelFromCode } from '@/lib/status-catalog'
 import { useMetricsStore } from '@/stores/metrics.store'
 import type { ApiError } from '@/types/api'
 import type { LoadStatus } from '@/types/dashboard'
-import type { MetricsData, ProcessMetricName } from '@/types/prometheus'
+import type {
+  MetricsData,
+  ProcessMetricName,
+  PrometheusSeries,
+} from '@/types/prometheus'
 import type { ProcessSummary } from '@/types/process'
 import type { RegisteredServer } from '@/types/server'
 
@@ -118,6 +125,13 @@ export function ProcessMetricsTab({
     enabled: configured && active,
   })
   const toChartSeries = useMetricChartSeries(metrics)
+  const styleMap = useMemo(
+    () => buildProcessStyleMap(Object.values(metrics.data), theme.palette),
+    [metrics.data, theme.palette],
+  )
+  const fallbackStyle = { color: theme.palette[0] ?? '#155dfc' }
+  const colorFor = (series: PrometheusSeries) =>
+    processStyleFor(series, styleMap, fallbackStyle).color
 
   const cpuSeries = metrics.data.pm2_cpu
   const memorySeries = metrics.data.pm2_memory
@@ -168,13 +182,13 @@ export function ProcessMetricsTab({
   const cpuChartSeries = cpuBasisIsServer
     ? cpuServerReady
       ? toChartSeries(cpuSeries, {
-          color: theme.series.cpu,
+          color: colorFor,
           filled: true,
           valueMapper: (value) => normalizeCpu(value, cpuCores),
         })
       : []
     : toChartSeries(cpuSeries, {
-        color: theme.series.cpu,
+        color: colorFor,
         filled: true,
       })
   const cpuDisplayLast =
@@ -228,14 +242,14 @@ export function ProcessMetricsTab({
   const memoryChartSeries = memoryBasisIsServer
     ? memoryServerReady
       ? toChartSeries(memorySeries, {
-          color: theme.series.memory,
+          color: colorFor,
           filled: true,
           valueMapper: (value) =>
             memorySharePercent(value, totalMemoryBytes) ?? 0,
         })
       : []
     : toChartSeries(memorySeries, {
-        color: theme.series.memory,
+        color: colorFor,
         filled: true,
       })
   const memoryDescriptionValue =
@@ -446,7 +460,7 @@ export function ProcessMetricsTab({
                   uptimeLast === null ? null : formatUptimeValue(uptimeLast),
                 )}
                 series={toChartSeries(uptimeSeries, {
-                  color: theme.series.uptime,
+                  color: colorFor,
                   filled: true,
                 })}
                 theme={theme}
