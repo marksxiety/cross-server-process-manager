@@ -7,30 +7,30 @@ const PERCENT_DANGER_THRESHOLD = 90;
 const SERVER_PROCESS_CPU_WARNING_THRESHOLD = 80;
 
 export const toneIconClasses: Record<Tone, string> = {
-    success: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-    warning: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-    danger: "bg-destructive/10 text-destructive",
+    success: "bg-status-online-surface text-status-online-text",
+    warning: "bg-status-waiting-restart-surface text-status-waiting-restart-text",
+    danger: "bg-status-errored-surface text-status-errored-text",
     neutral: "bg-muted text-muted-foreground",
 };
 
 export const toneTextClasses: Record<Tone, string> = {
-    success: "text-emerald-600 dark:text-emerald-400",
-    warning: "text-amber-600 dark:text-amber-400",
-    danger: "text-destructive",
+    success: "text-status-online-text",
+    warning: "text-status-waiting-restart-text",
+    danger: "text-status-errored-text",
     neutral: "text-muted-foreground",
 };
 
 export const toneSurfaceClasses: Record<Tone, string> = {
-    success: "bg-emerald-500/10",
-    warning: "bg-amber-500/10",
-    danger: "bg-destructive/10",
+    success: "bg-status-online-surface",
+    warning: "bg-status-waiting-restart-surface",
+    danger: "bg-status-errored-surface",
     neutral: "bg-muted",
 };
 
 export const toneProgressClasses: Record<Tone, string> = {
-    success: "**:data-[slot=progress-indicator]:bg-emerald-500",
-    warning: "**:data-[slot=progress-indicator]:bg-amber-500",
-    danger: "**:data-[slot=progress-indicator]:bg-destructive",
+    success: "**:data-[slot=progress-indicator]:bg-status-online",
+    warning: "**:data-[slot=progress-indicator]:bg-status-waiting-restart",
+    danger: "**:data-[slot=progress-indicator]:bg-status-errored",
     neutral: "**:data-[slot=progress-indicator]:bg-muted-foreground/40",
 };
 
