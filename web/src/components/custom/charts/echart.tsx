@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { CustomChart, GaugeChart, LineChart, PieChart } from 'echarts/charts'
 import {
+  AriaComponent,
   GridComponent,
   LegendComponent,
   TitleComponent,
@@ -13,6 +14,7 @@ import { CanvasRenderer } from 'echarts/renderers'
 import { cn } from '@/lib/utils'
 
 echarts.use([
+  AriaComponent,
   CustomChart,
   GaugeChart,
   LineChart,
