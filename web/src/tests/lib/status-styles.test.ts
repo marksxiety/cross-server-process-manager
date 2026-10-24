@@ -15,6 +15,13 @@ describe('STATUS_VISUALS', () => {
       expect(visual.surface).toMatch(/^bg-/)
       expect(visual.border).toMatch(/^border-/)
       expect(visual.ring).toMatch(/^ring-/)
+      expect(visual.badge).toMatch(/bg-card/)
+    }
+  })
+
+  test('assigns a severity tier to every status', () => {
+    for (const status of ALL_STATUSES) {
+      expect(STATUS_VISUALS[status].severity).toBeTruthy()
     }
   })
 
@@ -30,22 +37,26 @@ describe('STATUS_VISUALS', () => {
     ])
   })
 
-  test('maps online to emerald shades', () => {
+  test('maps online to the online status tokens', () => {
     const online = STATUS_VISUALS.online
 
-    expect(online.dot).toBe('bg-emerald-500')
-    expect(online.text).toBe('text-emerald-700 dark:text-emerald-400')
-    expect(online.surface).toBe('bg-emerald-50 dark:bg-emerald-950')
-    expect(online.border).toBe('border-emerald-200 dark:border-emerald-800')
+    expect(online.dot).toBe('bg-status-online')
+    expect(online.text).toBe('text-status-online-text')
+    expect(online.surface).toBe('bg-status-online-surface')
+    expect(online.border).toBe('border-status-online-border')
+    expect(online.ring).toBe('ring-status-online-border')
+    expect(online.severity).toBe('calm')
   })
 
-  test('maps errored to red shades', () => {
+  test('maps errored to the critical status tokens', () => {
     const errored = STATUS_VISUALS.errored
 
-    expect(errored.dot).toBe('bg-red-500')
-    expect(errored.text).toBe('text-red-700 dark:text-red-400')
-    expect(errored.surface).toBe('bg-red-50 dark:bg-red-950')
-    expect(errored.border).toBe('border-red-200 dark:border-red-800')
+    expect(errored.dot).toBe('bg-status-errored')
+    expect(errored.text).toBe('text-status-errored-text')
+    expect(errored.surface).toBe('bg-status-errored-surface')
+    expect(errored.border).toBe('border-status-errored-border')
+    expect(errored.ring).toBe('ring-status-errored-border')
+    expect(errored.severity).toBe('critical')
   })
 })
 
