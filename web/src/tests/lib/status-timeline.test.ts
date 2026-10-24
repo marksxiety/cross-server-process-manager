@@ -4,7 +4,7 @@ import {
     type BuildStatusTimelineOptions,
 } from '../../lib/status-timeline'
 import { formatSeriesLabel, seriesIdentity } from '../../lib/prometheus'
-import { STATUS_CHART_COLORS } from '../../lib/status-chart'
+import { STATUS_COLOR_VAR, STATUS_TEXT_COLOR_VAR } from '../../lib/status-chart'
 import { STATUS_ORDER } from '../../lib/status-catalog'
 import type {
     PrometheusSeries,
@@ -223,9 +223,10 @@ describe('buildStatusTimeline', () => {
 })
 
 describe('status chart colors', () => {
-    test('defines a color for every effective status', () => {
-        expect(Object.keys(STATUS_CHART_COLORS).sort()).toEqual(
-            [...STATUS_ORDER].sort(),
-        )
+    test('defines a color token for every effective status', () => {
+        const expected = [...STATUS_ORDER].sort()
+
+        expect(Object.keys(STATUS_COLOR_VAR).sort()).toEqual(expected)
+        expect(Object.keys(STATUS_TEXT_COLOR_VAR).sort()).toEqual(expected)
     })
 })
