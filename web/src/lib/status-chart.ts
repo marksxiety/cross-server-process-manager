@@ -1,18 +1,32 @@
-import type { EffectiveStatus } from "@/types/process";
+import type { EffectiveStatus } from '@/types/process'
 
 /**
- * Chart-friendly status colors. These mirror the Tailwind tones in
- * `status-styles.ts` so the timeline and the dashboard badges agree.
+ * CSS custom properties that hold the canonical status colors.
+ * The chart layer resolves these through `useChartTheme` so the timeline,
+ * badges, and thresholds all share one palette.
  */
-export const STATUS_CHART_COLORS: Record<EffectiveStatus, string> = {
-    errored: "#ef4444",
-    failed_exit: "#f43f5e",
-    degraded: "#f97316",
-    waiting_restart: "#f59e0b",
-    transitioning: "#0ea5e9",
-    stopped_manual: "#64748b",
-    scheduled_idle: "#8b5cf6",
-    completed: "#14b8a6",
-    online: "#10b981",
-    unknown: "#94a3b8",
-};
+export const STATUS_COLOR_VAR: Record<EffectiveStatus, string> = {
+  errored: '--status-errored',
+  failed_exit: '--status-failed-exit',
+  degraded: '--status-degraded',
+  waiting_restart: '--status-waiting-restart',
+  transitioning: '--status-transitioning',
+  stopped_manual: '--status-stopped-manual',
+  scheduled_idle: '--status-scheduled-idle',
+  completed: '--status-completed',
+  online: '--status-online',
+  unknown: '--status-unknown',
+}
+
+export const STATUS_TEXT_COLOR_VAR: Record<EffectiveStatus, string> = {
+  errored: '--status-errored-text',
+  failed_exit: '--status-failed-exit-text',
+  degraded: '--status-degraded-text',
+  waiting_restart: '--status-waiting-restart-text',
+  transitioning: '--status-transitioning-text',
+  stopped_manual: '--status-stopped-manual-text',
+  scheduled_idle: '--status-scheduled-idle-text',
+  completed: '--status-completed-text',
+  online: '--status-online-text',
+  unknown: '--status-unknown-text',
+}
