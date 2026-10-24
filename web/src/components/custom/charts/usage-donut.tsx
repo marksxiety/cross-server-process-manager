@@ -130,7 +130,7 @@ function buildOption(
   }
 
   return {
-    animation: true,
+    animation: !theme.reducedMotion,
     animationDuration: 300,
     animationDurationUpdate: 300,
     animationEasingUpdate: 'cubicOut',
