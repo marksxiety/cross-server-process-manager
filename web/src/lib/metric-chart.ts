@@ -1,5 +1,5 @@
 import type { RestartTimestamps } from "@/lib/metric-restart";
-import { seriesIdentity } from "@/lib/prometheus";
+import { formatSeriesLabel, seriesIdentity } from "@/lib/prometheus";
 import type {
     MetricChartSeries,
     PrometheusPoint,
@@ -8,6 +8,9 @@ import type {
 
 export interface MetricChartSeriesOptions {
     color: string | ((series: PrometheusSeries, index: number) => string);
+    dashPattern?:
+        | number[]
+        | ((series: PrometheusSeries, index: number) => number[] | undefined);
     label?: (series: PrometheusSeries, index: number) => string;
     stepped?: boolean;
     filled?: boolean;
@@ -16,6 +19,18 @@ export interface MetricChartSeriesOptions {
     stepMs?: number;
     restarts?: RestartTimestamps;
 }
+
+export type ProcessChartStyle = {
+    color: string;
+    dashPattern?: number[];
+};
+
+export const PROCESS_DASH_PATTERNS: Array<number[] | undefined> = [
+    undefined,
+    [6, 3],
+    [2, 2],
+    [8, 3, 2, 3],
+];
 
 export const GAP_STEP_FACTOR = 1.5;
 
@@ -120,6 +135,53 @@ function toChartPoints(
     return result;
 }
 
+/**
+ * Assigns a stable color and dash pattern to every process label in the
+ * supplied data. Callers should pass the full metric data (before
+ * namespace/search filtering) so filtering never changes an existing style.
+ */
+export function buildProcessStyleMap(
+    seriesGroups: Iterable<PrometheusSeries[] | undefined>,
+    palette: string[],
+    dashPatterns: Array<number[] | undefined> = PROCESS_DASH_PATTERNS,
+): Map<string, ProcessChartStyle> {
+    const labels = new Set<string>();
+
+    for (const seriesList of seriesGroups) {
+        for (const series of seriesList ?? []) {
+            labels.add(formatSeriesLabel(series));
+        }
+    }
+
+    const styles = new Map<string, ProcessChartStyle>();
+    const sorted = [...labels].sort();
+
+    sorted.forEach((label, index) => {
+        if (palette.length === 0) return;
+
+        const color = palette[index % palette.length]!;
+        const patternIndex =
+            dashPatterns.length === 0
+                ? -1
+                : Math.floor(index / palette.length) % dashPatterns.length;
+
+        styles.set(label, {
+            color,
+            dashPattern: patternIndex >= 0 ? dashPatterns[patternIndex] : undefined,
+        });
+    });
+
+    return styles;
+}
+
+export function processStyleFor(
+    series: PrometheusSeries,
+    styleMap: Map<string, ProcessChartStyle>,
+    fallback: ProcessChartStyle,
+): ProcessChartStyle {
+    return styleMap.get(formatSeriesLabel(series)) ?? fallback;
+}
+
 export function toMetricChartSeries(
     seriesList: PrometheusSeries[] | undefined,
     options: MetricChartSeriesOptions,
@@ -144,6 +206,10 @@ export function toMetricChartSeries(
                 stepped: options.stepped,
                 filled: options.filled,
                 dashed: options.dashed,
+                dashPattern:
+                    typeof options.dashPattern === "function"
+                        ? options.dashPattern(series, index)
+                        : options.dashPattern,
                 points: toChartPoints(series.points, options, restarts),
             };
         });
