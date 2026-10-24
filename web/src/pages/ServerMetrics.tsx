@@ -33,10 +33,12 @@ import { useMetricChartSeries } from '@/hooks/use-metric-chart-series'
 import { useStatusTimeline } from '@/hooks/use-status-timeline'
 import { formatBytes, formatPercent, memorySharePercent } from '@/lib/format'
 import {
+  buildProcessStyleMap,
   maxNumericValue,
   niceCpuProcessMax,
   nicePercentMax,
   percentAxisFormatter,
+  processStyleFor,
 } from '@/lib/metric-chart'
 import {
   metricDescription,
@@ -181,7 +183,6 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
   const statusSeries = filterMetric(metrics.data.pm2_status)
   const uptimeSeries = filterMetric(metrics.data.pm2_uptime)
 
-  const colorLabels = new Set<string>()
   const processIdentities = new Map<string, string>()
   for (const seriesList of Object.values(metrics.data)) {
     for (const series of filterSeries(seriesList ?? [], {
@@ -189,20 +190,28 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
       query,
     })) {
       const label = formatSeriesLabel(series)
-      colorLabels.add(label)
-
       if (!processIdentities.has(label)) {
         processIdentities.set(label, seriesIdentity(series.metric))
       }
     }
   }
-  const colorMap = new Map<string, string>()
-  ;[...colorLabels].sort().forEach((label, index) => {
-    colorMap.set(label, theme.palette[index % theme.palette.length])
-  })
 
-  const colorFor = (series: PrometheusSeries) =>
-    colorMap.get(formatSeriesLabel(series)) ?? theme.palette[0]
+  const styleMap = useMemo(
+    () => buildProcessStyleMap(Object.values(metrics.data), theme.palette),
+    [metrics.data, theme.palette],
+  )
+  const fallbackStyle = { color: theme.palette[0] ?? '#155dfc' }
+  const styleFor = (series: PrometheusSeries) =>
+    processStyleFor(series, styleMap, fallbackStyle)
+  const chartStyle = (seriesList: PrometheusSeries[]) => ({
+    color: (series: PrometheusSeries) => styleFor(series).color,
+    ...(seriesList.length > 1
+      ? {
+          dashPattern: (series: PrometheusSeries) =>
+            styleFor(series).dashPattern,
+        }
+      : {}),
+  })
 
   const visibleLabels = new Set<string>()
   for (const seriesList of [
@@ -309,14 +318,14 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
   const cpuChartSeries = cpuBasisIsServer
     ? cpuServerReady
       ? toChartSeries(cpuSeries, {
-          color: colorFor,
+          ...chartStyle(cpuSeries),
           filled: true,
           label: formatSeriesLabel,
           valueMapper: (value) => normalizeCpu(value, cpuCores),
         })
       : []
     : toChartSeries(cpuSeries, {
-        color: colorFor,
+        ...chartStyle(cpuSeries),
         filled: true,
         label: formatSeriesLabel,
       })
@@ -372,7 +381,7 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
   const memoryChartSeries = memoryBasisIsServer
     ? memoryServerReady
       ? toChartSeries(memorySeries, {
-          color: colorFor,
+          ...chartStyle(memorySeries),
           filled: true,
           label: formatSeriesLabel,
           valueMapper: (value) =>
@@ -380,7 +389,7 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
         })
       : []
     : toChartSeries(memorySeries, {
-        color: colorFor,
+        ...chartStyle(memorySeries),
         filled: true,
         label: formatSeriesLabel,
       })
@@ -637,7 +646,7 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
                   : processCountLabel(uptimeSeries.length),
               )}
               series={toChartSeries(uptimeSeries, {
-                color: colorFor,
+                ...chartStyle(uptimeSeries),
                 filled: true,
                 label: formatSeriesLabel,
               })}
