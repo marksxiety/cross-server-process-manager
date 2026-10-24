@@ -569,15 +569,14 @@ export function Dashboard() {
                   variant='outline'
                   className={cn(
                     'shrink-0 gap-1.5 border font-normal',
-                    selectedVisual.surface,
-                    selectedVisual.text,
-                    selectedVisual.border,
+                    selectedVisual.badge,
                   )}
                 >
                   <Circle
                     className={cn(
                       'fill-current',
-                      selectedVisual.pulse && 'animate-pulse',
+                      selectedVisual.pulse &&
+                        'animate-pulse motion-reduce:animate-none',
                     )}
                     strokeWidth={0}
                   />
