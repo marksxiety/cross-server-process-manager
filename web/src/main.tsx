@@ -10,8 +10,25 @@ import { Template } from './pages/Template.tsx'
 import { Server } from './pages/Server.tsx'
 import { Process } from './pages/Process.tsx'
 import { ServerMetricsRoute } from './pages/ServerMetricsRoute.tsx'
+import { Login } from './pages/auth/login.tsx'
+import { Register } from './pages/auth/register.tsx'
+import { VerifyEmail } from './pages/auth/verify-email.tsx'
+import { ForgotPassword } from './pages/auth/forgot-password.tsx'
+import { ResetPassword } from './pages/auth/reset-password.tsx'
+import { Forbidden } from './pages/Forbidden.tsx'
 
 const router = createBrowserRouter([
+  {
+    errorElement: <ErrorPage />,
+    children: [
+      { path: 'login', element: <Login /> },
+      { path: 'register', element: <Register /> },
+      { path: 'verify-email', element: <VerifyEmail /> },
+      { path: 'forgot-password', element: <ForgotPassword /> },
+      { path: 'reset-password', element: <ResetPassword /> },
+      { path: 'forbidden', element: <Forbidden /> },
+    ],
+  },
   {
     path: '/',
     element: <App />,
