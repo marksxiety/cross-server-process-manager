@@ -7,3 +7,8 @@ export function buildPlaceholders(count: number): string {
 export function quoteIdentifier(name: string): string {
     return `[${name.replace(/]/g, ']]')}]`;
 }
+
+/** Quotes a SQL Server string literal with the N prefix. */
+export function quoteLiteral(value: string): string {
+    return `N'${value.replace(/'/g, "''")}'`;
+}

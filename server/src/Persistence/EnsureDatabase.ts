@@ -1,6 +1,6 @@
 import type { ConnectionPool } from 'mssql';
-import { isDatabaseAlreadyExistsError } from './dbError';
-import { quoteIdentifier } from './sql';
+import { isDatabaseAlreadyExistsError } from './DatabaseError';
+import { quoteIdentifier } from './Sql';
 
 export type EnsureDatabaseResult = 'created' | 'existed';
 

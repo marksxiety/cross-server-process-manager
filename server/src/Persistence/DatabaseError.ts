@@ -53,8 +53,15 @@ export function isCheckViolation(error: DbErrorInfo): boolean {
 }
 
 const DATABASE_ALREADY_EXISTS_NUMBER = 1801;
+const OBJECT_ALREADY_EXISTS_NUMBERS = new Set([1913, 2705, 2714]);
 
 /** True when CREATE DATABASE lost a race and the database now exists. */
 export function isDatabaseAlreadyExistsError(error: unknown): boolean {
     return describeDbError(error).number === DATABASE_ALREADY_EXISTS_NUMBER;
+}
+
+/** True when DDL failed because the table, column, or constraint already exists. */
+export function isObjectAlreadyExistsError(error: unknown): boolean {
+    const number = describeDbError(error).number;
+    return number !== undefined && OBJECT_ALREADY_EXISTS_NUMBERS.has(number);
 }
