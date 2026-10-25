@@ -1,11 +1,13 @@
 import { z } from 'zod';
+import { ValidationException } from '../../Exceptions/ValidationException';
+import type { ServerData } from '../../Models/Server';
 
 const MAX_SERVER_LENGTH = 100;
 const MAX_HOST_LENGTH = 255;
 const MIN_PORT = 1;
 const MAX_PORT = 65535;
 
-export const serverInputSchema = z.object({
+export const serverSchema = z.object({
     server: z
         .string({ message: 'Server name is required' })
         .trim()
@@ -31,4 +33,15 @@ export const serverInputSchema = z.object({
     is_active: z.boolean({ message: 'Active must be a boolean' }).optional(),
 });
 
-export type ServerInput = z.infer<typeof serverInputSchema>;
+export abstract class ServerRequest {
+    static validate(body: unknown): ServerData {
+        const parsed = serverSchema.safeParse(body);
+        if (!parsed.success) {
+            throw new ValidationException(
+                'Invalid server payload',
+                z.flattenError(parsed.error).fieldErrors
+            );
+        }
+        return parsed.data;
+    }
+}

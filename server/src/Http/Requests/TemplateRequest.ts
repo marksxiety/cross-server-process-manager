@@ -1,14 +1,12 @@
 import { z } from 'zod';
+import { ValidationException } from '../../Exceptions/ValidationException';
+import type { TemplateData } from '../../Models/Template';
+import type { TemplateValuesData } from '../../Models/TemplateKey';
 
 const MAX_PROPERTY_KEY_LENGTH = 100;
 const MAX_TEMPLATE_NAME_LENGTH = 100;
 const MAX_METADATA_LENGTH = 255;
 
-/**
- * Sparse map of PM2 option keys to initial values. Templates are guides: an
- * absent key is simply left empty in the form, and there are no required,
- * hidden or locked states.
- */
 export const templateValuesSchema = z.record(
     z
         .string({ message: 'Key is required' })
@@ -19,10 +17,6 @@ export const templateValuesSchema = z.record(
         }),
     z.unknown()
 );
-
-export const templateValuesInputSchema = z.object({
-    values: templateValuesSchema,
-});
 
 export const templateInputSchema = z.object({
     template_name: z
@@ -60,5 +54,28 @@ export const templateInputSchema = z.object({
     values: templateValuesSchema.default({}),
 });
 
-export type TemplateValuesInput = z.infer<typeof templateValuesInputSchema>;
-export type TemplateInput = z.infer<typeof templateInputSchema>;
+export const templateValuesInputSchema = z.object({
+    values: templateValuesSchema,
+});
+
+export function validateTemplate(body: unknown): TemplateData {
+    const parsed = templateInputSchema.safeParse(body);
+    if (!parsed.success) {
+        throw new ValidationException(
+            'Invalid template payload',
+            z.flattenError(parsed.error).fieldErrors
+        );
+    }
+    return parsed.data;
+}
+
+export function validateTemplateValues(body: unknown): TemplateValuesData {
+    const parsed = templateValuesInputSchema.safeParse(body);
+    if (!parsed.success) {
+        throw new ValidationException(
+            'Invalid template payload',
+            z.flattenError(parsed.error).fieldErrors
+        );
+    }
+    return parsed.data;
+}
