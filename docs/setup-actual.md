@@ -50,11 +50,39 @@ Both `xpm-server` and the `xpm-web` build read the same root `.env`:
 
 ## 4. Create and migrate the database
 
+For a fresh database:
+
 ```bash
 npm run db:setup -w server
 ```
 
-This creates the `DB_DATABASE` database (via the `master` database), runs the migrations, and seeds the starter templates. For local SQL Server, make sure TCP/IP is enabled on `DB_PORT` (default `1433`) and SQL Server authentication is allowed.
+This creates the `DB_DATABASE` database (via the `master` database), runs the migrations, and seeds the starter templates. Applied migrations are recorded in `dbo.migrations`, which is created automatically and never dropped by `db:migrate` or `db:migrate:rollback`.
+
+### Existing database
+
+Migrations are strict: if a table, column, or constraint already exists while its migration is not recorded in `dbo.migrations`, `db:migrate` stops with an "already exists" error instead of silently skipping it. Verify the schema, then baseline the matching migration:
+
+```bash
+# Mark one migration as applied without running it
+npm run db:migrate:baseline -w server -- 1789879705046_create-servers-table.js
+
+# Or mark every unrecorded migration as applied
+npm run db:migrate:baseline -w server -- --all
+```
+
+Use `--all` only when the whole schema predates the journal. Then apply anything still pending:
+
+```bash
+npm run db:migrate -w server
+```
+
+Roll back the most recently applied migration:
+
+```bash
+npm run db:migrate:rollback -w server
+```
+
+For local SQL Server, make sure TCP/IP is enabled on `DB_PORT` (default `1433`) and SQL Server authentication is allowed.
 
 ## 5. Start the registry and the dashboard
 
