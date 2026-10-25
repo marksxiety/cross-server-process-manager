@@ -12,7 +12,7 @@ module.exports = {
       namespace: "XPM",
       cwd: path.join(__dirname, "server"),
       interpreter: "node",
-      script: "./dist/index.js",
+      script: "./dist/src/index.js",
       env: {
         NODE_ENV: "production"
       },
