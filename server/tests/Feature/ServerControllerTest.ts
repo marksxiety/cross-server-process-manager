@@ -1,41 +1,21 @@
-import type { Request, Response } from 'express';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
-vi.mock('../../config/db', () => ({
+vi.mock('../../src/Persistence/Connection', () => ({
     default: { query: vi.fn() },
 }));
 
-import db from '../../config/db';
-import { index, register, remove, update } from '../../controllers/serverController';
+import db from '../../src/Persistence/Connection';
+import { ServerController } from '../../src/Http/Controllers/ServerController';
+import { ServerService } from '../../src/Services/ServerService';
+import {
+    createRequest,
+    createResponse,
+    invoke,
+    responseBody,
+} from '../Support/Http';
 
 const query = db.query as unknown as Mock;
-
-type MockResponse = Response & { status: Mock; json: Mock };
-
-function createRequest(overrides: {
-    params?: Record<string, string>;
-    query?: Record<string, string>;
-    body?: unknown;
-}): Request {
-    return {
-        params: overrides.params ?? {},
-        query: overrides.query ?? {},
-        body: overrides.body ?? {},
-    } as unknown as Request;
-}
-
-function createResponse(): MockResponse {
-    const res = {
-        status: vi.fn(),
-        json: vi.fn(),
-    };
-    res.status.mockReturnValue(res);
-    return res as unknown as MockResponse;
-}
-
-function responseBody(res: MockResponse): Record<string, unknown> {
-    return res.json.mock.calls.at(-1)?.[0] as Record<string, unknown>;
-}
+const controller = new ServerController(new ServerService());
 
 function uniqueViolation(constraint: string): Error & { number: number } {
     return Object.assign(
@@ -74,12 +54,12 @@ afterEach(() => {
     vi.restoreAllMocks();
 });
 
-describe('serverController.register', () => {
+describe('ServerController.store', () => {
     it('inserts a valid payload and responds with the created row', async () => {
         query.mockResolvedValueOnce({ rows: [SERVER_ROW] });
         const res = createResponse();
 
-        await register(createRequest({ body: VALID_BODY }), res);
+        await invoke(controller.store, createRequest({ body: VALID_BODY }), res);
 
         expect(res.status).not.toHaveBeenCalled();
         expect(responseBody(res)).toEqual({
@@ -98,7 +78,7 @@ describe('serverController.register', () => {
         query.mockResolvedValueOnce({ rows: [{ ...SERVER_ROW, is_active: false }] });
         const res = createResponse();
 
-        await register(createRequest({ body: { ...VALID_BODY, is_active: false } }), res);
+        await invoke(controller.store, createRequest({ body: { ...VALID_BODY, is_active: false } }), res);
 
         const [, params] = query.mock.calls[0] as [string, unknown[]];
         expect(params).toEqual(['app-1', 'http', '127.0.0.1', 4000, false]);
@@ -107,7 +87,7 @@ describe('serverController.register', () => {
     it('responds 400 with field errors when the payload is invalid', async () => {
         const res = createResponse();
 
-        await register(createRequest({ body: { ...VALID_BODY, host: undefined } }), res);
+        await invoke(controller.store, createRequest({ body: { ...VALID_BODY, host: undefined } }), res);
 
         expect(res.status).toHaveBeenCalledWith(400);
         const body = responseBody(res);
@@ -120,7 +100,7 @@ describe('serverController.register', () => {
         query.mockRejectedValueOnce(uniqueViolation('servers_server_key'));
         const res = createResponse();
 
-        await register(createRequest({ body: VALID_BODY }), res);
+        await invoke(controller.store, createRequest({ body: VALID_BODY }), res);
 
         expect(res.status).toHaveBeenCalledWith(409);
         const body = responseBody(res);
@@ -132,7 +112,7 @@ describe('serverController.register', () => {
         query.mockRejectedValueOnce(uniqueViolation('servers_host_unique'));
         const res = createResponse();
 
-        await register(createRequest({ body: VALID_BODY }), res);
+        await invoke(controller.store, createRequest({ body: VALID_BODY }), res);
 
         expect(res.status).toHaveBeenCalledWith(409);
         const body = responseBody(res);
@@ -144,7 +124,7 @@ describe('serverController.register', () => {
         query.mockRejectedValueOnce(uniqueViolation('some_other_unique'));
         const res = createResponse();
 
-        await register(createRequest({ body: VALID_BODY }), res);
+        await invoke(controller.store, createRequest({ body: VALID_BODY }), res);
 
         expect(responseBody(res).code).toBe('DUPLICATE_SERVER');
     });
@@ -153,18 +133,18 @@ describe('serverController.register', () => {
         query.mockRejectedValueOnce(new Error('connection terminated'));
         const res = createResponse();
 
-        await register(createRequest({ body: VALID_BODY }), res);
+        await invoke(controller.store, createRequest({ body: VALID_BODY }), res);
 
         expect(res.status).toHaveBeenCalledWith(500);
         expect(responseBody(res).code).toBe('INTERNAL_SERVER_ERROR');
     });
 });
 
-describe('serverController.update', () => {
+describe('ServerController.update', () => {
     it('responds 400 INVALID_ID without touching the database', async () => {
         const res = createResponse();
 
-        await update(createRequest({ params: { id: 'abc' }, body: VALID_BODY }), res);
+        await invoke(controller.update, createRequest({ params: { id: 'abc' }, body: VALID_BODY }), res);
 
         expect(res.status).toHaveBeenCalledWith(400);
         expect(responseBody(res).code).toBe('INVALID_ID');
@@ -174,7 +154,7 @@ describe('serverController.update', () => {
     it('responds 400 with field errors when the payload is invalid', async () => {
         const res = createResponse();
 
-        await update(
+        await invoke(controller.update, 
             createRequest({ params: { id: '1' }, body: { ...VALID_BODY, port: 0 } }),
             res
         );
@@ -192,7 +172,7 @@ describe('serverController.update', () => {
         });
         const res = createResponse();
 
-        await update(createRequest({ params: { id: '999' }, body: VALID_BODY }), res);
+        await invoke(controller.update, createRequest({ params: { id: '999' }, body: VALID_BODY }), res);
 
         expect(res.status).toHaveBeenCalledWith(404);
         expect(responseBody(res).code).toBe('NOT_FOUND');
@@ -205,7 +185,7 @@ describe('serverController.update', () => {
         });
         const res = createResponse();
 
-        await update(createRequest({ params: { id: '1' }, body: VALID_BODY }), res);
+        await invoke(controller.update, createRequest({ params: { id: '1' }, body: VALID_BODY }), res);
 
         expect(res.status).toHaveBeenCalledWith(409);
         const body = responseBody(res);
@@ -220,7 +200,7 @@ describe('serverController.update', () => {
         });
         const res = createResponse();
 
-        await update(createRequest({ params: { id: '1' }, body: VALID_BODY }), res);
+        await invoke(controller.update, createRequest({ params: { id: '1' }, body: VALID_BODY }), res);
 
         expect(res.status).toHaveBeenCalledWith(409);
         const body = responseBody(res);
@@ -236,7 +216,7 @@ describe('serverController.update', () => {
         query.mockResolvedValueOnce({ rows: [SERVER_ROW] });
         const res = createResponse();
 
-        await update(createRequest({ params: { id: '1' }, body: VALID_BODY }), res);
+        await invoke(controller.update, createRequest({ params: { id: '1' }, body: VALID_BODY }), res);
 
         expect(res.status).not.toHaveBeenCalled();
         expect(responseBody(res)).toEqual({
@@ -258,7 +238,7 @@ describe('serverController.update', () => {
         query.mockResolvedValueOnce({ rows: [{ ...SERVER_ROW, is_active: false }] });
         const res = createResponse();
 
-        await update(
+        await invoke(controller.update, 
             createRequest({ params: { id: '1' }, body: { ...VALID_BODY, is_active: false } }),
             res
         );
@@ -274,18 +254,18 @@ describe('serverController.update', () => {
         query.mockRejectedValueOnce(uniqueViolation('servers_host_unique'));
         const res = createResponse();
 
-        await update(createRequest({ params: { id: '1' }, body: VALID_BODY }), res);
+        await invoke(controller.update, createRequest({ params: { id: '1' }, body: VALID_BODY }), res);
 
         expect(res.status).toHaveBeenCalledWith(409);
         expect(responseBody(res).code).toBe('DUPLICATE_HOST');
     });
 });
 
-describe('serverController.remove', () => {
+describe('ServerController.destroy', () => {
     it('responds 400 INVALID_ID without touching the database', async () => {
         const res = createResponse();
 
-        await remove(createRequest({ params: { id: '0' } }), res);
+        await invoke(controller.destroy, createRequest({ params: { id: '0' } }), res);
 
         expect(res.status).toHaveBeenCalledWith(400);
         expect(responseBody(res).code).toBe('INVALID_ID');
@@ -296,7 +276,7 @@ describe('serverController.remove', () => {
         query.mockResolvedValueOnce({ rows: [] });
         const res = createResponse();
 
-        await remove(createRequest({ params: { id: '999' } }), res);
+        await invoke(controller.destroy, createRequest({ params: { id: '999' } }), res);
 
         expect(res.status).toHaveBeenCalledWith(404);
         expect(responseBody(res).code).toBe('NOT_FOUND');
@@ -306,7 +286,7 @@ describe('serverController.remove', () => {
         query.mockResolvedValueOnce({ rows: [SERVER_ROW] });
         const res = createResponse();
 
-        await remove(createRequest({ params: { id: '1' } }), res);
+        await invoke(controller.destroy, createRequest({ params: { id: '1' } }), res);
 
         expect(res.status).not.toHaveBeenCalled();
         expect(responseBody(res)).toEqual({
@@ -321,12 +301,12 @@ describe('serverController.remove', () => {
     });
 });
 
-describe('serverController.index', () => {
+describe('ServerController.index', () => {
     it('lists only active servers by default', async () => {
         query.mockResolvedValueOnce({ rows: [SERVER_ROW] });
         const res = createResponse();
 
-        await index(createRequest({}), res);
+        await invoke(controller.index, createRequest({}), res);
 
         const [sql] = query.mock.calls[0] as [string];
         expect(sql).toContain('WHERE is_active = 1');
@@ -341,7 +321,7 @@ describe('serverController.index', () => {
         query.mockResolvedValueOnce({ rows: [SERVER_ROW] });
         const res = createResponse();
 
-        await index(createRequest({ query: { with_inactive: 'true' } }), res);
+        await invoke(controller.index, createRequest({ query: { with_inactive: 'true' } }), res);
 
         const [sql] = query.mock.calls[0] as [string];
         expect(sql).not.toContain('WHERE');
@@ -351,7 +331,7 @@ describe('serverController.index', () => {
         query.mockRejectedValueOnce(new Error('connection terminated'));
         const res = createResponse();
 
-        await index(createRequest({}), res);
+        await invoke(controller.index, createRequest({}), res);
 
         expect(res.status).toHaveBeenCalledWith(500);
         expect(responseBody(res).code).toBe('INTERNAL_SERVER_ERROR');

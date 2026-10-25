@@ -1,39 +1,17 @@
-import type { Request, Response } from 'express';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
-vi.mock('../../config/db', () => ({
+vi.mock('../../src/Persistence/Connection', () => ({
     default: { query: vi.fn(), beginTransaction: vi.fn() },
 }));
 
-import db from '../../config/db';
-import { create, index, remove, update } from '../../controllers/templateController';
+import db from '../../src/Persistence/Connection';
+import { TemplateController } from '../../src/Http/Controllers/TemplateController';
+import { TemplateService } from '../../src/Services/TemplateService';
+import { createRequest, createResponse, invoke, responseBody } from '../Support/Http';
 
 const query = db.query as unknown as Mock;
 const beginTransaction = db.beginTransaction as unknown as Mock;
-
-type MockResponse = Response & { status: Mock; json: Mock };
-
-function createRequest(overrides: {
-    params?: Record<string, string>;
-    query?: Record<string, string>;
-    body?: unknown;
-}): Request {
-    return {
-        params: overrides.params ?? {},
-        query: overrides.query ?? {},
-        body: overrides.body ?? {},
-    } as unknown as Request;
-}
-
-function createResponse(): MockResponse {
-    const res = { status: vi.fn(), json: vi.fn() };
-    res.status.mockReturnValue(res);
-    return res as unknown as MockResponse;
-}
-
-function responseBody(res: MockResponse): Record<string, unknown> {
-    return res.json.mock.calls.at(-1)?.[0] as Record<string, unknown>;
-}
+const controller = new TemplateController(new TemplateService());
 
 const VALUES = {
     script: 'index.js',
@@ -73,13 +51,13 @@ afterEach(() => {
     vi.restoreAllMocks();
 });
 
-describe('templateController.index', () => {
+describe('TemplateController.index', () => {
     it('returns template rows with values assembled from template_keys', async () => {
         query.mockResolvedValueOnce({ rows: [TEMPLATE_ROW] });
         query.mockResolvedValueOnce({ rows: KEY_ROWS });
         const res = createResponse();
 
-        await index(createRequest({}), res);
+        await invoke(controller.index, createRequest({}), res);
 
         expect(res.status).not.toHaveBeenCalled();
         expect(responseBody(res)).toEqual({
@@ -105,7 +83,7 @@ describe('templateController.index', () => {
         query.mockResolvedValueOnce({ rows: [] });
         const res = createResponse();
 
-        await index(createRequest({}), res);
+        await invoke(controller.index, createRequest({}), res);
 
         const info = responseBody(res).info as Array<{ values: unknown }>;
         expect(info[0]?.values).toEqual({});
@@ -115,7 +93,7 @@ describe('templateController.index', () => {
         query.mockResolvedValueOnce({ rows: [] });
         const res = createResponse();
 
-        await index(createRequest({}), res);
+        await invoke(controller.index, createRequest({}), res);
 
         expect(query).toHaveBeenCalledTimes(1);
     });
@@ -125,7 +103,7 @@ describe('templateController.index', () => {
         query.mockResolvedValueOnce({ rows: KEY_ROWS });
         const res = createResponse();
 
-        await index(createRequest({}), res);
+        await invoke(controller.index, createRequest({}), res);
 
         const [sql, params] = query.mock.calls[0] as [string, unknown[]];
         expect(sql).toContain('WHERE (@p1 = 1 OR t.is_active = 1)');
@@ -137,7 +115,7 @@ describe('templateController.index', () => {
         query.mockResolvedValueOnce({ rows: KEY_ROWS });
         const res = createResponse();
 
-        await index(createRequest({ query: { with_inactive: 'true' } }), res);
+        await invoke(controller.index, createRequest({ query: { with_inactive: 'true' } }), res);
 
         const [, params] = query.mock.calls[0] as [string, unknown[]];
         expect(params).toEqual([true]);
@@ -147,7 +125,7 @@ describe('templateController.index', () => {
         query.mockRejectedValueOnce(new Error('connection terminated'));
         const res = createResponse();
 
-        await index(createRequest({}), res);
+        await invoke(controller.index, createRequest({}), res);
 
         expect(res.status).toHaveBeenCalledWith(500);
         expect(responseBody(res).code).toBe('INTERNAL_SERVER_ERROR');
@@ -186,7 +164,7 @@ function sqlCalls(session: SessionStub): string[] {
     return session.query.mock.calls.map((call) => call[0] as string);
 }
 
-describe('templateController.create', () => {
+describe('TemplateController.store', () => {
     const CREATE_BODY = {
         template_name: 'Deno',
         category: 'Deno',
@@ -200,7 +178,7 @@ describe('templateController.create', () => {
         beginTransaction.mockResolvedValueOnce(session);
         const res = createResponse();
 
-        await create(createRequest({ body: CREATE_BODY }), res);
+        await invoke(controller.store, createRequest({ body: CREATE_BODY }), res);
 
         expect(res.status).not.toHaveBeenCalled();
         expect(responseBody(res)).toEqual({
@@ -246,7 +224,7 @@ describe('templateController.create', () => {
         beginTransaction.mockResolvedValueOnce(session);
         const res = createResponse();
 
-        await create(
+        await invoke(controller.store, 
             createRequest({ body: { template_name: '  Deno  ', category: '   ' } }),
             res
         );
@@ -279,7 +257,7 @@ describe('templateController.create', () => {
         beginTransaction.mockResolvedValueOnce(session);
         const res = createResponse();
 
-        await create(
+        await invoke(controller.store, 
             createRequest({
                 body: { template_name: 'Deno', values: { script: 'main.ts', note: null } },
             }),
@@ -298,7 +276,7 @@ describe('templateController.create', () => {
     it('rejects a blank template name before touching the database', async () => {
         const res = createResponse();
 
-        await create(createRequest({ body: { template_name: '   ' } }), res);
+        await invoke(controller.store, createRequest({ body: { template_name: '   ' } }), res);
 
         expect(res.status).toHaveBeenCalledWith(400);
         expect(responseBody(res).code).toBe('VALIDATION_FAILED');
@@ -308,7 +286,7 @@ describe('templateController.create', () => {
     it('rejects a blank key inside values before touching the database', async () => {
         const res = createResponse();
 
-        await create(
+        await invoke(controller.store, 
             createRequest({
                 body: { template_name: 'Deno', values: { '   ': 'x' } },
             }),
@@ -340,7 +318,7 @@ describe('templateController.create', () => {
         beginTransaction.mockResolvedValueOnce(session);
         const res = createResponse();
 
-        await create(createRequest({ body: CREATE_BODY }), res);
+        await invoke(controller.store, createRequest({ body: CREATE_BODY }), res);
 
         expect(res.status).toHaveBeenCalledWith(409);
         expect(responseBody(res)).toEqual({
@@ -376,7 +354,7 @@ describe('templateController.create', () => {
         beginTransaction.mockResolvedValueOnce(session);
         const res = createResponse();
 
-        await create(createRequest({ body: CREATE_BODY }), res);
+        await invoke(controller.store, createRequest({ body: CREATE_BODY }), res);
 
         expect(res.status).toHaveBeenCalledWith(400);
         expect(responseBody(res).code).toBe('VALIDATION_FAILED');
@@ -396,7 +374,7 @@ describe('templateController.create', () => {
         beginTransaction.mockResolvedValueOnce(session);
         const res = createResponse();
 
-        await create(createRequest({ body: CREATE_BODY }), res);
+        await invoke(controller.store, createRequest({ body: CREATE_BODY }), res);
 
         expect(res.status).toHaveBeenCalledWith(500);
         expect(responseBody(res).code).toBe('INTERNAL_SERVER_ERROR');
@@ -405,7 +383,7 @@ describe('templateController.create', () => {
     });
 });
 
-describe('templateController.update', () => {
+describe('TemplateController.update', () => {
     it('replaces the template keys and returns the stored template', async () => {
         const session = createSession({
             rows: [TEMPLATE_ROW],
@@ -416,7 +394,7 @@ describe('templateController.update', () => {
         beginTransaction.mockResolvedValueOnce(session);
         const res = createResponse();
 
-        await update(
+        await invoke(controller.update, 
             createRequest({ params: { id: '1' }, body: { values: { script: 'app.py' } } }),
             res
         );
@@ -457,7 +435,7 @@ describe('templateController.update', () => {
     it('rejects a blank key inside values', async () => {
         const res = createResponse();
 
-        await update(
+        await invoke(controller.update, 
             createRequest({ params: { id: '1' }, body: { values: { '  ': 'x' } } }),
             res
         );
@@ -472,7 +450,7 @@ describe('templateController.update', () => {
         beginTransaction.mockResolvedValueOnce(session);
         const res = createResponse();
 
-        await update(
+        await invoke(controller.update, 
             createRequest({ params: { id: '99' }, body: { values: {} } }),
             res
         );
@@ -486,7 +464,7 @@ describe('templateController.update', () => {
     it('rejects an invalid id before touching the database', async () => {
         const res = createResponse();
 
-        await update(createRequest({ params: { id: 'abc' }, body: { values: {} } }), res);
+        await invoke(controller.update, createRequest({ params: { id: 'abc' }, body: { values: {} } }), res);
 
         expect(res.status).toHaveBeenCalledWith(400);
         expect(responseBody(res).code).toBe('INVALID_ID');
@@ -506,7 +484,7 @@ describe('templateController.update', () => {
         beginTransaction.mockResolvedValueOnce(session);
         const res = createResponse();
 
-        await update(createRequest({ params: { id: '1' }, body: { values: {} } }), res);
+        await invoke(controller.update, createRequest({ params: { id: '1' }, body: { values: {} } }), res);
 
         expect(res.status).toHaveBeenCalledWith(500);
         expect(responseBody(res).code).toBe('INTERNAL_SERVER_ERROR');
@@ -515,7 +493,7 @@ describe('templateController.update', () => {
     });
 });
 
-describe('templateController.remove', () => {
+describe('TemplateController.destroy', () => {
     const SUMMARY_ROW = {
         id: 1,
         template_name: 'Node',
@@ -529,7 +507,7 @@ describe('templateController.remove', () => {
         query.mockResolvedValueOnce({ rows: [SUMMARY_ROW], rowCount: 1 });
         const res = createResponse();
 
-        await remove(createRequest({ params: { id: '1' } }), res);
+        await invoke(controller.destroy, createRequest({ params: { id: '1' } }), res);
 
         expect(res.status).not.toHaveBeenCalled();
         expect(responseBody(res)).toEqual({
@@ -548,7 +526,7 @@ describe('templateController.remove', () => {
         query.mockResolvedValueOnce({ rows: [], rowCount: 0 });
         const res = createResponse();
 
-        await remove(createRequest({ params: { id: '99' } }), res);
+        await invoke(controller.destroy, createRequest({ params: { id: '99' } }), res);
 
         expect(res.status).toHaveBeenCalledWith(404);
         expect(responseBody(res).code).toBe('NOT_FOUND');
@@ -557,7 +535,7 @@ describe('templateController.remove', () => {
     it('rejects an invalid id before querying', async () => {
         const res = createResponse();
 
-        await remove(createRequest({ params: { id: 'abc' } }), res);
+        await invoke(controller.destroy, createRequest({ params: { id: 'abc' } }), res);
 
         expect(res.status).toHaveBeenCalledWith(400);
         expect(responseBody(res).code).toBe('INVALID_ID');
@@ -568,7 +546,7 @@ describe('templateController.remove', () => {
         query.mockRejectedValueOnce(new Error('connection terminated'));
         const res = createResponse();
 
-        await remove(createRequest({ params: { id: '1' } }), res);
+        await invoke(controller.destroy, createRequest({ params: { id: '1' } }), res);
 
         expect(res.status).toHaveBeenCalledWith(500);
         expect(responseBody(res).code).toBe('INTERNAL_SERVER_ERROR');

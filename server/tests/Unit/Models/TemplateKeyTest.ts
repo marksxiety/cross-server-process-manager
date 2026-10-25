@@ -1,12 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-    buildKeyInsert,
-    fromStoredValues,
-    groupByTemplateId,
-    normalizeValues,
-    toStoredValues,
-    type TemplateKeyRow,
-} from '../../utils/templateValues';
+import { TemplateKey, type TemplateKeyRow } from '../../../src/Models/TemplateKey';
 
 const KEY_ROWS: TemplateKeyRow[] = [
     { template_id: 1, property_key: 'script', property_value: 'index.js', data_type: 'string' },
@@ -22,9 +15,9 @@ const KEY_ROWS: TemplateKeyRow[] = [
     },
 ];
 
-describe('toStoredValues', () => {
+describe('TemplateKey.toStoredValues', () => {
     it('maps each JSON type to its data_type and stored representation', () => {
-        const stored = toStoredValues({
+        const stored = TemplateKey.toStoredValues({
             script: 'index.js',
             instances: 1,
             autorestart: true,
@@ -48,7 +41,7 @@ describe('toStoredValues', () => {
     });
 
     it('drops null and undefined entries', () => {
-        const stored = toStoredValues({ script: 'index.js', missing: null, also_missing: undefined });
+        const stored = TemplateKey.toStoredValues({ script: 'index.js', missing: null, also_missing: undefined });
 
         expect(stored).toEqual([
             { property_key: 'script', property_value: 'index.js', data_type: 'string' },
@@ -56,13 +49,13 @@ describe('toStoredValues', () => {
     });
 
     it('returns an empty list for no values', () => {
-        expect(toStoredValues({})).toEqual([]);
+        expect(TemplateKey.toStoredValues({})).toEqual([]);
     });
 });
 
-describe('fromStoredValues', () => {
+describe('TemplateKey.fromStoredValues', () => {
     it('restores each value to its original JSON type', () => {
-        expect(fromStoredValues(KEY_ROWS)).toEqual({
+        expect(TemplateKey.fromStoredValues(KEY_ROWS)).toEqual({
             script: 'index.js',
             instances: 1,
             autorestart: true,
@@ -80,9 +73,9 @@ describe('fromStoredValues', () => {
             args: ['-u'],
             env: { PORT: '5000' },
         };
-        const rows = toStoredValues(values).map((row) => ({ template_id: 1, ...row }));
+        const rows = TemplateKey.toStoredValues(values).map((row) => ({ template_id: 1, ...row }));
 
-        expect(fromStoredValues(rows)).toEqual(values);
+        expect(TemplateKey.fromStoredValues(rows)).toEqual(values);
     });
 
     it('keeps numeric-looking strings as strings', () => {
@@ -90,14 +83,14 @@ describe('fromStoredValues', () => {
             { template_id: 1, property_key: 'PORT', property_value: '3000', data_type: 'string' },
         ];
 
-        expect(fromStoredValues(rows)).toEqual({ PORT: '3000' });
+        expect(TemplateKey.fromStoredValues(rows)).toEqual({ PORT: '3000' });
     });
 });
 
-describe('normalizeValues', () => {
+describe('TemplateKey.normalize', () => {
     it('round-trips values and drops entries that cannot be stored', () => {
         expect(
-            normalizeValues({
+            TemplateKey.normalize({
                 script: 'index.js',
                 instances: 2,
                 autorestart: false,
@@ -114,7 +107,7 @@ describe('normalizeValues', () => {
     });
 });
 
-describe('groupByTemplateId', () => {
+describe('TemplateKey.groupByTemplateId', () => {
     it('buckets rows into one values object per template', () => {
         const rows: TemplateKeyRow[] = [
             { template_id: 1, property_key: 'script', property_value: 'index.js', data_type: 'string' },
@@ -122,7 +115,7 @@ describe('groupByTemplateId', () => {
             { template_id: 1, property_key: 'instances', property_value: '2', data_type: 'number' },
         ];
 
-        const grouped = groupByTemplateId(rows);
+        const grouped = TemplateKey.groupByTemplateId(rows);
 
         expect(grouped.size).toBe(2);
         expect(grouped.get(1)).toEqual({ script: 'index.js', instances: 2 });
@@ -130,13 +123,13 @@ describe('groupByTemplateId', () => {
     });
 
     it('returns an empty map for no rows', () => {
-        expect(groupByTemplateId([]).size).toBe(0);
+        expect(TemplateKey.groupByTemplateId([]).size).toBe(0);
     });
 });
 
-describe('buildKeyInsert', () => {
+describe('TemplateKey.buildInsert', () => {
     it('builds a parameterized multi-row insert', () => {
-        const insert = buildKeyInsert(7, { script: 'app.py', instances: 2 });
+        const insert = TemplateKey.buildInsert(7, { script: 'app.py', instances: 2 });
 
         expect(insert?.text).toBe(
             'INSERT INTO template_keys (template_id, property_key, property_value, data_type) ' +
@@ -149,6 +142,6 @@ describe('buildKeyInsert', () => {
     });
 
     it('returns null when there is nothing to insert', () => {
-        expect(buildKeyInsert(7, {})).toBeNull();
+        expect(TemplateKey.buildInsert(7, {})).toBeNull();
     });
 });

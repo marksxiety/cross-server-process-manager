@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { serverInputSchema } from '../../schemas/serverSchema';
+import { serverSchema } from '../../../../src/Http/Requests/ServerRequest';
 
 const VALID_INPUT = {
     server: 'app-1',
@@ -10,16 +10,16 @@ const VALID_INPUT = {
 };
 
 function fieldErrors(input: unknown): Record<string, string[] | undefined> {
-    const result = serverInputSchema.safeParse(input);
+    const result = serverSchema.safeParse(input);
     if (result.success) {
         throw new Error('Expected parsing to fail, but it succeeded');
     }
     return z.flattenError(result.error).fieldErrors;
 }
 
-describe('serverInputSchema', () => {
+describe('serverSchema', () => {
     it('accepts a valid payload and leaves is_active undefined', () => {
-        const result = serverInputSchema.safeParse(VALID_INPUT);
+        const result = serverSchema.safeParse(VALID_INPUT);
 
         expect(result.success).toBe(true);
         if (!result.success) return;
@@ -27,7 +27,7 @@ describe('serverInputSchema', () => {
     });
 
     it('trims server and host', () => {
-        const result = serverInputSchema.safeParse({
+        const result = serverSchema.safeParse({
             ...VALID_INPUT,
             server: '  app-1  ',
             host: '  10.0.0.1  ',
@@ -40,7 +40,7 @@ describe('serverInputSchema', () => {
     });
 
     it('coerces a numeric string port', () => {
-        const result = serverInputSchema.safeParse({ ...VALID_INPUT, port: '4000' });
+        const result = serverSchema.safeParse({ ...VALID_INPUT, port: '4000' });
 
         expect(result.success).toBe(true);
         if (!result.success) return;
@@ -48,7 +48,7 @@ describe('serverInputSchema', () => {
     });
 
     it('accepts a boolean is_active', () => {
-        const result = serverInputSchema.safeParse({ ...VALID_INPUT, is_active: false });
+        const result = serverSchema.safeParse({ ...VALID_INPUT, is_active: false });
 
         expect(result.success).toBe(true);
         if (!result.success) return;

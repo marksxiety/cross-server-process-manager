@@ -1,8 +1,8 @@
 import type { ConnectionPool } from 'mssql';
 import { describe, expect, it, vi } from 'vitest';
-import { isDatabaseAlreadyExistsError } from '../../utils/dbError';
-import { ensureDatabaseExists } from '../../utils/ensureDatabase';
-import { quoteIdentifier } from '../../utils/sql';
+import { isDatabaseAlreadyExistsError } from '../../../src/Persistence/DatabaseError';
+import { ensureDatabaseExists } from '../../../src/Persistence/EnsureDatabase';
+import { quoteIdentifier } from '../../../src/Persistence/Sql';
 
 function mockPool(options: {
     existingNames: string[];
