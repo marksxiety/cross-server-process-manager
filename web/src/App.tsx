@@ -2,6 +2,7 @@ import { Outlet, useLocation } from 'react-router'
 import { Maximize, Minimize2 } from 'lucide-react'
 import { SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/custom/AppSidebar'
+import { UserMenu } from '@/components/auth/user-menu'
 import { ThemeToggle } from '@/components/custom/ThemeToggle'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -43,8 +44,9 @@ function AppLayout() {
             <SidebarTrigger />
           </div>
 
-          {/* Theme & Fullscreen Triggers */}
-          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+          {/* Account, Theme & Fullscreen Triggers */}
+          <div className='flex shrink-0 items-center gap-1 sm:gap-2'>
+            <UserMenu />
             <ThemeToggle />
             {showFullscreenToggle && (
               <Button
