@@ -20,6 +20,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { Badge } from '@/components/ui/badge'
+import { useCanManage } from '@/hooks/use-can-manage'
 
 const navItems = [
   { title: 'Dashboard', url: '/', icon: LayoutDashboard },
@@ -31,6 +32,10 @@ const navItems = [
 export function AppSidebar() {
   const { pathname } = useLocation()
   const { state, isMobile } = useSidebar()
+  const canManage = useCanManage()
+  const visibleNavItems = canManage
+    ? navItems
+    : navItems.filter((item) => item.url === '/')
 
   return (
     <Sidebar collapsible='icon'>
@@ -72,7 +77,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupLabel>General</SidebarGroupLabel>
           <SidebarMenu>
-            {navItems.map((item) => (
+            {visibleNavItems.map((item) => (
               <SidebarMenuItem key={item.title}>
                 <SidebarMenuButton
                   render={
