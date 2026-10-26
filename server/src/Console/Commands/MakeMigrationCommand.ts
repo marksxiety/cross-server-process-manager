@@ -25,7 +25,7 @@ exports.down = async (query) => {
 
 export class MakeMigrationCommand {
     async handle(): Promise<void> {
-        const name = process.argv[3];
+        const name = process.argv[2];
         if (!name || !name.trim()) {
             throw new Error('Usage: npm run migrate:create -- <name>');
         }
