@@ -1,0 +1,227 @@
+import { afterEach, beforeEach, describe, expect, test, vi, type Mock } from 'vitest'
+
+vi.mock('@/api/services/auth.service', () => ({
+  authService: vi.fn(),
+}))
+
+import { authService } from '@/api/services/auth.service'
+import {
+  isGuestSession,
+  readSession,
+  startGuestSession,
+  writeSession,
+} from '@/lib/auth-session'
+import { createInitialAuthState, useAuthStore } from '@/stores/auth.store'
+import type { ApiResponse } from '@/types/api'
+import type { AuthSessionPayload, AuthUser } from '@/types/auth'
+import { FakeStorage } from '../support/fake-storage'
+
+const USER: AuthUser = {
+  id: 1,
+  email: 'admin@example.com',
+  name: 'Admin',
+  role: 'viewer',
+  is_active: true,
+  email_verified_at: null,
+  last_login_at: null,
+  created_at: '2026-01-01T00:00:00.000Z',
+  updated_at: '2026-01-01T00:00:00.000Z',
+}
+
+const PAYLOAD: AuthSessionPayload = {
+  token: 'jwt-token',
+  token_type: 'Bearer',
+  expires_in: 60,
+  user: USER,
+}
+
+let storage: FakeStorage
+
+function mockAuthService(): {
+  login: Mock
+  register: Mock
+  me: Mock
+} {
+  const service = {
+    login: vi.fn(),
+    register: vi.fn(),
+    me: vi.fn(),
+  }
+  vi.mocked(authService).mockReturnValue(
+    service as unknown as ReturnType<typeof authService>,
+  )
+  return service
+}
+
+function success<T>(info: T): ApiResponse<T> {
+  return { success: true, message: 'ok', info, status: 200 }
+}
+
+function failure<T>(message: string, status: number, code?: string): ApiResponse<T> {
+  return {
+    success: false,
+    message,
+    ...(code === undefined ? {} : { code }),
+    info: null,
+    status,
+  }
+}
+
+beforeEach(() => {
+  storage = new FakeStorage()
+  vi.stubGlobal('sessionStorage', storage)
+  vi.mocked(authService).mockReset()
+  useAuthStore.setState(createInitialAuthState())
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+  vi.restoreAllMocks()
+})
+
+describe('auth store login/register', () => {
+  test('login stores the session and marks the user authenticated', async () => {
+    const service = mockAuthService()
+    service.login.mockResolvedValue(success(PAYLOAD))
+
+    const signedIn = await useAuthStore
+      .getState()
+      .login({ email: 'admin@example.com', password: 'secret-password' })
+
+    expect(signedIn).toBe(true)
+    const state = useAuthStore.getState()
+    expect(state.status).toBe('authenticated')
+    expect(state.token).toBe('jwt-token')
+    expect(state.user).toEqual(USER)
+    expect(state.error).toBeNull()
+    expect(readSession(storage)?.token).toBe('jwt-token')
+  })
+
+  test('login failure records the API error and keeps the visitor signed out', async () => {
+    const service = mockAuthService()
+    service.login.mockResolvedValue(
+      failure('Invalid email or password', 401, 'INVALID_CREDENTIALS'),
+    )
+
+    const signedIn = await useAuthStore
+      .getState()
+      .login({ email: 'admin@example.com', password: 'wrong-password' })
+
+    expect(signedIn).toBe(false)
+    const state = useAuthStore.getState()
+    expect(state.status).toBe('unauthenticated')
+    expect(state.token).toBeNull()
+    expect(state.error?.code).toBe('INVALID_CREDENTIALS')
+    expect(readSession(storage)).toBeNull()
+  })
+
+  test('register stores the session and clears guest mode', async () => {
+    const service = mockAuthService()
+    service.register.mockResolvedValue(success(PAYLOAD))
+    startGuestSession(storage)
+    useAuthStore.setState({ status: 'guest' })
+
+    const created = await useAuthStore.getState().register({
+      email: 'admin@example.com',
+      name: 'Admin',
+      password: 'secret-password',
+    })
+
+    expect(created).toBe(true)
+    expect(useAuthStore.getState().status).toBe('authenticated')
+    expect(isGuestSession(storage)).toBe(false)
+    expect(readSession(storage)?.token).toBe('jwt-token')
+  })
+})
+
+describe('auth store guest mode', () => {
+  test('continueAsGuest clears any session and persists the guest flag', () => {
+    writeSession(PAYLOAD, storage)
+
+    useAuthStore.getState().continueAsGuest()
+
+    const state = useAuthStore.getState()
+    expect(state.status).toBe('guest')
+    expect(state.token).toBeNull()
+    expect(state.user).toBeNull()
+    expect(isGuestSession(storage)).toBe(true)
+    expect(readSession(storage)).toBeNull()
+  })
+})
+
+describe('auth store restore', () => {
+  test('refreshes the cached user from /auth/me', async () => {
+    const service = mockAuthService()
+    const fresh = { ...USER, name: 'Fresh Name' }
+    service.me.mockResolvedValue(success(fresh))
+    writeSession(PAYLOAD, storage)
+    useAuthStore.setState({
+      token: PAYLOAD.token,
+      user: { ...USER, name: 'Stale Name' },
+      status: 'idle',
+    })
+
+    await useAuthStore.getState().restore()
+
+    expect(useAuthStore.getState().status).toBe('authenticated')
+    expect(useAuthStore.getState().user?.name).toBe('Fresh Name')
+    expect(readSession(storage)?.user.name).toBe('Fresh Name')
+  })
+
+  test('clears the session when /auth/me rejects the token', async () => {
+    const service = mockAuthService()
+    service.me.mockResolvedValue(failure('Token is invalid', 401, 'INVALID_TOKEN'))
+    writeSession(PAYLOAD, storage)
+    useAuthStore.setState({ token: PAYLOAD.token, user: USER, status: 'idle' })
+
+    await useAuthStore.getState().restore()
+
+    const state = useAuthStore.getState()
+    expect(state.status).toBe('unauthenticated')
+    expect(state.token).toBeNull()
+    expect(state.user).toBeNull()
+    expect(readSession(storage)).toBeNull()
+  })
+
+  test('keeps the cached session when /auth/me is unreachable', async () => {
+    const service = mockAuthService()
+    service.me.mockResolvedValue(failure('Network error reaching localhost:5638', 0))
+    writeSession(PAYLOAD, storage)
+    useAuthStore.setState({ token: PAYLOAD.token, user: USER, status: 'idle' })
+
+    await useAuthStore.getState().restore()
+
+    const state = useAuthStore.getState()
+    expect(state.status).toBe('authenticated')
+    expect(state.token).toBe('jwt-token')
+    expect(state.error?.code).toBe('UNREACHABLE')
+  })
+
+  test('honors the guest flag when there is no token', async () => {
+    const service = mockAuthService()
+    startGuestSession(storage)
+    useAuthStore.setState({ token: null, user: null, status: 'idle' })
+
+    await useAuthStore.getState().restore()
+
+    expect(useAuthStore.getState().status).toBe('guest')
+    expect(service.me).not.toHaveBeenCalled()
+  })
+})
+
+describe('auth store logout', () => {
+  test('clears both the session and guest mode', () => {
+    writeSession(PAYLOAD, storage)
+    startGuestSession(storage)
+    useAuthStore.setState({ status: 'authenticated', token: PAYLOAD.token, user: USER })
+
+    useAuthStore.getState().logout()
+
+    const state = useAuthStore.getState()
+    expect(state.status).toBe('unauthenticated')
+    expect(state.token).toBeNull()
+    expect(state.user).toBeNull()
+    expect(readSession(storage)).toBeNull()
+    expect(isGuestSession(storage)).toBe(false)
+  })
+})
