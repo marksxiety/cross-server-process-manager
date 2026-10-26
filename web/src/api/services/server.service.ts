@@ -1,13 +1,9 @@
-import { createConnection } from "@/api/connection";
+import { registryConnection } from "@/api/registry";
 import type { RegisteredServer, ServerInput } from "@/types/server";
 import type { ApiResponse } from "@/types/api";
 
 export function serverService() {
-    const api = createConnection({
-        protocol: import.meta.env.VITE_SERVER_PROTOCOL as "http" | "https",
-        host: import.meta.env.VITE_SERVER_HOST,
-        port: Number(import.meta.env.VITE_SERVER_PORT),
-    });
+    const api = registryConnection();
 
     return {
 
