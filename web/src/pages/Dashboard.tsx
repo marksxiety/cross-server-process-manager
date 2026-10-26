@@ -62,6 +62,7 @@ import { ProcessCard } from '@/components/custom/process-card'
 import { ProcessDetails } from '@/components/custom/process-details'
 import { ServerHeader } from '@/components/custom/server-header'
 import { useFlipReorder } from '@/hooks/use-flip-reorder'
+import { useCanManage } from '@/hooks/use-can-manage'
 import { useProcessDescribe } from '@/hooks/use-process-describe'
 import { errorCodeLabel, toApiError } from '@/lib/error-code'
 import { canRunProcessCommand } from '@/lib/process-runtime'
@@ -125,6 +126,7 @@ export function Dashboard() {
   const sortOrder = useDashboardStore((state) => state.sortOrder)
   const setSortOrder = useDashboardStore((state) => state.setSortOrder)
   const processesStatus = useProcessesStatus()
+  const canManage = useCanManage()
 
   const [selected, setSelected] = useState<{
     server: RegisteredServer
@@ -351,7 +353,13 @@ export function Dashboard() {
               </EmptyDescription>
             </EmptyHeader>
             <EmptyContent>
-              <Button render={<Link to='/server' />}>Register a server</Button>
+              {canManage ? (
+                <Button render={<Link to='/server' />}>Register a server</Button>
+              ) : (
+                <p className='text-xs text-muted-foreground'>
+                  Sign in to register a server.
+                </p>
+              )}
             </EmptyContent>
           </Empty>
         )}
@@ -478,12 +486,16 @@ export function Dashboard() {
                         serverLabel={`${item.server.server} · ${item.server.host}:${item.server.port}`}
                         totalMemoryBytes={overview?.memory.totalBytes ?? null}
                         cpuCores={overview?.cpu.cores ?? null}
-                        onSelect={() => {
-                          setSelected({
-                            server: item.server,
-                            process: item.process,
-                          })
-                        }}
+                        onSelect={
+                          canManage
+                            ? () => {
+                                setSelected({
+                                  server: item.server,
+                                  process: item.process,
+                                })
+                              }
+                            : undefined
+                        }
                       />
                     </div>
                   )
@@ -543,7 +555,7 @@ export function Dashboard() {
         )}
 
       <Sheet
-        open={selected !== null}
+        open={canManage && selected !== null}
         onOpenChange={(open) => {
           if (!open) setSelected(null)
         }}
@@ -691,7 +703,7 @@ export function Dashboard() {
       </Sheet>
 
       <AlertDialog
-        open={isDeleteOpen}
+        open={canManage && isDeleteOpen}
         onOpenChange={(open) => {
           if (!open && !isDeleting) setIsDeleteOpen(false)
         }}
