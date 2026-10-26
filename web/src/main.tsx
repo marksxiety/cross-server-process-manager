@@ -16,13 +16,18 @@ import { VerifyEmail } from './pages/auth/verify-email.tsx'
 import { ForgotPassword } from './pages/auth/forgot-password.tsx'
 import { ResetPassword } from './pages/auth/reset-password.tsx'
 import { Forbidden } from './pages/Forbidden.tsx'
+import {
+  redirectIfAuthenticated,
+  requireMember,
+  requireSession,
+} from './auth/require-session.ts'
 
 const router = createBrowserRouter([
   {
     errorElement: <ErrorPage />,
     children: [
-      { path: 'login', element: <Login /> },
-      { path: 'register', element: <Register /> },
+      { path: 'login', element: <Login />, loader: redirectIfAuthenticated },
+      { path: 'register', element: <Register />, loader: redirectIfAuthenticated },
       { path: 'verify-email', element: <VerifyEmail /> },
       { path: 'forgot-password', element: <ForgotPassword /> },
       { path: 'reset-password', element: <ResetPassword /> },
@@ -33,14 +38,21 @@ const router = createBrowserRouter([
     path: '/',
     element: <App />,
     errorElement: <ErrorPage />,
+    loader: requireSession,
+    shouldRevalidate: () => false,
     children: [
       { index: true, element: <Dashboard /> },
-      { path: 'template', element: <Template /> },
-      { path: 'server', element: <Server /> },
-      { path: 'process', element: <Process /> },
       {
         path: 'server/:serverName/metrics',
         element: <ServerMetricsRoute />,
+      },
+      {
+        loader: requireMember,
+        children: [
+          { path: 'template', element: <Template /> },
+          { path: 'server', element: <Server /> },
+          { path: 'process', element: <Process /> },
+        ],
       },
     ],
   },
