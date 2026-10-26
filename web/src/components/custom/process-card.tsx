@@ -58,18 +58,21 @@ export function ProcessCard({
     }
   }
 
+  const interactive = onSelect !== undefined
+
   return (
     <Card
       size='sm'
-      role='button'
-      tabIndex={0}
+      role={interactive ? 'button' : undefined}
+      tabIndex={interactive ? 0 : undefined}
       onClick={onSelect}
-      onKeyDown={handleKeyDown}
+      onKeyDown={interactive ? handleKeyDown : undefined}
       className={cn(
-        'h-full cursor-pointer transition-shadow focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+        'h-full transition-shadow',
+        interactive &&
+          'cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none hover:ring-2 hover:ring-foreground/15',
         visual.surface,
         visual.ring,
-        'hover:ring-2 hover:ring-foreground/15',
       )}
     >
       <CardHeader>
