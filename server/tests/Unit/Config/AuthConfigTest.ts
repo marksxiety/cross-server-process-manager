@@ -7,7 +7,7 @@ describe('loadAuthConfig', () => {
     it('returns the secret and the default lifetime', () => {
         expect(loadAuthConfig({ JWT_SECRET: SECRET })).toEqual({
             jwtSecret: SECRET,
-            jwtExpiresInSeconds: 3600,
+            jwtExpiresInSeconds: 43200,
         });
     });
 
@@ -20,7 +20,7 @@ describe('loadAuthConfig', () => {
     it('treats a blank lifetime as the default', () => {
         expect(
             loadAuthConfig({ JWT_SECRET: SECRET, JWT_EXPIRES_IN: '   ' }).jwtExpiresInSeconds
-        ).toBe(3600);
+        ).toBe(43200);
     });
 
     it('rejects a missing secret', () => {
