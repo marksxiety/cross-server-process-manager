@@ -2,17 +2,23 @@ import { Outlet, useLocation } from 'react-router'
 import { Maximize, Minimize2 } from 'lucide-react'
 import { SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/custom/AppSidebar'
-import { UserMenu } from '@/components/auth/user-menu'
+import { SessionExpiredDialog } from '@/components/auth/session-expired-dialog'
+import { SignedOutDialog } from '@/components/auth/signed-out-dialog'
 import { ThemeToggle } from '@/components/custom/ThemeToggle'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useFullscreen } from '@/hooks/use-fullscreen'
+import { useSessionExpiry } from '@/hooks/use-session-expiry'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
 export function App() {
+  useSessionExpiry()
+
   return (
     <SidebarProvider className="h-dvh overflow-hidden">
       <AppLayout />
+      <SessionExpiredDialog />
+      <SignedOutDialog />
     </SidebarProvider>
   )
 }
@@ -44,9 +50,8 @@ function AppLayout() {
             <SidebarTrigger />
           </div>
 
-          {/* Account, Theme & Fullscreen Triggers */}
+          {/* Theme & Fullscreen Triggers */}
           <div className='flex shrink-0 items-center gap-1 sm:gap-2'>
-            <UserMenu />
             <ThemeToggle />
             {showFullscreenToggle && (
               <Button

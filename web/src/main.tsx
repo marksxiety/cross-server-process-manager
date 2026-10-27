@@ -16,14 +16,19 @@ import { VerifyEmail } from './pages/auth/verify-email.tsx'
 import { ForgotPassword } from './pages/auth/forgot-password.tsx'
 import { ResetPassword } from './pages/auth/reset-password.tsx'
 import { Forbidden } from './pages/Forbidden.tsx'
+import { AdminPanel } from './pages/admin/AdminPanel.tsx'
 import {
   redirectIfAuthenticated,
-  requireMember,
+  requireAdmin,
+  requirePage,
   requireSession,
 } from './auth/require-session.ts'
+import { SessionHydrateFallback } from './components/auth/session-hydrate-fallback.tsx'
+import { AuthRoot } from './components/auth/auth-root.tsx'
 
 const router = createBrowserRouter([
   {
+    element: <AuthRoot />,
     errorElement: <ErrorPage />,
     children: [
       { path: 'login', element: <Login />, loader: redirectIfAuthenticated },
@@ -32,26 +37,31 @@ const router = createBrowserRouter([
       { path: 'forgot-password', element: <ForgotPassword /> },
       { path: 'reset-password', element: <ResetPassword /> },
       { path: 'forbidden', element: <Forbidden /> },
-    ],
-  },
-  {
-    path: '/',
-    element: <App />,
-    errorElement: <ErrorPage />,
-    loader: requireSession,
-    shouldRevalidate: () => false,
-    children: [
-      { index: true, element: <Dashboard /> },
       {
-        path: 'server/:serverName/metrics',
-        element: <ServerMetricsRoute />,
-      },
-      {
-        loader: requireMember,
+        path: '/',
+        element: <App />,
+        loader: requireSession,
+        HydrateFallback: SessionHydrateFallback,
+        shouldRevalidate: () => false,
         children: [
-          { path: 'template', element: <Template /> },
-          { path: 'server', element: <Server /> },
-          { path: 'process', element: <Process /> },
+          { index: true, element: <Dashboard /> },
+          {
+            path: 'server/:serverName/metrics',
+            element: <ServerMetricsRoute />,
+            loader: requirePage('server_metrics'),
+          },
+          {
+            path: 'template',
+            element: <Template />,
+            loader: requirePage('templates'),
+          },
+          { path: 'server', element: <Server />, loader: requirePage('servers') },
+          { path: 'process', element: <Process />, loader: requirePage('process') },
+          {
+            path: 'admin',
+            element: <AdminPanel />,
+            loader: requireAdmin,
+          },
         ],
       },
     ],
