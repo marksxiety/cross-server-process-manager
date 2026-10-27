@@ -1,11 +1,9 @@
 import { z } from 'zod';
 import { ValidationException } from '../../Exceptions/ValidationException';
-import type { RegisterData } from '../../Services/AuthService';
+import type { RegistrationInput } from '../../Services/RegistrationService';
 
 const MAX_EMAIL_LENGTH = 255;
 const MAX_NAME_LENGTH = 100;
-const MIN_PASSWORD_LENGTH = 8;
-const MAX_PASSWORD_LENGTH = 128;
 
 export const registerSchema = z.object({
     email: z
@@ -24,18 +22,10 @@ export const registerSchema = z.object({
         .max(MAX_NAME_LENGTH, {
             message: `Name must be ${MAX_NAME_LENGTH} characters or less`,
         }),
-    password: z
-        .string({ message: 'Password is required' })
-        .min(MIN_PASSWORD_LENGTH, {
-            message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
-        })
-        .max(MAX_PASSWORD_LENGTH, {
-            message: `Password must be ${MAX_PASSWORD_LENGTH} characters or less`,
-        }),
 });
 
 export class RegisterRequest {
-    static validate(body: unknown): RegisterData {
+    static validate(body: unknown): RegistrationInput {
         const parsed = registerSchema.safeParse(body);
         if (!parsed.success) {
             throw new ValidationException(
