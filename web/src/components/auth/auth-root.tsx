@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
 import { useAuthSync } from '@/hooks/use-auth-sync'
 import { isAuthPath, isCredentialPath, isMemberPath } from '@/lib/auth-paths'
+import { onUnauthorized } from '@/lib/auth-events'
 import { isDemoMode } from '@/lib/demo-mode'
 import { useAuthStore } from '@/stores/auth.store'
 
@@ -11,6 +12,8 @@ export function AuthRoot() {
   const status = useAuthStore((state) => state.status)
   const navigate = useNavigate()
   const location = useLocation()
+
+  useEffect(() => onUnauthorized(() => useAuthStore.getState().logout()), [])
 
   useEffect(() => {
     if (isDemoMode()) return
