@@ -13,7 +13,7 @@ export async function ensureAdminAccount(): Promise<void> {
 
     if (!existing) {
         const passwordHash = await hashPassword(config.password);
-        const created = await User.create({
+        const created = await User.createVerified({
             email: config.email,
             name: config.name,
             password_hash: passwordHash,
@@ -24,14 +24,6 @@ export async function ensureAdminAccount(): Promise<void> {
         if (!created) {
             throw new Error('Failed to create the ENV admin account');
         }
-
-        await db.query(
-            `UPDATE users
-             SET email_verified_at = SYSDATETIME(),
-                 updated_at = SYSDATETIME()
-             WHERE id = @p1`,
-            [created.id]
-        );
 
         console.log(`Admin account created for ${config.email}`);
         return;
