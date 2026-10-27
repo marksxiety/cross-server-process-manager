@@ -1,113 +1,120 @@
-import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router'
-import { REGEXP_ONLY_DIGITS } from 'input-otp'
+import { useState } from 'react'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useForm } from 'react-hook-form'
+import { Link, useNavigate, useSearchParams } from 'react-router'
+import { authService } from '@/api/services/auth.service'
 import { AuthLayout } from '@/components/auth/auth-layout'
+import { ErrorAlert } from '@/components/custom/error-alert'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import {
-  InputOTP,
-  InputOTPGroup,
-  InputOTPSlot,
-} from '@/components/ui/input-otp'
-import { Label } from '@/components/ui/label'
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import { Spinner } from '@/components/ui/spinner'
+import { toApiError } from '@/lib/error-code'
+import {
+  resetPasswordSchema,
+  type ResetPasswordFormInput,
+  type ResetPasswordFormValues,
+} from '@/schemas/auth.schema'
+import type { ApiError } from '@/types/api'
 
-const CODE_SLOTS = [0, 1, 2, 3, 4, 5]
+const DEFAULT_FORM_VALUES: ResetPasswordFormInput = {
+  password: '',
+  confirm_password: '',
+}
 
 export function ResetPassword() {
   const navigate = useNavigate()
-  const [step, setStep] = useState<1 | 2>(1)
-  const [email, setEmail] = useState('')
-  const [code, setCode] = useState('')
-  const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
+  const [searchParams] = useSearchParams()
+  const token = searchParams.get('token') ?? ''
+  const [error, setError] = useState<ApiError | null>(null)
 
-  const handleVerify = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    // TODO: verify the code through the API
-    setStep(2)
-  }
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<ResetPasswordFormInput, unknown, ResetPasswordFormValues>({
+    resolver: zodResolver(resetPasswordSchema),
+    defaultValues: DEFAULT_FORM_VALUES,
+  })
 
-  const handleReset = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    // TODO: reset the password through the API
-    navigate('/login')
+  const onSubmit = handleSubmit(async (values) => {
+    if (token === '') return
+
+    setError(null)
+    const result = await authService().resetPassword({
+      token,
+      password: values.password,
+    })
+
+    if (result.success) {
+      navigate('/login?reset=success', { replace: true })
+      return
+    }
+    setError(toApiError(result))
+  })
+
+  if (token === '') {
+    return (
+      <AuthLayout
+        title='Invalid link'
+        description='This password reset link is missing or incomplete.'
+      >
+        <div className='grid gap-4'>
+          <p className='text-sm text-muted-foreground'>
+            Request a new reset link from the sign-in page.
+          </p>
+          <Button className='w-full' render={<Link to='/forgot-password' />}>
+            Request a new link
+          </Button>
+        </div>
+      </AuthLayout>
+    )
   }
 
   return (
     <AuthLayout
       title='Reset password'
-      description={
-        step === 1
-          ? 'Enter your email and the code we sent you.'
-          : 'Choose a new password for your account.'
-      }
+      description='Choose a new password for your account.'
     >
-      {step === 1 ? (
-        <form className='grid gap-4' onSubmit={handleVerify}>
-          <div className='grid gap-2'>
-            <Label htmlFor='email'>Email</Label>
-            <Input
-              id='email'
-              type='email'
-              autoComplete='email'
-              placeholder='you@example.com'
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-            />
-          </div>
+      <form className='grid gap-4' onSubmit={onSubmit} noValidate>
+        {error && <ErrorAlert error={error} showDetails={false} />}
 
-          <div className='grid gap-2'>
-            <Label htmlFor='code'>Verification code</Label>
-            <div className='flex justify-center'>
-              <InputOTP
-                id='code'
-                maxLength={6}
-                pattern={REGEXP_ONLY_DIGITS}
-                value={code}
-                onChange={setCode}
-              >
-                <InputOTPGroup>
-                  {CODE_SLOTS.map((index) => (
-                    <InputOTPSlot key={index} index={index} />
-                  ))}
-                </InputOTPGroup>
-              </InputOTP>
-            </div>
-          </div>
-
-          <Button type='submit' className='w-full'>
-            Verify code
-          </Button>
-        </form>
-      ) : (
-        <form className='grid gap-4' onSubmit={handleReset}>
-          <div className='grid gap-2'>
-            <Label htmlFor='new-password'>New password</Label>
+        <FieldGroup>
+          <Field data-invalid={!!errors.password}>
+            <FieldLabel htmlFor='new-password'>New password</FieldLabel>
             <Input
               id='new-password'
               type='password'
               autoComplete='new-password'
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              aria-invalid={!!errors.password}
+              {...register('password')}
             />
-          </div>
+            <FieldError errors={[errors.password]} />
+          </Field>
 
-          <div className='grid gap-2'>
-            <Label htmlFor='confirm-password'>Confirm password</Label>
+          <Field data-invalid={!!errors.confirm_password}>
+            <FieldLabel htmlFor='confirm-password'>Confirm password</FieldLabel>
             <Input
               id='confirm-password'
               type='password'
               autoComplete='new-password'
-              value={confirmPassword}
-              onChange={(event) => setConfirmPassword(event.target.value)}
+              aria-invalid={!!errors.confirm_password}
+              {...register('confirm_password')}
             />
-          </div>
+            <FieldError errors={[errors.confirm_password]} />
+          </Field>
+        </FieldGroup>
 
-          <Button type='submit' className='w-full'>
-            Reset password
-          </Button>
-        </form>
-      )}
+        <Button type='submit' className='w-full' disabled={isSubmitting}>
+          {isSubmitting && <Spinner className='size-4' />}
+          Reset password
+        </Button>
+      </form>
 
       <div className='mt-4 text-xs text-muted-foreground'>
         <Link to='/login' className='text-primary hover:underline'>
