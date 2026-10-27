@@ -37,24 +37,58 @@ export const loginSchema = z.object({
     }),
 })
 
-export const registerSchema = z
+export const registerSchema = z.object({
+  name: z
+    .string({ message: 'Name is required' })
+    .trim()
+    .min(1, { message: 'Name is required' })
+    .max(MAX_NAME_LENGTH, {
+      message: `Name must be ${MAX_NAME_LENGTH} characters or less`,
+    }),
+  email: z
+    .string({ message: 'Email is required' })
+    .trim()
+    .toLowerCase()
+    .min(1, { message: 'Email is required' })
+    .max(MAX_EMAIL_LENGTH, {
+      message: `Email must be ${MAX_EMAIL_LENGTH} characters or less`,
+    })
+    .email({ message: 'Email must be a valid email address' }),
+})
+
+export const verifyEmailSchema = z
   .object({
-    name: z
-      .string({ message: 'Name is required' })
-      .trim()
-      .min(1, { message: 'Name is required' })
-      .max(MAX_NAME_LENGTH, {
-        message: `Name must be ${MAX_NAME_LENGTH} characters or less`,
-      }),
-    email: z
-      .string({ message: 'Email is required' })
-      .trim()
-      .toLowerCase()
-      .min(1, { message: 'Email is required' })
-      .max(MAX_EMAIL_LENGTH, {
-        message: `Email must be ${MAX_EMAIL_LENGTH} characters or less`,
+    password: z
+      .string({ message: 'Password is required' })
+      .min(MIN_PASSWORD_LENGTH, {
+        message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
       })
-      .email({ message: 'Email must be a valid email address' }),
+      .max(MAX_PASSWORD_LENGTH, {
+        message: `Password must be ${MAX_PASSWORD_LENGTH} characters or less`,
+      }),
+    confirm_password: z
+      .string({ message: 'Confirm your password' })
+      .min(1, { message: 'Confirm your password' }),
+  })
+  .refine((values) => values.password === values.confirm_password, {
+    path: ['confirm_password'],
+    message: 'Passwords do not match',
+  })
+
+export const forgotPasswordSchema = z.object({
+  email: z
+    .string({ message: 'Email is required' })
+    .trim()
+    .toLowerCase()
+    .min(1, { message: 'Email is required' })
+    .max(MAX_EMAIL_LENGTH, {
+      message: `Email must be ${MAX_EMAIL_LENGTH} characters or less`,
+    })
+    .email({ message: 'Email must be a valid email address' }),
+})
+
+export const resetPasswordSchema = z
+  .object({
     password: z
       .string({ message: 'Password is required' })
       .min(MIN_PASSWORD_LENGTH, {
@@ -76,3 +110,9 @@ export type LoginFormInput = z.input<typeof loginSchema>
 export type LoginFormValues = z.output<typeof loginSchema>
 export type RegisterFormInput = z.input<typeof registerSchema>
 export type RegisterFormValues = z.output<typeof registerSchema>
+export type VerifyEmailFormInput = z.input<typeof verifyEmailSchema>
+export type VerifyEmailFormValues = z.output<typeof verifyEmailSchema>
+export type ForgotPasswordFormInput = z.input<typeof forgotPasswordSchema>
+export type ForgotPasswordFormValues = z.output<typeof forgotPasswordSchema>
+export type ResetPasswordFormInput = z.input<typeof resetPasswordSchema>
+export type ResetPasswordFormValues = z.output<typeof resetPasswordSchema>
