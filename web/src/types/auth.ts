@@ -2,12 +2,14 @@ export interface AuthUser {
   id: number
   email: string
   name: string
-  role: string
+  is_admin: boolean
   is_active: boolean
   email_verified_at: string | null
   last_login_at: string | null
   created_at: string
   updated_at: string
+  pages: string[]
+  events: string[]
 }
 
 export interface AuthSessionPayload {
