@@ -5,6 +5,8 @@ import type {
   AuthUser,
   LoginInput,
   RegisterInput,
+  RegisterResult,
+  ResetPasswordInput,
 } from '@/types/auth'
 
 function unreachable<T>(cause: unknown): ApiResponse<T> {
@@ -26,9 +28,54 @@ export function authService() {
       }
     },
 
-    register: async (input: RegisterInput): Promise<ApiResponse<AuthSessionPayload>> => {
+    register: async (input: RegisterInput): Promise<ApiResponse<RegisterResult>> => {
       try {
-        return await anonymousRegistryConnection().post<AuthSessionPayload>('/auth/register', input)
+        return await anonymousRegistryConnection().post<RegisterResult>('/auth/register', input)
+      } catch (cause) {
+        return unreachable(cause)
+      }
+    },
+
+    verifyEmail: async (token: string, password: string): Promise<ApiResponse<null>> => {
+      try {
+        return await anonymousRegistryConnection().post<null>('/auth/verify-email', {
+          token,
+          password,
+        })
+      } catch (cause) {
+        return unreachable(cause)
+      }
+    },
+
+    resendVerification: async (email: string): Promise<ApiResponse<null>> => {
+      try {
+        return await anonymousRegistryConnection().post<null>('/auth/verify-email/request', {
+          email,
+        })
+      } catch (cause) {
+        return unreachable(cause)
+      }
+    },
+
+    forgotPassword: async (email: string): Promise<ApiResponse<null>> => {
+      try {
+        return await anonymousRegistryConnection().post<null>('/auth/forgot-password', { email })
+      } catch (cause) {
+        return unreachable(cause)
+      }
+    },
+
+    resetPassword: async (input: ResetPasswordInput): Promise<ApiResponse<null>> => {
+      try {
+        return await anonymousRegistryConnection().post<null>('/auth/reset-password', input)
+      } catch (cause) {
+        return unreachable(cause)
+      }
+    },
+
+    logout: async (): Promise<ApiResponse<null>> => {
+      try {
+        return await registryConnection().post<null>('/auth/logout')
       } catch (cause) {
         return unreachable(cause)
       }
