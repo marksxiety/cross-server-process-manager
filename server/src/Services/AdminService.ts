@@ -1,10 +1,10 @@
 import { loadAdminConfig } from '../../config/admin';
-import { DatabaseException } from '../Exceptions/DatabaseException';
 import { DuplicateResourceException } from '../Exceptions/DuplicateResourceException';
 import { HttpException } from '../Exceptions/HttpException';
 import { NotFoundException } from '../Exceptions/NotFoundException';
 import { User, type UserRecord } from '../Models/User';
 import { describeDbError, isUniqueViolation } from '../Persistence/DatabaseError';
+import { databaseException } from '../Persistence/DbException';
 import {
     ALL_PAGE_KEYS,
     DEFAULT_EVENT_KEYS,
@@ -24,7 +24,6 @@ import { AccessService } from './AccessService';
 const EMAIL_TAKEN_CODE = 'EMAIL_TAKEN';
 const EMAIL_TAKEN_MESSAGE = 'An account with this email already exists';
 const ENV_ADMIN_PROTECTED_CODE = 'ENV_ADMIN_PROTECTED';
-const INTERNAL_SERVER_ERROR_CODE = 'INTERNAL_SERVER_ERROR';
 
 export interface AdminUserUpdate {
     name?: string | undefined;
@@ -48,15 +47,6 @@ export interface AdminUserView {
     events: EventKey[];
 }
 
-function databaseError(error: unknown, fallback: string): DatabaseException {
-    const dbError = describeDbError(error);
-    return new DatabaseException(
-        dbError.message || fallback,
-        dbError.number !== undefined ? String(dbError.number) : INTERNAL_SERVER_ERROR_CODE,
-        { cause: error }
-    );
-}
-
 export class AdminService {
     private readonly envAdminEmail: string;
 
@@ -73,7 +63,7 @@ export class AdminService {
         try {
             [users, grants] = await Promise.all([User.all(), this.access.allGrants()]);
         } catch (error) {
-            throw databaseError(error, 'Failed to retrieve users');
+            throw databaseException(error, 'Failed to retrieve users');
         }
 
         return users.map((user) =>
@@ -120,11 +110,15 @@ export class AdminService {
                 is_active: data.is_active ?? user.is_active,
                 is_admin: data.is_admin ?? user.is_admin,
             });
+
+            if (updated && data.is_active === false) {
+                updated = (await User.bumpTokenVersion(id)) ?? updated;
+            }
         } catch (error) {
             if (isUniqueViolation(describeDbError(error))) {
                 throw new DuplicateResourceException(EMAIL_TAKEN_MESSAGE, EMAIL_TAKEN_CODE);
             }
-            throw databaseError(error, 'Failed to update user');
+            throw databaseException(error, 'Failed to update user');
         }
 
         if (!updated) {
@@ -151,7 +145,7 @@ export class AdminService {
         try {
             await this.access.replaceGrants(id, pages, events);
         } catch (error) {
-            throw databaseError(error, 'Failed to update user access');
+            throw databaseException(error, 'Failed to update user access');
         }
 
         return this.viewFor(user);
@@ -162,7 +156,7 @@ export class AdminService {
         try {
             user = await User.findById(id);
         } catch (error) {
-            throw databaseError(error, 'Failed to retrieve user');
+            throw databaseException(error, 'Failed to retrieve user');
         }
         if (!user) {
             throw new NotFoundException('User');
@@ -174,7 +168,7 @@ export class AdminService {
         try {
             return this.toView(user, await this.access.grantsFor(user.id));
         } catch (error) {
-            throw databaseError(error, 'Failed to retrieve user access');
+            throw databaseException(error, 'Failed to retrieve user access');
         }
     }
 
