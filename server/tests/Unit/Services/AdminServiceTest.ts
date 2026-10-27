@@ -5,6 +5,7 @@ vi.mock('../../../src/Models/User', () => ({
         all: vi.fn(),
         findById: vi.fn(),
         updateAdmin: vi.fn(),
+        bumpTokenVersion: vi.fn(),
     },
 }));
 
@@ -45,6 +46,7 @@ beforeEach(() => {
     vi.mocked(User.all).mockReset();
     vi.mocked(User.findById).mockReset();
     vi.mocked(User.updateAdmin).mockReset();
+    vi.mocked(User.bumpTokenVersion).mockReset();
     accessFns.allGrants.mockReset();
     accessFns.grantsFor.mockReset();
     accessFns.replaceGrants.mockReset();
@@ -102,6 +104,20 @@ describe('AdminService', () => {
         expect(updated.name).toBe('Renamed');
         expect(updated.is_admin).toBe(true);
         expect(updated.events).toEqual(['process.delete']);
+    });
+
+    it('revokes existing tokens when an account is disabled', async () => {
+        vi.mocked(User.findById).mockResolvedValue(userRow());
+        vi.mocked(User.updateAdmin).mockResolvedValue(userRow({ is_active: false }));
+        vi.mocked(User.bumpTokenVersion).mockResolvedValue(
+            userRow({ is_active: false, token_version: 1 })
+        );
+        accessFns.grantsFor.mockResolvedValue({ pages: [], events: [] });
+
+        const updated = await service.updateUser(1, { is_active: false });
+
+        expect(User.bumpTokenVersion).toHaveBeenCalledWith(1);
+        expect(updated.is_active).toBe(false);
     });
 
     it('refuses to modify the ENV admin', async () => {
