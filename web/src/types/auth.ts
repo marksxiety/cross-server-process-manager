@@ -27,5 +27,18 @@ export interface LoginInput {
 export interface RegisterInput {
   email: string
   name: string
+}
+
+export interface RegisterResult {
+  email: string
+}
+
+export interface VerifyEmailInput {
+  token: string
+  password: string
+}
+
+export interface ResetPasswordInput {
+  token: string
   password: string
 }
