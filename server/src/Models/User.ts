@@ -83,8 +83,30 @@ export class User {
         return rows[0];
     }
 
-    static async findByEmail(email: string): Promise<UserRecord | undefined> {
-        const { rows } = await db.query<UserRecord>(
+    static async createVerified(
+        attributes: UserCreateAttributes,
+        executor: DbQueryable = db
+    ): Promise<UserRecord | undefined> {
+        const { rows } = await executor.query<UserRecord>(
+            `INSERT INTO users (email, name, password_hash, is_active, is_admin, email_verified_at)
+             OUTPUT INSERTED.*
+             VALUES (@p1, @p2, @p3, @p4, @p5, SYSDATETIME())`,
+            [
+                attributes.email,
+                attributes.name,
+                attributes.password_hash,
+                attributes.is_active,
+                attributes.is_admin,
+            ]
+        );
+        return rows[0];
+    }
+
+    static async findByEmail(
+        email: string,
+        executor: DbQueryable = db
+    ): Promise<UserRecord | undefined> {
+        const { rows } = await executor.query<UserRecord>(
             'SELECT * FROM users WHERE email = @p1',
             [email]
         );
@@ -105,6 +127,46 @@ export class User {
         const { rows } = await db.query<UserRecord>(
             `UPDATE users
              SET last_login_at = SYSDATETIME(),
+                 updated_at = SYSDATETIME()
+             OUTPUT INSERTED.*
+             WHERE id = @p1`,
+            [id]
+        );
+        return rows[0];
+    }
+
+    static async markEmailVerified(id: number): Promise<UserRecord | undefined> {
+        const { rows } = await db.query<UserRecord>(
+            `UPDATE users
+             SET email_verified_at = COALESCE(email_verified_at, SYSDATETIME()),
+                 updated_at = SYSDATETIME()
+             OUTPUT INSERTED.*
+             WHERE id = @p1`,
+            [id]
+        );
+        return rows[0];
+    }
+
+    static async updatePassword(
+        id: number,
+        passwordHash: string
+    ): Promise<UserRecord | undefined> {
+        const { rows } = await db.query<UserRecord>(
+            `UPDATE users
+             SET password_hash = @p1,
+                 token_version = token_version + 1,
+                 updated_at = SYSDATETIME()
+             OUTPUT INSERTED.*
+             WHERE id = @p2`,
+            [passwordHash, id]
+        );
+        return rows[0];
+    }
+
+    static async bumpTokenVersion(id: number): Promise<UserRecord | undefined> {
+        const { rows } = await db.query<UserRecord>(
+            `UPDATE users
+             SET token_version = token_version + 1,
                  updated_at = SYSDATETIME()
              OUTPUT INSERTED.*
              WHERE id = @p1`,
