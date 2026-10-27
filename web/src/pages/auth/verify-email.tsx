@@ -1,71 +1,128 @@
-import { useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router'
-import { REGEXP_ONLY_DIGITS } from 'input-otp'
+import { useState } from 'react'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useForm } from 'react-hook-form'
+import { Link, useNavigate, useSearchParams } from 'react-router'
+import { authService } from '@/api/services/auth.service'
 import { AuthLayout } from '@/components/auth/auth-layout'
+import { ErrorAlert } from '@/components/custom/error-alert'
 import { Button } from '@/components/ui/button'
 import {
-  InputOTP,
-  InputOTPGroup,
-  InputOTPSlot,
-} from '@/components/ui/input-otp'
-import { Label } from '@/components/ui/label'
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import { Spinner } from '@/components/ui/spinner'
+import { toApiError } from '@/lib/error-code'
+import {
+  verifyEmailSchema,
+  type VerifyEmailFormInput,
+  type VerifyEmailFormValues,
+} from '@/schemas/auth.schema'
+import type { ApiError } from '@/types/api'
 
-const CODE_SLOTS = [0, 1, 2, 3, 4, 5]
+const DEFAULT_FORM_VALUES: VerifyEmailFormInput = {
+  password: '',
+  confirm_password: '',
+}
 
 export function VerifyEmail() {
   const navigate = useNavigate()
-  const [code, setCode] = useState('')
+  const [searchParams] = useSearchParams()
+  const token = searchParams.get('token') ?? ''
+  const [error, setError] = useState<ApiError | null>(null)
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    // TODO: verify the code through the API
-    navigate('/login')
-  }
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<VerifyEmailFormInput, unknown, VerifyEmailFormValues>({
+    resolver: zodResolver(verifyEmailSchema),
+    defaultValues: DEFAULT_FORM_VALUES,
+  })
 
-  const handleResend = () => {
-    // TODO: request a new code through the API
+  const onSubmit = handleSubmit(async (values) => {
+    if (token === '') return
+
+    setError(null)
+    const result = await authService().verifyEmail(token, values.password)
+
+    if (result.success) {
+      navigate('/login?verified=success', { replace: true })
+      return
+    }
+    setError(toApiError(result))
+  })
+
+  if (token === '') {
+    return (
+      <AuthLayout
+        title='Invalid link'
+        description='This verification link is missing or incomplete.'
+      >
+        <div className='grid gap-4'>
+          <p className='text-sm text-muted-foreground'>
+            Start the registration again to receive a new link.
+          </p>
+          <Button className='w-full' render={<Link to='/register' />}>
+            Register again
+          </Button>
+        </div>
+      </AuthLayout>
+    )
   }
 
   return (
     <AuthLayout
-      title='Verify your email'
-      description='Confirm the code we sent to your inbox.'
+      title='Finish creating your account'
+      description='Choose a password to verify your email and complete registration.'
     >
-      <form className='grid gap-4' onSubmit={handleSubmit}>
-        <div className='grid gap-2'>
-          <Label htmlFor='code'>Verification code</Label>
-          <div className='flex justify-center'>
-            <InputOTP
-              id='code'
-              maxLength={6}
-              pattern={REGEXP_ONLY_DIGITS}
-              value={code}
-              onChange={setCode}
-            >
-              <InputOTPGroup>
-                {CODE_SLOTS.map((index) => (
-                  <InputOTPSlot key={index} index={index} />
-                ))}
-              </InputOTPGroup>
-            </InputOTP>
-          </div>
-          <p className='text-xs text-muted-foreground'>
-            Enter the 6-digit code sent to your email
-          </p>
-        </div>
+      <form className='grid gap-4' onSubmit={onSubmit} noValidate>
+        {error && <ErrorAlert error={error} showDetails={false} />}
 
-        <Button type='submit' className='w-full'>
-          Verify
-        </Button>
-        <Button
-          type='button'
-          variant='outline'
-          className='w-full'
-          onClick={handleResend}
-        >
-          Resend code
+        <FieldGroup>
+          <Field data-invalid={!!errors.password}>
+            <FieldLabel htmlFor='password'>Password</FieldLabel>
+            <Input
+              id='password'
+              type='password'
+              autoComplete='new-password'
+              aria-invalid={!!errors.password}
+              {...register('password')}
+            />
+            <FieldError errors={[errors.password]} />
+          </Field>
+
+          <Field data-invalid={!!errors.confirm_password}>
+            <FieldLabel htmlFor='confirm-password'>Confirm password</FieldLabel>
+            <Input
+              id='confirm-password'
+              type='password'
+              autoComplete='new-password'
+              aria-invalid={!!errors.confirm_password}
+              {...register('confirm_password')}
+            />
+            <FieldError errors={[errors.confirm_password]} />
+          </Field>
+        </FieldGroup>
+
+        <Button type='submit' className='w-full' disabled={isSubmitting}>
+          {isSubmitting && <Spinner className='size-4' />}
+          Create account
         </Button>
       </form>
+
+      <div className='mt-4 flex flex-col items-center gap-2 text-center text-xs text-muted-foreground'>
+        {error && (
+          <Link to='/register' className='text-primary hover:underline'>
+            Request a new link
+          </Link>
+        )}
+        <Link to='/login' className='text-primary hover:underline'>
+          Back to sign in
+        </Link>
+      </div>
     </AuthLayout>
   )
 }
