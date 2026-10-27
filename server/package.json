@@ -18,6 +18,7 @@
     "db:migrate:baseline": "tsx src/Console/Commands/MigrateCommand.ts baseline",
     "db:seed": "tsx src/Console/Commands/SeedCommand.ts",
     "db:setup": "npm run db:create && npm run db:migrate && npm run db:seed",
+    "mail:preview": "tsx src/Console/Commands/PreviewMailCommand.ts",
     "migrate:create": "tsx src/Console/Commands/MakeMigrationCommand.ts",
     "migrate:up": "tsx src/Console/Commands/MigrateCommand.ts up",
     "migrate:down": "tsx src/Console/Commands/MigrateCommand.ts down"
