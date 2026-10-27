@@ -38,4 +38,39 @@ describe('createConnection', () => {
 
     expect(new Headers(calls[0]?.headers).get('Authorization')).toBeNull()
   })
+
+  test('calls onUnauthorized when the server responds 401', async () => {
+    vi.stubGlobal('fetch', async () =>
+      new Response(JSON.stringify({ success: false, message: 'Unauthorized', info: null }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    )
+    const onUnauthorized = vi.fn()
+
+    await createConnection({
+      protocol: 'http',
+      host: 'localhost',
+      port: 4000,
+      authToken: 'expired',
+      onUnauthorized,
+    }).get('/auth/me')
+
+    expect(onUnauthorized).toHaveBeenCalledTimes(1)
+  })
+
+  test('does not call onUnauthorized for successful responses', async () => {
+    stubFetch()
+    const onUnauthorized = vi.fn()
+
+    await createConnection({
+      protocol: 'http',
+      host: 'localhost',
+      port: 4000,
+      authToken: 'valid',
+      onUnauthorized,
+    }).get('/auth/me')
+
+    expect(onUnauthorized).not.toHaveBeenCalled()
+  })
 })
