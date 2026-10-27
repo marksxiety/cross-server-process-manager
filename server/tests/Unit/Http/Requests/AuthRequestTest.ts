@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { z, type ZodObject } from 'zod';
 import { loginSchema } from '../../../../src/Http/Requests/LoginRequest';
 import { registerSchema } from '../../../../src/Http/Requests/RegisterRequest';
+import { verifyEmailSchema } from '../../../../src/Http/Requests/VerifyEmailRequest';
 
 const VALID_REGISTER = {
     email: 'admin@example.com',
     name: 'Admin',
-    password: 'correct-horse-battery',
 };
 
 function fieldErrors(
@@ -42,23 +42,15 @@ describe('registerSchema', () => {
         expect(result.data.name).toBe('Admin');
     });
 
-    it('does not trim the password', () => {
+    it('strips unknown fields such as password', () => {
         const result = registerSchema.safeParse({
             ...VALID_REGISTER,
-            password: '  spaced  ',
+            password: 'ignored-password',
         });
 
         expect(result.success).toBe(true);
         if (!result.success) return;
-        expect(result.data.password).toBe('  spaced  ');
-    });
-
-    it('strips unknown fields such as role', () => {
-        const result = registerSchema.safeParse({ ...VALID_REGISTER, role: 'admin' });
-
-        expect(result.success).toBe(true);
-        if (!result.success) return;
-        expect(result.data).not.toHaveProperty('role');
+        expect(result.data).not.toHaveProperty('password');
     });
 
     it('rejects a missing email', () => {
@@ -92,17 +84,31 @@ describe('registerSchema', () => {
             fieldErrors(registerSchema, { ...VALID_REGISTER, name: 'x'.repeat(101) }).name
         ).toContain('Name must be 100 characters or less');
     });
+});
+
+describe('verifyEmailSchema', () => {
+    const VALID_VERIFY = { token: 'raw-token', password: 'new-password' };
+
+    it('accepts a valid payload', () => {
+        expect(verifyEmailSchema.safeParse(VALID_VERIFY).success).toBe(true);
+    });
+
+    it('rejects a missing token', () => {
+        expect(
+            fieldErrors(verifyEmailSchema, { ...VALID_VERIFY, token: '' }).token
+        ).toContain('Verification token is required');
+    });
 
     it('rejects a password shorter than 8 characters', () => {
         expect(
-            fieldErrors(registerSchema, { ...VALID_REGISTER, password: 'short12' }).password
+            fieldErrors(verifyEmailSchema, { ...VALID_VERIFY, password: 'short12' }).password
         ).toContain('Password must be at least 8 characters');
     });
 
     it('rejects a password longer than 128 characters', () => {
         expect(
-            fieldErrors(registerSchema, {
-                ...VALID_REGISTER,
+            fieldErrors(verifyEmailSchema, {
+                ...VALID_VERIFY,
                 password: 'x'.repeat(129),
             }).password
         ).toContain('Password must be 128 characters or less');
