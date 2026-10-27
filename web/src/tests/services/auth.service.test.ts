@@ -68,20 +68,77 @@ describe('authService', () => {
     const post = vi.fn().mockResolvedValue({
       success: true,
       message: 'Registration successful',
-      info: PAYLOAD,
+      info: { email: 'admin@example.com' },
       status: 200,
     })
     vi.mocked(anonymousRegistryConnection).mockReturnValue(connectionWith({ post }))
     const input = {
       email: 'admin@example.com',
       name: 'Admin',
-      password: 'secret-password',
     }
 
-    await authService().register(input)
+    const result = await authService().register(input)
 
     expect(post).toHaveBeenCalledWith('/auth/register', input)
     expect(vi.mocked(registryConnection)).not.toHaveBeenCalled()
+    expect(result.info).toEqual({ email: 'admin@example.com' })
+  })
+
+  test('verifies an email link through the public endpoint', async () => {
+    const post = vi.fn().mockResolvedValue({ success: true, message: 'ok', info: null, status: 200 })
+    vi.mocked(anonymousRegistryConnection).mockReturnValue(connectionWith({ post }))
+
+    await authService().verifyEmail('raw-token', 'new-password')
+
+    expect(post).toHaveBeenCalledWith('/auth/verify-email', {
+      token: 'raw-token',
+      password: 'new-password',
+    })
+    expect(vi.mocked(registryConnection)).not.toHaveBeenCalled()
+  })
+
+  test('requests a new verification email', async () => {
+    const post = vi.fn().mockResolvedValue({ success: true, message: 'ok', info: null, status: 200 })
+    vi.mocked(anonymousRegistryConnection).mockReturnValue(connectionWith({ post }))
+
+    await authService().resendVerification('admin@example.com')
+
+    expect(post).toHaveBeenCalledWith('/auth/verify-email/request', {
+      email: 'admin@example.com',
+    })
+  })
+
+  test('requests a password reset link', async () => {
+    const post = vi.fn().mockResolvedValue({ success: true, message: 'ok', info: null, status: 200 })
+    vi.mocked(anonymousRegistryConnection).mockReturnValue(connectionWith({ post }))
+
+    await authService().forgotPassword('admin@example.com')
+
+    expect(post).toHaveBeenCalledWith('/auth/forgot-password', {
+      email: 'admin@example.com',
+    })
+  })
+
+  test('submits a password reset', async () => {
+    const post = vi.fn().mockResolvedValue({ success: true, message: 'ok', info: null, status: 200 })
+    vi.mocked(anonymousRegistryConnection).mockReturnValue(connectionWith({ post }))
+
+    await authService().resetPassword({ token: 'raw-token', password: 'new-password' })
+
+    expect(post).toHaveBeenCalledWith('/auth/reset-password', {
+      token: 'raw-token',
+      password: 'new-password',
+    })
+  })
+
+  test('revokes the session through the authenticated logout endpoint', async () => {
+    const post = vi.fn().mockResolvedValue({ success: true, message: 'ok', info: null, status: 200 })
+    vi.mocked(registryConnection).mockReturnValue(connectionWith({ post }))
+
+    await authService().logout()
+
+    expect(post).toHaveBeenCalledWith('/auth/logout')
+    expect(vi.mocked(anonymousRegistryConnection)).not.toHaveBeenCalled()
   })
 
   test('loads the current user through the authenticated registry connection', async () => {
