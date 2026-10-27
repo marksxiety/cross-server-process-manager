@@ -1,5 +1,12 @@
 import { NavLink, useLocation } from 'react-router'
-import { Cog, FileText, LayoutDashboard, Server } from 'lucide-react'
+import {
+  Cog,
+  FileText,
+  LayoutDashboard,
+  Server,
+  ShieldCheck,
+  type LucideIcon,
+} from 'lucide-react'
 import xpmIcon from '@/assets/xpm-icon.svg'
 import {
   Sidebar,
@@ -20,22 +27,38 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { Badge } from '@/components/ui/badge'
-import { useCanManage } from '@/hooks/use-can-manage'
+import { SidebarUserMenu } from '@/components/auth/sidebar-user-menu'
+import { useAccess } from '@/hooks/use-access'
+import type { PageKey } from '@/lib/access-catalog'
 
-const navItems = [
-  { title: 'Dashboard', url: '/', icon: LayoutDashboard },
-  { title: 'Process', url: '/process', icon: Cog },
-  { title: 'Templates', url: '/template', icon: FileText },
-  { title: 'Servers', url: '/server', icon: Server },
+type NavItem = {
+  title: string
+  url: string
+  icon: LucideIcon
+  page?: PageKey
+  adminOnly?: boolean
+}
+
+const navItems: NavItem[] = [
+  { title: 'Dashboard', url: '/', icon: LayoutDashboard, page: 'dashboard' },
+  { title: 'Process', url: '/process', icon: Cog, page: 'process' },
+  { title: 'Templates', url: '/template', icon: FileText, page: 'templates' },
+  { title: 'Servers', url: '/server', icon: Server, page: 'servers' },
+  {
+    title: 'Admin',
+    url: '/admin',
+    icon: ShieldCheck,
+    adminOnly: true,
+  },
 ]
 
 export function AppSidebar() {
   const { pathname } = useLocation()
   const { state, isMobile } = useSidebar()
-  const canManage = useCanManage()
-  const visibleNavItems = canManage
-    ? navItems
-    : navItems.filter((item) => item.url === '/')
+  const access = useAccess()
+  const visibleNavItems = navItems.filter((item) =>
+    item.adminOnly ? access.isAdmin : item.page !== undefined && access.canVisit(item.page)
+  )
 
   return (
     <Sidebar collapsible='icon'>
@@ -100,13 +123,14 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className='items-center'>
+      <SidebarFooter className='items-center gap-2'>
         <Badge
           variant='secondary'
           className='w-fit font-mono font-normal normal-case tracking-wider text-muted-foreground/70 group-data-[collapsible=icon]:hidden'
         >
           v{__APP_VERSION__}
         </Badge>
+        <SidebarUserMenu />
       </SidebarFooter>
 
       <SidebarRail />
