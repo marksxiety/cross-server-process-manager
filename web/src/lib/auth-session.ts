@@ -2,11 +2,11 @@ import { z } from 'zod'
 import { authUserSchema } from '@/schemas/auth.schema'
 import type { AuthSessionPayload, AuthUser } from '@/types/auth'
 
-const SESSION_KEY = 'xpm.auth.session'
-const GUEST_KEY = 'xpm.auth.guest'
+export const AUTH_SESSION_KEY = 'xpm.auth.session'
+export const AUTH_GUEST_KEY = 'xpm.auth.guest'
 const GUEST_VALUE = '1'
 
-export interface SessionStorageLike {
+export interface StorageLike {
   getItem(key: string): string | null
   setItem(key: string, value: string): void
   removeItem(key: string): void
@@ -20,24 +20,25 @@ const storedSessionSchema = z.object({
 
 export type StoredSession = z.infer<typeof storedSessionSchema>
 
-function defaultStorage(): SessionStorageLike | null {
+/** Auth state is shared across tabs, so both the token and guest flag use localStorage. */
+function defaultStorage(): StorageLike | null {
   try {
-    return globalThis.sessionStorage ?? null
+    return globalThis.localStorage ?? null
   } catch (error) {
-    console.warn('auth-session: sessionStorage is unavailable', error)
+    console.warn('auth-session: localStorage is unavailable', error)
     return null
   }
 }
 
 export function readSession(
-  storage: SessionStorageLike | null = defaultStorage(),
+  storage: StorageLike | null = defaultStorage(),
   now = Date.now(),
 ): StoredSession | null {
   if (!storage) return null
 
   let raw: string | null
   try {
-    raw = storage.getItem(SESSION_KEY)
+    raw = storage.getItem(AUTH_SESSION_KEY)
   } catch (error) {
     console.warn('auth-session: could not read the stored session', error)
     return null
@@ -62,9 +63,9 @@ export function readSession(
   return parsed.data
 }
 
-function removeSession(storage: SessionStorageLike): void {
+function removeSession(storage: StorageLike): void {
   try {
-    storage.removeItem(SESSION_KEY)
+    storage.removeItem(AUTH_SESSION_KEY)
   } catch (error) {
     console.warn('auth-session: could not clear the session', error)
   }
@@ -72,7 +73,7 @@ function removeSession(storage: SessionStorageLike): void {
 
 export function writeSession(
   payload: AuthSessionPayload,
-  storage: SessionStorageLike | null = defaultStorage(),
+  storage: StorageLike | null = defaultStorage(),
   now = Date.now(),
 ): StoredSession {
   const session: StoredSession = {
@@ -82,7 +83,7 @@ export function writeSession(
   }
 
   try {
-    storage?.setItem(SESSION_KEY, JSON.stringify(session))
+    storage?.setItem(AUTH_SESSION_KEY, JSON.stringify(session))
   } catch (error) {
     console.warn('auth-session: could not persist the session', error)
   }
@@ -92,51 +93,51 @@ export function writeSession(
 
 export function updateSessionUser(
   user: AuthUser,
-  storage: SessionStorageLike | null = defaultStorage(),
+  storage: StorageLike | null = defaultStorage(),
 ): void {
   const session = readSession(storage)
   if (!session) return
 
   try {
-    storage?.setItem(SESSION_KEY, JSON.stringify({ ...session, user }))
+    storage?.setItem(AUTH_SESSION_KEY, JSON.stringify({ ...session, user }))
   } catch (error) {
     console.warn('auth-session: could not refresh the stored user', error)
   }
 }
 
-export function clearSession(storage: SessionStorageLike | null = defaultStorage()): void {
+export function clearSession(storage: StorageLike | null = defaultStorage()): void {
   if (storage) removeSession(storage)
 }
 
 export function getAccessToken(
-  storage: SessionStorageLike | null = defaultStorage(),
+  storage: StorageLike | null = defaultStorage(),
   now = Date.now(),
 ): string | null {
   return readSession(storage, now)?.token ?? null
 }
 
-export function isGuestSession(storage: SessionStorageLike | null = defaultStorage()): boolean {
+export function isGuestSession(storage: StorageLike | null = defaultStorage()): boolean {
   if (!storage) return false
 
   try {
-    return storage.getItem(GUEST_KEY) === GUEST_VALUE
+    return storage.getItem(AUTH_GUEST_KEY) === GUEST_VALUE
   } catch (error) {
     console.warn('auth-session: could not read the guest flag', error)
     return false
   }
 }
 
-export function startGuestSession(storage: SessionStorageLike | null = defaultStorage()): void {
+export function startGuestSession(storage: StorageLike | null = defaultStorage()): void {
   try {
-    storage?.setItem(GUEST_KEY, GUEST_VALUE)
+    storage?.setItem(AUTH_GUEST_KEY, GUEST_VALUE)
   } catch (error) {
     console.warn('auth-session: could not persist guest mode', error)
   }
 }
 
-export function clearGuestSession(storage: SessionStorageLike | null = defaultStorage()): void {
+export function clearGuestSession(storage: StorageLike | null = defaultStorage()): void {
   try {
-    storage?.removeItem(GUEST_KEY)
+    storage?.removeItem(AUTH_GUEST_KEY)
   } catch (error) {
     console.warn('auth-session: could not clear guest mode', error)
   }

@@ -17,12 +17,15 @@ export type AuthStatus =
   | 'idle'
   | 'checking'
   | 'authenticated'
+  | 'expired'
+  | 'signed-out'
   | 'guest'
   | 'unauthenticated'
 
 interface AuthSnapshot {
   user: AuthUser | null
   token: string | null
+  expiresAt: number | null
   status: AuthStatus
   error: ApiError | null
   isSubmitting: boolean
@@ -33,19 +36,22 @@ interface AuthState extends AuthSnapshot {
   register: (input: RegisterInput) => Promise<boolean>
   continueAsGuest: () => void
   restore: () => Promise<void>
+  expireSession: () => void
   logout: () => void
   clearError: () => void
-  hydrate: (token: string, user: AuthUser) => void
+  syncFromStorage: () => void
+  hydrate: (token: string, user: AuthUser, expiresAt: number) => void
   hydrateGuest: () => void
 }
 
-/** Rebuilt by tests after they stub sessionStorage. */
+/** Rebuilt by tests after they stub localStorage. */
 export function createInitialAuthState(): AuthSnapshot {
   const session = readSession()
   if (session) {
     return {
       user: session.user,
       token: session.token,
+      expiresAt: session.expiresAt,
       status: 'idle',
       error: null,
       isSubmitting: false,
@@ -56,6 +62,7 @@ export function createInitialAuthState(): AuthSnapshot {
     return {
       user: null,
       token: null,
+      expiresAt: null,
       status: 'guest',
       error: null,
       isSubmitting: false,
@@ -65,6 +72,7 @@ export function createInitialAuthState(): AuthSnapshot {
   return {
     user: null,
     token: null,
+    expiresAt: null,
     status: 'unauthenticated',
     error: null,
     isSubmitting: false,
@@ -83,11 +91,12 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       return false
     }
 
-    clearGuestSession()
     const session = writeSession(result.info)
+    clearGuestSession()
     set({
       user: session.user,
       token: session.token,
+      expiresAt: session.expiresAt,
       status: 'authenticated',
       error: null,
       isSubmitting: false,
@@ -104,11 +113,12 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       return false
     }
 
-    clearGuestSession()
     const session = writeSession(result.info)
+    clearGuestSession()
     set({
       user: session.user,
       token: session.token,
+      expiresAt: session.expiresAt,
       status: 'authenticated',
       error: null,
       isSubmitting: false,
@@ -117,12 +127,12 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   },
 
   continueAsGuest: () => {
-    clearSession()
-    clearGuestSession()
     startGuestSession()
+    clearSession()
     set({
       user: null,
       token: null,
+      expiresAt: null,
       status: 'guest',
       error: null,
       isSubmitting: false,
@@ -134,6 +144,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     if (!token) {
       set({
         user: null,
+        expiresAt: null,
         status: isGuestSession() ? 'guest' : 'unauthenticated',
       })
       return
@@ -150,7 +161,13 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     if (result.status === 401 || result.status === 403) {
       clearSession()
       clearGuestSession()
-      set({ user: null, token: null, status: 'unauthenticated', error: null })
+      set({
+        user: null,
+        token: null,
+        expiresAt: null,
+        status: 'unauthenticated',
+        error: null,
+      })
       return
     }
 
@@ -166,12 +183,25 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     set({ user: result.info, status: 'authenticated', error: null })
   },
 
-  logout: () => {
-    clearSession()
+  expireSession: () => {
     clearGuestSession()
+    clearSession()
+    set({
+      token: null,
+      expiresAt: null,
+      status: 'expired',
+      error: null,
+      isSubmitting: false,
+    })
+  },
+
+  logout: () => {
+    clearGuestSession()
+    clearSession()
     set({
       user: null,
       token: null,
+      expiresAt: null,
       status: 'unauthenticated',
       error: null,
       isSubmitting: false,
@@ -180,15 +210,89 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   clearError: () => set({ error: null }),
 
-  hydrate: (token, user) => {
-    clearGuestSession()
+  syncFromStorage: () => {
+    const previous = get()
+    const session = readSession()
+    if (session) {
+      if (
+        previous.token === session.token &&
+        previous.expiresAt === session.expiresAt
+      ) {
+        return
+      }
+
+      set({
+        user: session.user,
+        token: session.token,
+        expiresAt: session.expiresAt,
+        status: 'authenticated',
+        error: null,
+        isSubmitting: false,
+      })
+      return
+    }
+
+    if (isGuestSession()) {
+      if (previous.status === 'guest') return
+
+      set({
+        user: null,
+        token: null,
+        expiresAt: null,
+        status: 'guest',
+        error: null,
+        isSubmitting: false,
+      })
+      return
+    }
+
+    if (previous.status === 'authenticated' || previous.status === 'checking') {
+      const expired = previous.expiresAt !== null && previous.expiresAt <= Date.now()
+      set({
+        token: null,
+        expiresAt: null,
+        status: expired ? 'expired' : 'signed-out',
+        error: null,
+        isSubmitting: false,
+      })
+      return
+    }
+
+    if (previous.status === 'guest' || previous.status === 'idle') {
+      set({
+        user: null,
+        token: null,
+        expiresAt: null,
+        status: 'unauthenticated',
+        error: null,
+        isSubmitting: false,
+      })
+    }
+  },
+
+  hydrate: (token, user, expiresAt) => {
     updateSessionUser(user)
-    set({ token, user, status: 'authenticated', error: null, isSubmitting: false })
+    clearGuestSession()
+    set({
+      token,
+      user,
+      expiresAt,
+      status: 'authenticated',
+      error: null,
+      isSubmitting: false,
+    })
   },
 
   hydrateGuest: () => {
-    clearSession()
     startGuestSession()
-    set({ user: null, token: null, status: 'guest', error: null, isSubmitting: false })
+    clearSession()
+    set({
+      user: null,
+      token: null,
+      expiresAt: null,
+      status: 'guest',
+      error: null,
+      isSubmitting: false,
+    })
   },
 }))
