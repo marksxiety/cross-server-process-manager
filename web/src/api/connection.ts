@@ -5,6 +5,7 @@ type Method = "GET" | "POST" | "PUT" | "DELETE";
 
 export type ApiTarget = Pick<RegisteredServer, "protocol" | "host" | "port"> & {
     authToken?: string;
+    onUnauthorized?: () => void;
 };
 
 function buildUrl(target: ApiTarget, path: string): string {
@@ -17,8 +18,24 @@ export function createConnection(target: ApiTarget) {
         ? { Authorization: `Bearer ${target.authToken}` }
         : undefined;
 
-    const request = <T = unknown>(path: string, method: Method, body?: unknown, signal?: AbortSignal) =>
-        httpRequest<T>({ url: buildUrl(target, path), method, body, headers: authHeaders, signal });
+    const request = async <T = unknown>(
+        path: string,
+        method: Method,
+        body?: unknown,
+        signal?: AbortSignal
+    ) => {
+        const response = await httpRequest<T>({
+            url: buildUrl(target, path),
+            method,
+            body,
+            headers: authHeaders,
+            signal,
+        });
+        if (response.status === 401) {
+            target.onUnauthorized?.();
+        }
+        return response;
+    };
 
     return {
         get: <T = unknown>(path: string, signal?: AbortSignal) => request<T>(path, "GET", undefined, signal),
