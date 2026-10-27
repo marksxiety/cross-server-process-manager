@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router'
+import { authService } from '@/api/services/auth.service'
 import { AuthLayout } from '@/components/auth/auth-layout'
 import { ErrorAlert } from '@/components/custom/error-alert'
 import { Button } from '@/components/ui/button'
@@ -12,6 +14,7 @@ import {
 } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
+import { toApiError } from '@/lib/error-code'
 import {
   registerSchema,
   type RegisterFormInput,
@@ -19,12 +22,11 @@ import {
 } from '@/schemas/auth.schema'
 import { useAuthStore } from '@/stores/auth.store'
 import type { RegisterInput } from '@/types/auth'
+import type { ApiError } from '@/types/api'
 
 const DEFAULT_FORM_VALUES: RegisterFormInput = {
   name: '',
   email: '',
-  password: '',
-  confirm_password: '',
 }
 
 export function Register() {
@@ -32,6 +34,10 @@ export function Register() {
   const registerAccount = useAuthStore((state) => state.register)
   const requestError = useAuthStore((state) => state.error)
   const clearError = useAuthStore((state) => state.clearError)
+  const [registeredEmail, setRegisteredEmail] = useState<string | null>(null)
+  const [resendError, setResendError] = useState<ApiError | null>(null)
+  const [resendNotice, setResendNotice] = useState<string | null>(null)
+  const [isResending, setIsResending] = useState(false)
 
   const {
     register,
@@ -48,12 +54,67 @@ export function Register() {
     const payload: RegisterInput = {
       name: values.name,
       email: values.email,
-      password: values.password,
     }
 
-    const created = await registerAccount(payload)
-    if (created) navigate('/', { replace: true })
+    if (await registerAccount(payload)) {
+      setRegisteredEmail(values.email)
+    }
   })
+
+  const handleResend = async () => {
+    if (!registeredEmail) return
+
+    setIsResending(true)
+    setResendError(null)
+    setResendNotice(null)
+    const result = await authService().resendVerification(registeredEmail)
+    setIsResending(false)
+
+    if (result.success) {
+      setResendNotice('If that account needs verification, we sent a new link.')
+      return
+    }
+    setResendError(toApiError(result))
+  }
+
+  if (registeredEmail) {
+    return (
+      <AuthLayout
+        title='Check your email'
+        description={`We sent a verification link to ${registeredEmail}.`}
+      >
+        <div className='grid gap-4'>
+          <p className='text-sm text-muted-foreground'>
+            Open the link to set your password and finish creating your account.
+          </p>
+
+          {resendError && <ErrorAlert error={resendError} showDetails={false} />}
+          {resendNotice && (
+            <p className='text-sm text-muted-foreground'>{resendNotice}</p>
+          )}
+
+          <Button
+            type='button'
+            variant='outline'
+            className='w-full'
+            disabled={isResending}
+            onClick={() => void handleResend()}
+          >
+            {isResending && <Spinner className='size-4' />}
+            Resend verification email
+          </Button>
+
+          <Button
+            type='button'
+            className='w-full'
+            onClick={() => navigate('/login', { replace: true })}
+          >
+            Back to sign in
+          </Button>
+        </div>
+      </AuthLayout>
+    )
+  }
 
   return (
     <AuthLayout
@@ -87,30 +148,6 @@ export function Register() {
               {...register('email')}
             />
             <FieldError errors={[errors.email]} />
-          </Field>
-
-          <Field data-invalid={!!errors.password}>
-            <FieldLabel htmlFor='password'>Password</FieldLabel>
-            <Input
-              id='password'
-              type='password'
-              autoComplete='new-password'
-              aria-invalid={!!errors.password}
-              {...register('password')}
-            />
-            <FieldError errors={[errors.password]} />
-          </Field>
-
-          <Field data-invalid={!!errors.confirm_password}>
-            <FieldLabel htmlFor='confirm-password'>Confirm password</FieldLabel>
-            <Input
-              id='confirm-password'
-              type='password'
-              autoComplete='new-password'
-              aria-invalid={!!errors.confirm_password}
-              {...register('confirm_password')}
-            />
-            <FieldError errors={[errors.confirm_password]} />
           </Field>
         </FieldGroup>
 
