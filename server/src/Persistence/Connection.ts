@@ -25,6 +25,11 @@ export interface DbSession {
     rollback(): Promise<void>;
 }
 
+/** Minimal query surface shared by the pool and a transaction session. */
+export interface DbQueryable {
+    query<T>(text: string, params?: unknown[]): Promise<QueryResult<T>>;
+}
+
 const pool = new ConnectionPool(buildConfig());
 
 pool.on('error', (err) => {

@@ -5,13 +5,11 @@ const ISSUER = 'xpm-server';
 
 export interface AccessTokenInput {
     id: number;
-    role: string;
     tokenVersion: number;
 }
 
 export interface AccessTokenClaims {
     userId: number;
-    role: string;
     tokenVersion: number;
 }
 
@@ -46,7 +44,7 @@ export class TokenService {
             expiresIn: this.expiresInSeconds,
         };
 
-        const token = jwt.sign({ role: user.role, tv: user.tokenVersion }, this.secret, options);
+        const token = jwt.sign({ tv: user.tokenVersion }, this.secret, options);
         return { token, expiresIn: this.expiresInSeconds };
     }
 
@@ -68,14 +66,11 @@ export class TokenService {
         }
 
         const userId = Number(payload.sub);
-        const role: unknown = payload.role;
         const tokenVersion: unknown = payload.tv;
 
         if (
             !Number.isInteger(userId) ||
             userId <= 0 ||
-            typeof role !== 'string' ||
-            role.length === 0 ||
             typeof tokenVersion !== 'number' ||
             !Number.isInteger(tokenVersion) ||
             tokenVersion < 0
@@ -83,6 +78,6 @@ export class TokenService {
             throw new TokenVerificationError('invalid');
         }
 
-        return { userId, role, tokenVersion };
+        return { userId, tokenVersion };
     }
 }

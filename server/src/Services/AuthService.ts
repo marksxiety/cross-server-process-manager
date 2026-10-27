@@ -3,14 +3,11 @@ import { TokenService } from '../Auth/TokenService';
 import { DatabaseException } from '../Exceptions/DatabaseException';
 import { DuplicateResourceException } from '../Exceptions/DuplicateResourceException';
 import { HttpException } from '../Exceptions/HttpException';
-import {
-    DEFAULT_ROLE,
-    toPublicUser,
-    User,
-    type PublicUser,
-    type UserRecord,
-} from '../Models/User';
+import { toPublicUser, User, type PublicUser, type UserRecord } from '../Models/User';
+import db, { type DbSession } from '../Persistence/Connection';
 import { describeDbError, isUniqueViolation } from '../Persistence/DatabaseError';
+import type { UserAccess } from '../Security/AccessCatalog';
+import { AccessService } from './AccessService';
 
 const EMAIL_TAKEN_CODE = 'EMAIL_TAKEN';
 const INVALID_CREDENTIALS_CODE = 'INVALID_CREDENTIALS';
@@ -58,29 +55,50 @@ function unauthorized(): HttpException {
 }
 
 export class AuthService {
-    constructor(private readonly tokens: TokenService) {}
+    constructor(
+        private readonly tokens: TokenService,
+        private readonly access: AccessService = new AccessService()
+    ) {}
 
     async register(data: RegisterData): Promise<AuthResult> {
         const passwordHash = await hashPassword(data.password);
 
+        let session: DbSession;
+        try {
+            session = await db.beginTransaction();
+        } catch (error) {
+            throw databaseError(error, 'Failed to register account');
+        }
+
         let user: UserRecord | undefined;
         try {
-            user = await User.create({
-                email: data.email,
-                name: data.name,
-                password_hash: passwordHash,
-                role: DEFAULT_ROLE,
-                is_active: true,
-            });
+            user = await User.create(
+                {
+                    email: data.email,
+                    name: data.name,
+                    password_hash: passwordHash,
+                    is_active: true,
+                    is_admin: false,
+                },
+                session
+            );
+
+            if (!user) {
+                throw new DatabaseException('Failed to register account');
+            }
+
+            await this.access.grantDefaults(user.id, session);
+            await session.commit();
         } catch (error) {
+            await session.rollback().catch(() => undefined);
+
+            if (error instanceof DatabaseException) {
+                throw error;
+            }
             if (isUniqueViolation(describeDbError(error))) {
                 throw new DuplicateResourceException(EMAIL_TAKEN_MESSAGE, EMAIL_TAKEN_CODE);
             }
             throw databaseError(error, 'Failed to register account');
-        }
-
-        if (!user) {
-            throw new DatabaseException('Failed to register account');
         }
 
         return this.authenticated(user);
@@ -130,13 +148,23 @@ export class AuthService {
             throw unauthorized();
         }
 
-        return toPublicUser(user);
+        try {
+            return await this.access.publicUser(user);
+        } catch (error) {
+            throw databaseError(error, 'Failed to retrieve account permissions');
+        }
     }
 
-    private authenticated(user: UserRecord): AuthResult {
+    private async authenticated(user: UserRecord): Promise<AuthResult> {
+        let access: UserAccess;
+        try {
+            access = await this.access.effectiveFor(user);
+        } catch (error) {
+            throw databaseError(error, 'Failed to load account permissions');
+        }
+
         const signed = this.tokens.sign({
             id: user.id,
-            role: user.role,
             tokenVersion: user.token_version,
         });
 
@@ -144,7 +172,7 @@ export class AuthService {
             token: signed.token,
             tokenType: 'Bearer',
             expiresIn: signed.expiresIn,
-            user: toPublicUser(user),
+            user: toPublicUser(user, access),
         };
     }
 }
