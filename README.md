@@ -28,10 +28,34 @@ PM2 is a process manager — the engine that keeps your apps alive in the backgr
 
 XPM is the control plane for [`xpm-agent`](https://github.com/marksxiety/xpm-agent) — watch and control every process from here. It's two workspaces in this repo, plus the agent that runs on every monitored server:
 
+```mermaid
+flowchart LR
+    Browser["🌐 You<br/>(browser)"] --> Web["xpm-web<br/>dashboard"]
+    Web --> Server["xpm-server<br/>registry API"]
+    Server --> DB[("SQL Server")]
+
+    Web -- "HTTP + bearer token" --> G1
+    Web -- "HTTP + bearer token" --> G2
+
+    subgraph S1["Monitored server A"]
+        subgraph AG1["xpm-agent"]
+            G1["Guard<br/>checks token + payload"] --> R1["Relay<br/>start / stop / restart"]
+        end
+        R1 --> P1["PM2 daemon"] --> Proc1["Your processes"]
+    end
+
+    subgraph S2["Monitored server B"]
+        subgraph AG2["xpm-agent"]
+            G2["Guard<br/>checks token + payload"] --> R2["Relay<br/>start / stop / restart"]
+        end
+        R2 --> P2["PM2 daemon"] --> Proc2["Your processes"]
+    end
+```
+
 | Piece | Where | Role |
 |---|---|---|
 | **xpm-web** | this repo (`web/`) | The dashboard you open in the browser |
-| **xpm-server** | this repo (`server/`) | Registry API — stores your server list (SQL Server) |
+| **xpm-server** | this repo (`server/`) | Registry API — accounts, login, and the server list (SQL Server) |
 | **xpm-agent** | separate repo — [`xpm-agent`](https://github.com/marksxiety/xpm-agent) | REST wrapper around PM2 — one per server, the only thing that touches PM2 |
 
 The dashboard reads your server list from **xpm-server**, then talks to each **xpm-agent** directly to pull live process data and send lifecycle commands. Agents are guarded by `AUTH_TOKEN`; give the dashboard the matching `VITE_AGENT_AUTH_TOKEN`.
@@ -46,6 +70,7 @@ Ready to connect your own servers → **[docs/setup-actual.md](docs/setup-actual
 - **Inspect anything, anywhere** — open any process and get its full story: how it's running, how it's been behaving, and what it's saying
 - **Follow live logs** — watch stdout/stderr stream in as it happens, no terminal required
 - **Register new services in minutes** — guided setup with ready-made templates and a production-ready config you can copy in one click
+- **Control access** — email-verified accounts, admin-managed page/action grants, and revocable 12-hour sessions
 - **Watch it anywhere** — including fullscreen, for a dedicated ops screen
 
 ## What you can monitor
