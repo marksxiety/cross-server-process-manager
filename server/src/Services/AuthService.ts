@@ -1,29 +1,19 @@
-import { getDummyPasswordHash, hashPassword, verifyPassword } from '../Auth/PasswordHasher';
+import { getDummyPasswordHash, verifyPassword } from '../Auth/PasswordHasher';
 import { TokenService } from '../Auth/TokenService';
-import { DatabaseException } from '../Exceptions/DatabaseException';
-import { DuplicateResourceException } from '../Exceptions/DuplicateResourceException';
 import { HttpException } from '../Exceptions/HttpException';
 import { toPublicUser, User, type PublicUser, type UserRecord } from '../Models/User';
-import db, { type DbSession } from '../Persistence/Connection';
-import { describeDbError, isUniqueViolation } from '../Persistence/DatabaseError';
+import { databaseException } from '../Persistence/DbException';
 import type { UserAccess } from '../Security/AccessCatalog';
 import { AccessService } from './AccessService';
 
-const EMAIL_TAKEN_CODE = 'EMAIL_TAKEN';
 const INVALID_CREDENTIALS_CODE = 'INVALID_CREDENTIALS';
 const ACCOUNT_DISABLED_CODE = 'ACCOUNT_DISABLED';
+const EMAIL_NOT_VERIFIED_CODE = 'EMAIL_NOT_VERIFIED';
 const UNAUTHORIZED_CODE = 'UNAUTHORIZED';
-const INTERNAL_SERVER_ERROR_CODE = 'INTERNAL_SERVER_ERROR';
 
 const INVALID_CREDENTIALS_MESSAGE = 'Invalid email or password';
 const UNAUTHORIZED_MESSAGE = 'Authentication required';
-const EMAIL_TAKEN_MESSAGE = 'An account with this email already exists';
-
-export interface RegisterData {
-    email: string;
-    name: string;
-    password: string;
-}
+const EMAIL_NOT_VERIFIED_MESSAGE = 'Please verify your email address before signing in';
 
 export interface LoginData {
     email: string;
@@ -35,15 +25,6 @@ export interface AuthResult {
     tokenType: 'Bearer';
     expiresIn: number;
     user: PublicUser;
-}
-
-function databaseError(error: unknown, fallback: string): DatabaseException {
-    const dbError = describeDbError(error);
-    return new DatabaseException(
-        dbError.message || fallback,
-        dbError.number !== undefined ? String(dbError.number) : INTERNAL_SERVER_ERROR_CODE,
-        { cause: error }
-    );
 }
 
 function invalidCredentials(): HttpException {
@@ -60,56 +41,12 @@ export class AuthService {
         private readonly access: AccessService = new AccessService()
     ) {}
 
-    async register(data: RegisterData): Promise<AuthResult> {
-        const passwordHash = await hashPassword(data.password);
-
-        let session: DbSession;
-        try {
-            session = await db.beginTransaction();
-        } catch (error) {
-            throw databaseError(error, 'Failed to register account');
-        }
-
-        let user: UserRecord | undefined;
-        try {
-            user = await User.create(
-                {
-                    email: data.email,
-                    name: data.name,
-                    password_hash: passwordHash,
-                    is_active: true,
-                    is_admin: false,
-                },
-                session
-            );
-
-            if (!user) {
-                throw new DatabaseException('Failed to register account');
-            }
-
-            await this.access.grantDefaults(user.id, session);
-            await session.commit();
-        } catch (error) {
-            await session.rollback().catch(() => undefined);
-
-            if (error instanceof DatabaseException) {
-                throw error;
-            }
-            if (isUniqueViolation(describeDbError(error))) {
-                throw new DuplicateResourceException(EMAIL_TAKEN_MESSAGE, EMAIL_TAKEN_CODE);
-            }
-            throw databaseError(error, 'Failed to register account');
-        }
-
-        return this.authenticated(user);
-    }
-
     async login(data: LoginData): Promise<AuthResult> {
         let user: UserRecord | undefined;
         try {
             user = await User.findByEmail(data.email);
         } catch (error) {
-            throw databaseError(error, 'Failed to log in');
+            throw databaseException(error, 'Failed to log in');
         }
 
         if (!user) {
@@ -126,11 +63,19 @@ export class AuthService {
             throw new HttpException(403, 'This account is disabled', ACCOUNT_DISABLED_CODE);
         }
 
+        if (user.email_verified_at === null) {
+            throw new HttpException(
+                403,
+                EMAIL_NOT_VERIFIED_MESSAGE,
+                EMAIL_NOT_VERIFIED_CODE
+            );
+        }
+
         let loggedInUser: UserRecord | undefined;
         try {
             loggedInUser = await User.touchLastLogin(user.id);
         } catch (error) {
-            throw databaseError(error, 'Failed to log in');
+            throw databaseException(error, 'Failed to log in');
         }
 
         return this.authenticated(loggedInUser ?? user);
@@ -141,17 +86,33 @@ export class AuthService {
         try {
             user = await User.findById(id);
         } catch (error) {
-            throw databaseError(error, 'Failed to retrieve account');
+            throw databaseException(error, 'Failed to retrieve account');
         }
 
         if (!user || !user.is_active || user.token_version !== tokenVersion) {
             throw unauthorized();
         }
 
+        if (user.email_verified_at === null) {
+            throw new HttpException(
+                403,
+                EMAIL_NOT_VERIFIED_MESSAGE,
+                EMAIL_NOT_VERIFIED_CODE
+            );
+        }
+
         try {
             return await this.access.publicUser(user);
         } catch (error) {
-            throw databaseError(error, 'Failed to retrieve account permissions');
+            throw databaseException(error, 'Failed to retrieve account permissions');
+        }
+    }
+
+    async logout(id: number): Promise<void> {
+        try {
+            await User.bumpTokenVersion(id);
+        } catch (error) {
+            throw databaseException(error, 'Failed to sign out');
         }
     }
 
@@ -160,7 +121,7 @@ export class AuthService {
         try {
             access = await this.access.effectiveFor(user);
         } catch (error) {
-            throw databaseError(error, 'Failed to load account permissions');
+            throw databaseException(error, 'Failed to load account permissions');
         }
 
         const signed = this.tokens.sign({
