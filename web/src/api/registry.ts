@@ -1,4 +1,5 @@
 import { createConnection, type Connection } from '@/api/connection'
+import { notifyUnauthorized } from '@/lib/auth-events'
 import { getAccessToken } from '@/lib/auth-session'
 
 function registryTarget() {
@@ -14,6 +15,7 @@ export function registryConnection(): Connection {
   return createConnection({
     ...registryTarget(),
     authToken: getAccessToken() ?? undefined,
+    onUnauthorized: notifyUnauthorized,
   })
 }
 
