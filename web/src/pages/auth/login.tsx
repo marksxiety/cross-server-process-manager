@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 import { AuthLayout } from '@/components/auth/auth-layout'
 import { LoginForm } from '@/components/auth/login-form'
 import { Button } from '@/components/ui/button'
@@ -7,6 +7,9 @@ import { useAuthStore } from '@/stores/auth.store'
 
 export function Login() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const resetSucceeded = searchParams.get('reset') === 'success'
+  const registrationComplete = searchParams.get('verified') === 'success'
   const continueAsGuest = useAuthStore((state) => state.continueAsGuest)
   const clearError = useAuthStore((state) => state.clearError)
 
@@ -21,6 +24,14 @@ export function Login() {
       title='Sign in'
       description='Enter your credentials to access your account.'
     >
+      {(resetSucceeded || registrationComplete) && (
+        <p className='mb-4 rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground'>
+          {registrationComplete
+            ? 'Account created. Sign in with your new password.'
+            : 'Password updated. Sign in with your new password.'}
+        </p>
+      )}
+
       <LoginForm
         autoFocus
         onSuccess={() => navigate('/', { replace: true })}
