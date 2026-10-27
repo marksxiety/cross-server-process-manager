@@ -38,6 +38,7 @@ interface AuthState extends AuthSnapshot {
   restore: () => Promise<void>
   expireSession: () => void
   logout: () => void
+  signOut: () => Promise<void>
   clearError: () => void
   syncFromStorage: () => void
   hydrate: (token: string, user: AuthUser, expiresAt: number) => void
@@ -113,13 +114,12 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       return false
     }
 
-    const session = writeSession(result.info)
     clearGuestSession()
     set({
-      user: session.user,
-      token: session.token,
-      expiresAt: session.expiresAt,
-      status: 'authenticated',
+      user: null,
+      token: null,
+      expiresAt: null,
+      status: 'unauthenticated',
       error: null,
       isSubmitting: false,
     })
@@ -206,6 +206,16 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       error: null,
       isSubmitting: false,
     })
+  },
+
+  signOut: async () => {
+    try {
+      await authService().logout()
+    } catch (error) {
+      console.error('Failed to revoke the session on the server', error)
+    } finally {
+      get().logout()
+    }
   },
 
   clearError: () => set({ error: null }),
