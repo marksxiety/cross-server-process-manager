@@ -45,11 +45,13 @@ function mockAuthService(): {
   login: Mock
   register: Mock
   me: Mock
+  logout: Mock
 } {
   const service = {
     login: vi.fn(),
     register: vi.fn(),
     me: vi.fn(),
+    logout: vi.fn(),
   }
   vi.mocked(authService).mockReturnValue(
     service as unknown as ReturnType<typeof authService>,
@@ -121,22 +123,21 @@ describe('auth store login/register', () => {
     expect(readSession(storage)).toBeNull()
   })
 
-  test('register stores the session and clears guest mode', async () => {
+  test('register clears guest mode but does not start a session', async () => {
     const service = mockAuthService()
-    service.register.mockResolvedValue(success(PAYLOAD))
+    service.register.mockResolvedValue(success({ email: 'admin@example.com' }))
     startGuestSession(storage)
     useAuthStore.setState({ status: 'guest' })
 
     const created = await useAuthStore.getState().register({
       email: 'admin@example.com',
       name: 'Admin',
-      password: 'secret-password',
     })
 
     expect(created).toBe(true)
-    expect(useAuthStore.getState().status).toBe('authenticated')
+    expect(useAuthStore.getState().status).toBe('unauthenticated')
     expect(isGuestSession(storage)).toBe(false)
-    expect(readSession(storage)?.token).toBe('jwt-token')
+    expect(readSession(storage)).toBeNull()
   })
 })
 
@@ -231,6 +232,32 @@ describe('auth store logout', () => {
     expect(state.user).toBeNull()
     expect(readSession(storage)).toBeNull()
     expect(isGuestSession(storage)).toBe(false)
+  })
+
+  test('signOut revokes the server session and clears local state', async () => {
+    const service = mockAuthService()
+    service.logout.mockResolvedValue(success(null))
+    writeSession(PAYLOAD, storage)
+    useAuthStore.setState({ status: 'authenticated', token: PAYLOAD.token, user: USER })
+
+    await useAuthStore.getState().signOut()
+
+    expect(service.logout).toHaveBeenCalledTimes(1)
+    expect(useAuthStore.getState().status).toBe('unauthenticated')
+    expect(readSession(storage)).toBeNull()
+  })
+
+  test('signOut still clears local state when the request fails', async () => {
+    const service = mockAuthService()
+    service.logout.mockRejectedValue(new Error('offline'))
+    writeSession(PAYLOAD, storage)
+    useAuthStore.setState({ status: 'authenticated', token: PAYLOAD.token, user: USER })
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+    await useAuthStore.getState().signOut()
+
+    expect(useAuthStore.getState().status).toBe('unauthenticated')
+    expect(readSession(storage)).toBeNull()
   })
 })
 
