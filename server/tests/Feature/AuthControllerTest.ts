@@ -1,17 +1,16 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 vi.mock('../../src/Persistence/Connection', () => ({
-    default: { query: vi.fn() },
+    default: { query: vi.fn(), beginTransaction: vi.fn() },
 }));
 
 import db from '../../src/Persistence/Connection';
 import { TokenService } from '../../src/Auth/TokenService';
-import {
-    hashPassword,
-    type ScryptParams,
-} from '../../src/Auth/PasswordHasher';
+import { hashPassword, type ScryptParams } from '../../src/Auth/PasswordHasher';
 import { AuthController } from '../../src/Http/Controllers/AuthController';
 import { toPublicUser, type PublicUser, type UserRecord } from '../../src/Models/User';
+import { allAccess, defaultAccess } from '../../src/Security/AccessCatalog';
+import type { AccessService } from '../../src/Services/AccessService';
 import { AuthService } from '../../src/Services/AuthService';
 import {
     createRequest,
@@ -22,9 +21,21 @@ import {
 } from '../Support/Http';
 
 const query = db.query as unknown as Mock;
+const beginTransaction = db.beginTransaction as unknown as Mock;
 const SECRET = 'test-secret-that-is-longer-than-thirty-two-characters';
 const tokens = new TokenService(SECRET, 3600);
-const controller = new AuthController(new AuthService(tokens));
+
+const access = {
+    effectiveFor: vi.fn(async (user: UserRecord) =>
+        user.is_admin ? allAccess() : defaultAccess()
+    ),
+    publicUser: vi.fn(async (user: UserRecord) =>
+        toPublicUser(user, user.is_admin ? allAccess() : defaultAccess())
+    ),
+    grantDefaults: vi.fn(async () => undefined),
+} as unknown as AccessService;
+
+const controller = new AuthController(new AuthService(tokens, access));
 
 const FAST_PARAMS: ScryptParams = { N: 1024, r: 8, p: 1, keylen: 32 };
 const PASSWORD = 'correct-horse-battery';
@@ -32,6 +43,7 @@ const CREATED_AT = new Date('2026-01-01T00:00:00Z');
 const LOGIN_AT = new Date('2026-01-02T00:00:00Z');
 
 let passwordHash = '';
+let session: { query: Mock; commit: Mock; rollback: Mock };
 
 function userRow(overrides: Partial<UserRecord> = {}): UserRecord {
     return {
@@ -39,7 +51,7 @@ function userRow(overrides: Partial<UserRecord> = {}): UserRecord {
         email: 'admin@example.com',
         name: 'Admin',
         password_hash: passwordHash,
-        role: 'viewer',
+        is_admin: false,
         is_active: true,
         token_version: 0,
         email_verified_at: null,
@@ -88,6 +100,13 @@ beforeAll(async () => {
 
 beforeEach(() => {
     query.mockReset();
+    beginTransaction.mockReset();
+    session = {
+        query: vi.fn(),
+        commit: vi.fn().mockResolvedValue(undefined),
+        rollback: vi.fn().mockResolvedValue(undefined),
+    };
+    beginTransaction.mockResolvedValue(session);
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
 });
 
@@ -96,17 +115,19 @@ afterEach(() => {
 });
 
 describe('AuthController.register', () => {
-    it('creates a viewer account with an active flag and returns a token', async () => {
-        query.mockResolvedValueOnce({ rows: [userRow()] });
+    async function register(body: unknown): Promise<MockResponse> {
         const res = createResponse();
+        await invoke(controller.register, createRequest({ body }), res);
+        return res;
+    }
 
-        await invoke(
-            controller.register,
-            createRequest({
-                body: { email: ' Admin@Example.com ', name: ' Admin ', password: PASSWORD },
-            }),
-            res
-        );
+    it('creates an active non-admin account with default page grants', async () => {
+        session.query.mockResolvedValueOnce({ rows: [userRow()] });
+        const res = await register({
+            email: ' Admin@Example.com ',
+            name: ' Admin ',
+            password: PASSWORD,
+        });
 
         expect(res.status).not.toHaveBeenCalled();
         const body = authBody(res);
@@ -116,56 +137,51 @@ describe('AuthController.register', () => {
         expect(body.info.expires_in).toBe(3600);
         expect(tokens.verify(body.info.token)).toEqual({
             userId: 1,
-            role: 'viewer',
             tokenVersion: 0,
+        });
+        expect(body.info.user).toMatchObject({
+            is_admin: false,
+            pages: ['dashboard', 'server_metrics'],
+            events: [],
         });
         expect(body.info.user).not.toHaveProperty('password_hash');
         expect(body.info.user).not.toHaveProperty('token_version');
 
-        const [sql, params] = query.mock.calls[0] as [string, unknown[]];
+        const [sql, params] = session.query.mock.calls[0] as [string, unknown[]];
         expect(sql).toContain('INSERT INTO users');
         expect(sql).toContain('OUTPUT INSERTED.*');
         expect(params[0]).toBe('admin@example.com');
         expect(params[1]).toBe('Admin');
         expect(String(params[2])).toMatch(/^scrypt\$16384\$8\$1\$/);
-        expect(params[3]).toBe('viewer');
-        expect(params[4]).toBe(true);
+        expect(params[3]).toBe(true);
+        expect(params[4]).toBe(false);
+        expect(session.commit).toHaveBeenCalledTimes(1);
+        expect(access.grantDefaults).toHaveBeenCalledWith(1, session);
     });
 
-    it('ignores client-supplied role and is_active', async () => {
-        query.mockResolvedValueOnce({ rows: [userRow()] });
-        const res = createResponse();
+    it('ignores client-supplied is_active and is_admin', async () => {
+        session.query.mockResolvedValueOnce({ rows: [userRow()] });
 
-        await invoke(
-            controller.register,
-            createRequest({
-                body: {
-                    email: 'admin@example.com',
-                    name: 'Admin',
-                    password: PASSWORD,
-                    role: 'admin',
-                    is_active: false,
-                },
-            }),
-            res
-        );
+        await register({
+            email: 'admin@example.com',
+            name: 'Admin',
+            password: PASSWORD,
+            is_active: false,
+            is_admin: true,
+        });
 
-        const [, params] = query.mock.calls[0] as [string, unknown[]];
-        expect(params[3]).toBe('viewer');
-        expect(params[4]).toBe(true);
+        const [, params] = session.query.mock.calls[0] as [string, unknown[]];
+        expect(params[3]).toBe(true);
+        expect(params[4]).toBe(false);
     });
 
     it('responds 409 EMAIL_TAKEN when the email constraint is violated', async () => {
-        query.mockRejectedValueOnce(uniqueViolation('users_email_key'));
-        const res = createResponse();
-
-        await invoke(
-            controller.register,
-            createRequest({
-                body: { email: 'admin@example.com', name: 'Admin', password: PASSWORD },
-            }),
-            res
-        );
+        session.query.mockRejectedValueOnce(uniqueViolation('users_email_key'));
+        const res = await register({
+            email: 'admin@example.com',
+            name: 'Admin',
+            password: PASSWORD,
+        });
 
         expect(res.status).toHaveBeenCalledWith(409);
         const body = responseBody(res);
@@ -174,15 +190,11 @@ describe('AuthController.register', () => {
     });
 
     it('responds 400 with field errors and skips the database for an invalid payload', async () => {
-        const res = createResponse();
-
-        await invoke(
-            controller.register,
-            createRequest({
-                body: { email: 'not-an-email', name: '', password: 'short' },
-            }),
-            res
-        );
+        const res = await register({
+            email: 'not-an-email',
+            name: '',
+            password: 'short',
+        });
 
         expect(res.status).toHaveBeenCalledWith(400);
         const body = responseBody(res);
@@ -191,64 +203,64 @@ describe('AuthController.register', () => {
         expect(errors.email).toContain('Email must be a valid email address');
         expect(errors.name).toContain('Name is required');
         expect(errors.password).toContain('Password must be at least 8 characters');
+        expect(beginTransaction).not.toHaveBeenCalled();
         expect(query).not.toHaveBeenCalled();
     });
 
-    it('responds 500 when the insert fails', async () => {
-        query.mockRejectedValueOnce(new Error('connection terminated'));
-        const res = createResponse();
-
-        await invoke(
-            controller.register,
-            createRequest({
-                body: { email: 'admin@example.com', name: 'Admin', password: PASSWORD },
-            }),
-            res
-        );
+    it('responds 500 when the insert fails and rolls back', async () => {
+        session.query.mockRejectedValueOnce(new Error('connection terminated'));
+        const res = await register({
+            email: 'admin@example.com',
+            name: 'Admin',
+            password: PASSWORD,
+        });
 
         expect(res.status).toHaveBeenCalledWith(500);
         expect(responseBody(res).code).toBe('INTERNAL_SERVER_ERROR');
+        expect(session.rollback).toHaveBeenCalledTimes(1);
     });
 
     it('responds 500 when the insert returns no row', async () => {
-        query.mockResolvedValueOnce({ rows: [] });
-        const res = createResponse();
-
-        await invoke(
-            controller.register,
-            createRequest({
-                body: { email: 'admin@example.com', name: 'Admin', password: PASSWORD },
-            }),
-            res
-        );
+        session.query.mockResolvedValueOnce({ rows: [] });
+        const res = await register({
+            email: 'admin@example.com',
+            name: 'Admin',
+            password: PASSWORD,
+        });
 
         expect(res.status).toHaveBeenCalledWith(500);
+        expect(session.rollback).toHaveBeenCalledTimes(1);
     });
 });
 
 describe('AuthController.login', () => {
+    async function login(body: unknown): Promise<MockResponse> {
+        const res = createResponse();
+        await invoke(controller.login, createRequest({ body }), res);
+        return res;
+    }
+
     it('verifies the password, refreshes last_login_at and returns a token', async () => {
         query.mockResolvedValueOnce({ rows: [userRow()] });
         query.mockResolvedValueOnce({
             rows: [userRow({ last_login_at: LOGIN_AT, updated_at: LOGIN_AT })],
         });
-        const res = createResponse();
-
-        await invoke(
-            controller.login,
-            createRequest({
-                body: { email: ' Admin@Example.com ', password: PASSWORD },
-            }),
-            res
-        );
+        const res = await login({
+            email: ' Admin@Example.com ',
+            password: PASSWORD,
+        });
 
         expect(res.status).not.toHaveBeenCalled();
         const body = authBody(res);
         expect(body.message).toBe('Login successful');
         expect(tokens.verify(body.info.token)).toEqual({
             userId: 1,
-            role: 'viewer',
             tokenVersion: 0,
+        });
+        expect(body.info.user).toMatchObject({
+            is_admin: false,
+            pages: ['dashboard', 'server_metrics'],
+            events: [],
         });
 
         const [selectSql, selectParams] = query.mock.calls[0] as [string, unknown[]];
@@ -263,13 +275,10 @@ describe('AuthController.login', () => {
 
     it('responds 401 INVALID_CREDENTIALS for an unknown email without leaking it', async () => {
         query.mockResolvedValueOnce({ rows: [] });
-        const res = createResponse();
-
-        await invoke(
-            controller.login,
-            createRequest({ body: { email: 'nobody@example.com', password: PASSWORD } }),
-            res
-        );
+        const res = await login({
+            email: 'nobody@example.com',
+            password: PASSWORD,
+        });
 
         expect(res.status).toHaveBeenCalledWith(401);
         expect(responseBody(res).code).toBe('INVALID_CREDENTIALS');
@@ -279,13 +288,10 @@ describe('AuthController.login', () => {
 
     it('responds 401 INVALID_CREDENTIALS for a wrong password', async () => {
         query.mockResolvedValueOnce({ rows: [userRow()] });
-        const res = createResponse();
-
-        await invoke(
-            controller.login,
-            createRequest({ body: { email: 'admin@example.com', password: 'wrong-password' } }),
-            res
-        );
+        const res = await login({
+            email: 'admin@example.com',
+            password: 'wrong-password',
+        });
 
         expect(res.status).toHaveBeenCalledWith(401);
         expect(responseBody(res).code).toBe('INVALID_CREDENTIALS');
@@ -294,13 +300,10 @@ describe('AuthController.login', () => {
 
     it('responds 403 ACCOUNT_DISABLED only after the password matches', async () => {
         query.mockResolvedValueOnce({ rows: [userRow({ is_active: false })] });
-        const res = createResponse();
-
-        await invoke(
-            controller.login,
-            createRequest({ body: { email: 'admin@example.com', password: PASSWORD } }),
-            res
-        );
+        const res = await login({
+            email: 'admin@example.com',
+            password: PASSWORD,
+        });
 
         expect(res.status).toHaveBeenCalledWith(403);
         expect(responseBody(res).code).toBe('ACCOUNT_DISABLED');
@@ -309,13 +312,10 @@ describe('AuthController.login', () => {
 
     it('responds 500 when the lookup fails', async () => {
         query.mockRejectedValueOnce(new Error('connection terminated'));
-        const res = createResponse();
-
-        await invoke(
-            controller.login,
-            createRequest({ body: { email: 'admin@example.com', password: PASSWORD } }),
-            res
-        );
+        const res = await login({
+            email: 'admin@example.com',
+            password: PASSWORD,
+        });
 
         expect(res.status).toHaveBeenCalledWith(500);
         expect(responseBody(res).code).toBe('INTERNAL_SERVER_ERROR');
@@ -324,13 +324,10 @@ describe('AuthController.login', () => {
     it('responds 500 when refreshing last_login_at fails', async () => {
         query.mockResolvedValueOnce({ rows: [userRow()] });
         query.mockRejectedValueOnce(new Error('connection terminated'));
-        const res = createResponse();
-
-        await invoke(
-            controller.login,
-            createRequest({ body: { email: 'admin@example.com', password: PASSWORD } }),
-            res
-        );
+        const res = await login({
+            email: 'admin@example.com',
+            password: PASSWORD,
+        });
 
         expect(res.status).toHaveBeenCalledWith(500);
         expect(responseBody(res).code).toBe('INTERNAL_SERVER_ERROR');
@@ -339,7 +336,7 @@ describe('AuthController.login', () => {
 
 describe('AuthController.me', () => {
     it('responds with the user attached by the middleware', async () => {
-        const user = toPublicUser(userRow());
+        const user = toPublicUser(userRow(), defaultAccess());
         const res = responseWithUser(user);
 
         await invoke(controller.me, createRequest({}), res);

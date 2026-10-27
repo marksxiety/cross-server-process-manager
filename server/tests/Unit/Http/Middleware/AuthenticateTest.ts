@@ -10,6 +10,8 @@ import { TokenService } from '../../../../src/Auth/TokenService';
 import { HttpException } from '../../../../src/Exceptions/HttpException';
 import { authenticate } from '../../../../src/Http/Middleware/Authenticate';
 import { toPublicUser, type UserRecord } from '../../../../src/Models/User';
+import { defaultAccess } from '../../../../src/Security/AccessCatalog';
+import type { AccessService } from '../../../../src/Services/AccessService';
 import { AuthService } from '../../../../src/Services/AuthService';
 
 const query = db.query as unknown as Mock;
@@ -20,7 +22,7 @@ const USER_ROW: UserRecord = {
     email: 'admin@example.com',
     name: 'Admin',
     password_hash: 'scrypt$1024$8$1$c2FsdA$aGFzaA',
-    role: 'viewer',
+    is_admin: false,
     is_active: true,
     token_version: 0,
     email_verified_at: null,
@@ -29,8 +31,12 @@ const USER_ROW: UserRecord = {
     updated_at: new Date('2026-01-01T00:00:00Z'),
 };
 
+const access = {
+    publicUser: vi.fn(async (user: UserRecord) => toPublicUser(user, defaultAccess())),
+} as unknown as AccessService;
+
 const tokens = new TokenService(SECRET, 3600);
-const middleware = authenticate(tokens, new AuthService(tokens));
+const middleware = authenticate(tokens, new AuthService(tokens, access));
 
 function requestWith(authorization: string | undefined): Request {
     return {
@@ -56,7 +62,7 @@ async function run(authorization: string | undefined): Promise<{
 }
 
 function bearer(service: TokenService): string {
-    return `Bearer ${service.sign({ id: 1, role: 'viewer', tokenVersion: 0 }).token}`;
+    return `Bearer ${service.sign({ id: 1, tokenVersion: 0 }).token}`;
 }
 
 function httpError(next: Mock): HttpException {
@@ -102,7 +108,6 @@ describe('authenticate', () => {
     it('reports an expired token', async () => {
         const expired = new TokenService(SECRET, -1).sign({
             id: 1,
-            role: 'viewer',
             tokenVersion: 0,
         }).token;
 
@@ -143,7 +148,7 @@ describe('authenticate', () => {
 
         expect(next).toHaveBeenCalledTimes(1);
         expect(next.mock.calls[0]).toHaveLength(0);
-        expect(locals.user).toEqual(toPublicUser(USER_ROW));
+        expect(locals.user).toEqual(toPublicUser(USER_ROW, defaultAccess()));
         expect(locals.user).not.toHaveProperty('password_hash');
         expect(locals.user).not.toHaveProperty('token_version');
     });
