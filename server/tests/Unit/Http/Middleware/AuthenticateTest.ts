@@ -25,7 +25,7 @@ const USER_ROW: UserRecord = {
     is_admin: false,
     is_active: true,
     token_version: 0,
-    email_verified_at: null,
+    email_verified_at: new Date('2026-01-01T00:00:00Z'),
     last_login_at: null,
     created_at: new Date('2026-01-01T00:00:00Z'),
     updated_at: new Date('2026-01-01T00:00:00Z'),
@@ -139,6 +139,14 @@ describe('authenticate', () => {
         const { next } = await run(bearer(tokens));
 
         expect(httpError(next).code).toBe('UNAUTHORIZED');
+    });
+
+    it('rejects an unverified user', async () => {
+        query.mockResolvedValueOnce({ rows: [{ ...USER_ROW, email_verified_at: null }] });
+
+        const { next } = await run(bearer(tokens));
+
+        expect(httpError(next).code).toBe('EMAIL_NOT_VERIFIED');
     });
 
     it('attaches the public user and continues for a valid token', async () => {
