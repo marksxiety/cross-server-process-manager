@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import {
+  AUTH_GUEST_KEY,
+  AUTH_SESSION_KEY,
   clearGuestSession,
   clearSession,
   getAccessToken,
@@ -16,7 +18,9 @@ const USER: AuthUser = {
   id: 1,
   email: 'admin@example.com',
   name: 'Admin',
-  role: 'viewer',
+  is_admin: false,
+  pages: ['dashboard', 'server_metrics'],
+  events: [],
   is_active: true,
   email_verified_at: null,
   last_login_at: null,
@@ -33,6 +37,7 @@ const PAYLOAD: AuthSessionPayload = {
 
 afterEach(() => {
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
 })
 
 describe('session storage', () => {
@@ -132,5 +137,28 @@ describe('session storage', () => {
     expect(isGuestSession(broken)).toBe(false)
     expect(() => clearSession(broken)).not.toThrow()
     expect(() => clearGuestSession(broken)).not.toThrow()
+  })
+
+  test('stores both the session and guest flag in localStorage', () => {
+    const local = new FakeStorage()
+    const session = new FakeStorage()
+    vi.stubGlobal('localStorage', local)
+    vi.stubGlobal('sessionStorage', session)
+
+    writeSession(PAYLOAD)
+    startGuestSession()
+
+    expect(local.getItem(AUTH_SESSION_KEY)).not.toBeNull()
+    expect(local.getItem(AUTH_GUEST_KEY)).toBe('1')
+    expect(session.size).toBe(0)
+    expect(readSession()?.token).toBe('jwt-token')
+    expect(isGuestSession()).toBe(true)
+
+    clearSession()
+    expect(readSession()).toBeNull()
+    expect(isGuestSession()).toBe(true)
+
+    clearGuestSession()
+    expect(isGuestSession()).toBe(false)
   })
 })

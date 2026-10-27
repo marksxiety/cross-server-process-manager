@@ -6,6 +6,8 @@ vi.mock('@/api/services/auth.service', () => ({
 
 import { authService } from '@/api/services/auth.service'
 import {
+  clearGuestSession,
+  clearSession,
   isGuestSession,
   readSession,
   startGuestSession,
@@ -20,7 +22,9 @@ const USER: AuthUser = {
   id: 1,
   email: 'admin@example.com',
   name: 'Admin',
-  role: 'viewer',
+  is_admin: false,
+  pages: ['dashboard', 'server_metrics'],
+  events: [],
   is_active: true,
   email_verified_at: null,
   last_login_at: null,
@@ -69,7 +73,7 @@ function failure<T>(message: string, status: number, code?: string): ApiResponse
 
 beforeEach(() => {
   storage = new FakeStorage()
-  vi.stubGlobal('sessionStorage', storage)
+  vi.stubGlobal('localStorage', storage)
   vi.mocked(authService).mockReset()
   useAuthStore.setState(createInitialAuthState())
 })
@@ -93,6 +97,7 @@ describe('auth store login/register', () => {
     expect(state.status).toBe('authenticated')
     expect(state.token).toBe('jwt-token')
     expect(state.user).toEqual(USER)
+    expect(state.expiresAt).toBe(readSession(storage)?.expiresAt)
     expect(state.error).toBeNull()
     expect(readSession(storage)?.token).toBe('jwt-token')
   })
@@ -111,7 +116,8 @@ describe('auth store login/register', () => {
     const state = useAuthStore.getState()
     expect(state.status).toBe('unauthenticated')
     expect(state.token).toBeNull()
-    expect(state.error?.code).toBe('INVALID_CREDENTIALS')
+    expect(state.expiresAt).toBeNull()
+    expect(state.user).toBeNull()
     expect(readSession(storage)).toBeNull()
   })
 
@@ -144,6 +150,7 @@ describe('auth store guest mode', () => {
     expect(state.status).toBe('guest')
     expect(state.token).toBeNull()
     expect(state.user).toBeNull()
+    expect(state.expiresAt).toBeNull()
     expect(isGuestSession(storage)).toBe(true)
     expect(readSession(storage)).toBeNull()
   })
@@ -220,8 +227,115 @@ describe('auth store logout', () => {
     const state = useAuthStore.getState()
     expect(state.status).toBe('unauthenticated')
     expect(state.token).toBeNull()
+    expect(state.expiresAt).toBeNull()
     expect(state.user).toBeNull()
     expect(readSession(storage)).toBeNull()
     expect(isGuestSession(storage)).toBe(false)
+  })
+})
+
+describe('auth store expiry', () => {
+  test('expireSession clears the token but keeps the account for the dialog', () => {
+    writeSession(PAYLOAD, storage)
+    useAuthStore.setState({
+      status: 'authenticated',
+      token: PAYLOAD.token,
+      expiresAt: Date.now() + 60_000,
+      user: USER,
+    })
+
+    useAuthStore.getState().expireSession()
+
+    const state = useAuthStore.getState()
+    expect(state.status).toBe('expired')
+    expect(state.token).toBeNull()
+    expect(state.expiresAt).toBeNull()
+    expect(state.user).toEqual(USER)
+    expect(readSession(storage)).toBeNull()
+  })
+})
+
+describe('auth store cross-tab sync', () => {
+  test('hydrates a session written by another tab', () => {
+    writeSession(PAYLOAD, storage)
+    useAuthStore.setState({
+      status: 'unauthenticated',
+      token: null,
+      user: null,
+      expiresAt: null,
+    })
+
+    useAuthStore.getState().syncFromStorage()
+
+    const state = useAuthStore.getState()
+    expect(state.status).toBe('authenticated')
+    expect(state.token).toBe('jwt-token')
+    expect(state.user).toEqual(USER)
+    expect(state.expiresAt).toBe(readSession(storage)?.expiresAt)
+  })
+
+  test('switches to guest when only the guest flag exists', () => {
+    startGuestSession(storage)
+    useAuthStore.setState({
+      status: 'authenticated',
+      token: PAYLOAD.token,
+      user: USER,
+      expiresAt: Date.now() + 60_000,
+    })
+
+    useAuthStore.getState().syncFromStorage()
+
+    const state = useAuthStore.getState()
+    expect(state.status).toBe('guest')
+    expect(state.token).toBeNull()
+    expect(state.user).toBeNull()
+    expect(state.expiresAt).toBeNull()
+  })
+
+  test('marks a cross-tab logout as signed out before expiry', () => {
+    useAuthStore.setState({
+      status: 'authenticated',
+      token: 'stale-token',
+      user: USER,
+      expiresAt: Date.now() + 60_000,
+    })
+    clearSession(storage)
+    clearGuestSession(storage)
+
+    useAuthStore.getState().syncFromStorage()
+
+    const state = useAuthStore.getState()
+    expect(state.status).toBe('signed-out')
+    expect(state.token).toBeNull()
+  })
+
+  test('marks a cross-tab expiry as expired', () => {
+    useAuthStore.setState({
+      status: 'authenticated',
+      token: 'stale-token',
+      user: USER,
+      expiresAt: Date.now() - 1_000,
+    })
+    clearSession(storage)
+    clearGuestSession(storage)
+
+    useAuthStore.getState().syncFromStorage()
+
+    const state = useAuthStore.getState()
+    expect(state.status).toBe('expired')
+    expect(state.user).toEqual(USER)
+  })
+
+  test('keeps the signed-out dialog open while storage stays empty', () => {
+    useAuthStore.setState({
+      status: 'signed-out',
+      token: null,
+      user: USER,
+      expiresAt: null,
+    })
+
+    useAuthStore.getState().syncFromStorage()
+
+    expect(useAuthStore.getState().status).toBe('signed-out')
   })
 })

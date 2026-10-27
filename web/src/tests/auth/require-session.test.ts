@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, test, vi, type Mock } from 'vitest'
-import type { LoaderFunctionArgs } from 'react-router'
 
 vi.mock('@/api/services/auth.service', () => ({
   authService: vi.fn(),
@@ -8,7 +7,8 @@ vi.mock('@/api/services/auth.service', () => ({
 import { authService } from '@/api/services/auth.service'
 import {
   redirectIfAuthenticated,
-  requireMember,
+  requireAdmin,
+  requirePage,
   requireSession,
 } from '@/auth/require-session'
 import {
@@ -26,7 +26,9 @@ const USER: AuthUser = {
   id: 1,
   email: 'admin@example.com',
   name: 'Admin',
-  role: 'viewer',
+  is_admin: false,
+  pages: ['dashboard', 'server_metrics'],
+  events: [],
   is_active: true,
   email_verified_at: null,
   last_login_at: null,
@@ -55,10 +57,6 @@ function mockAuthService(): { me: Mock } {
   return service
 }
 
-function args(url: string): LoaderFunctionArgs {
-  return { request: new Request(url), params: {} } as unknown as LoaderFunctionArgs
-}
-
 function responseFrom(run: () => unknown): Response {
   try {
     run()
@@ -85,7 +83,7 @@ function success<T>(info: T): ApiResponse<T> {
 
 beforeEach(() => {
   storage = new FakeStorage()
-  vi.stubGlobal('sessionStorage', storage)
+  vi.stubGlobal('localStorage', storage)
   vi.mocked(authService).mockReset()
   useAuthStore.setState(createInitialAuthState())
 })
@@ -100,21 +98,19 @@ describe('requireSession', () => {
     const service = mockAuthService()
     startGuestSession(storage)
 
-    const data = await requireSession(args('http://localhost/'))
+    const data = await requireSession()
 
     expect(data).toEqual({ mode: 'guest' })
     expect(useAuthStore.getState().status).toBe('guest')
     expect(service.me).not.toHaveBeenCalled()
   })
 
-  test('redirects an unauthenticated visitor to /login with the target path', async () => {
+  test('redirects an unauthenticated visitor to /login', async () => {
     mockAuthService()
 
-    const response = await asyncResponseFrom(() =>
-      requireSession(args('http://localhost/server')),
-    )
+    const response = await asyncResponseFrom(() => requireSession())
 
-    expect(response.headers.get('Location')).toBe('/login?from=%2Fserver')
+    expect(response.headers.get('Location')).toBe('/login')
   })
 
   test('validates a stored token and hydrates the user', async () => {
@@ -122,11 +118,12 @@ describe('requireSession', () => {
     service.me.mockResolvedValue(success(USER))
     writeSession(PAYLOAD, storage)
 
-    const data = await requireSession(args('http://localhost/'))
+    const data = await requireSession()
 
     expect(data).toEqual({ mode: 'user', stale: false })
     expect(useAuthStore.getState().status).toBe('authenticated')
     expect(useAuthStore.getState().user).toEqual(USER)
+    expect(useAuthStore.getState().expiresAt).toBe(readSession(storage)?.expiresAt)
   })
 
   test('clears a rejected token and redirects to /login', async () => {
@@ -140,11 +137,9 @@ describe('requireSession', () => {
     })
     writeSession(PAYLOAD, storage)
 
-    const response = await asyncResponseFrom(() =>
-      requireSession(args('http://localhost/')),
-    )
+    const response = await asyncResponseFrom(() => requireSession())
 
-    expect(response.headers.get('Location')).toBe('/login?from=%2F')
+    expect(response.headers.get('Location')).toBe('/login')
     expect(readSession(storage)).toBeNull()
     expect(useAuthStore.getState().status).toBe('unauthenticated')
   })
@@ -159,7 +154,7 @@ describe('requireSession', () => {
     })
     writeSession(PAYLOAD, storage)
 
-    const data = await requireSession(args('http://localhost/'))
+    const data = await requireSession()
 
     expect(data).toEqual({ mode: 'user', stale: true })
     expect(useAuthStore.getState().user).toEqual(USER)
@@ -167,26 +162,74 @@ describe('requireSession', () => {
   })
 })
 
-describe('requireMember', () => {
-  test('lets a signed-in user through', () => {
-    writeSession(PAYLOAD, storage)
+describe('requirePage', () => {
+  test('lets a signed-in user with the page grant through', () => {
+    writeSession(
+      { ...PAYLOAD, user: { ...USER, pages: [...USER.pages, 'servers'] } },
+      storage
+    )
 
-    expect(requireMember(args('http://localhost/server'))).toBeNull()
+    expect(requirePage('servers')()).toBeNull()
   })
 
-  test('sends guests back to the dashboard', () => {
+  test('lets an admin through without grants', () => {
+    writeSession({ ...PAYLOAD, user: { ...USER, is_admin: true } }, storage)
+
+    expect(requirePage('servers')()).toBeNull()
+  })
+
+  test('redirects an authenticated user without the grant', () => {
+    writeSession(PAYLOAD, storage)
+
+    const response = responseFrom(() => requirePage('servers')())
+
+    expect(response.headers.get('Location')).toBe('/forbidden')
+  })
+
+  test('allows dashboard and metrics for guests', () => {
     startGuestSession(storage)
 
-    const response = responseFrom(() => requireMember(args('http://localhost/server')))
+    expect(requirePage('dashboard')()).toBeNull()
+    expect(requirePage('server_metrics')()).toBeNull()
+  })
+
+  test('sends guests back to the dashboard for member pages', () => {
+    startGuestSession(storage)
+
+    const response = responseFrom(() => requirePage('servers')())
 
     expect(response.headers.get('Location')).toBe('/')
     expect(isGuestSession(storage)).toBe(true)
   })
 
   test('redirects an unauthenticated visitor to /login', () => {
-    const response = responseFrom(() => requireMember(args('http://localhost/template')))
+    const response = responseFrom(() => requirePage('servers')())
 
-    expect(response.headers.get('Location')).toBe('/login?from=%2Ftemplate')
+    expect(response.headers.get('Location')).toBe('/login')
+  })
+})
+
+describe('requireAdmin', () => {
+  test('lets an admin through', () => {
+    writeSession({ ...PAYLOAD, user: { ...USER, is_admin: true } }, storage)
+
+    expect(requireAdmin()).toBeNull()
+  })
+
+  test('redirects an authenticated non-admin', () => {
+    writeSession(PAYLOAD, storage)
+
+    const response = responseFrom(() => requireAdmin())
+
+    expect(response.headers.get('Location')).toBe('/forbidden')
+  })
+
+  test('redirects a guest to login', () => {
+    startGuestSession(storage)
+
+    const response = responseFrom(() => requireAdmin())
+
+    expect(response.headers.get('Location')).toBe('/login')
   })
 })
 
@@ -194,7 +237,7 @@ describe('redirectIfAuthenticated', () => {
   test('allows guests to see /login', () => {
     startGuestSession(storage)
 
-    expect(redirectIfAuthenticated(args('http://localhost/login'))).toBeNull()
+    expect(redirectIfAuthenticated()).toBeNull()
   })
 
   test('clears a stale auth error whenever the page is entered', () => {
@@ -206,38 +249,14 @@ describe('redirectIfAuthenticated', () => {
       },
     })
 
-    expect(redirectIfAuthenticated(args('http://localhost/login'))).toBeNull()
+    expect(redirectIfAuthenticated()).toBeNull()
     expect(useAuthStore.getState().error).toBeNull()
   })
 
   test('sends a signed-in user to the dashboard', () => {
     writeSession(PAYLOAD, storage)
 
-    const response = responseFrom(() =>
-      redirectIfAuthenticated(args('http://localhost/login')),
-    )
-
-    expect(response.headers.get('Location')).toBe('/')
-  })
-
-  test('honors a safe from parameter', () => {
-    writeSession(PAYLOAD, storage)
-
-    const response = responseFrom(() =>
-      redirectIfAuthenticated(args('http://localhost/login?from=%2Fserver')),
-    )
-
-    expect(response.headers.get('Location')).toBe('/server')
-  })
-
-  test('ignores an absolute from parameter', () => {
-    writeSession(PAYLOAD, storage)
-
-    const response = responseFrom(() =>
-      redirectIfAuthenticated(
-        args('http://localhost/login?from=https%3A%2F%2Fevil.example'),
-      ),
-    )
+    const response = responseFrom(() => redirectIfAuthenticated())
 
     expect(response.headers.get('Location')).toBe('/')
   })

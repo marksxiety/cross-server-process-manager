@@ -1,7 +1,7 @@
-import type { SessionStorageLike } from '@/lib/auth-session'
+import type { StorageLike } from '@/lib/auth-session'
 
-/** Minimal sessionStorage stand-in for deterministic tests. */
-export class FakeStorage implements SessionStorageLike {
+/** Minimal browser-storage stand-in for deterministic tests. */
+export class FakeStorage implements StorageLike {
   private readonly values = new Map<string, string>()
 
   getItem(key: string): string | null {
