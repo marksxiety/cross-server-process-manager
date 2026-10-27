@@ -1,7 +1,7 @@
 import './env';
 
 const MIN_SECRET_LENGTH = 32;
-const DEFAULT_EXPIRES_IN_SECONDS = 3600;
+const DEFAULT_EXPIRES_IN_SECONDS = 12 * 60 * 60;
 const MAX_EXPIRES_IN_SECONDS = 7 * 24 * 60 * 60;
 
 export interface AuthConfig {
