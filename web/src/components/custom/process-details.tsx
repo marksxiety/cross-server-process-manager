@@ -43,6 +43,7 @@ import { toast } from '@/components/ui/toast'
 import { ErrorAlert } from '@/components/custom/error-alert'
 import { PageLoader } from '@/components/custom/page-loader'
 import { processService } from '@/api/services/process.service'
+import { useAccess } from '@/hooks/use-access'
 import { errorCodeLabel, toApiError } from '@/lib/error-code'
 import { metricsLoadingDescription } from '@/lib/metrics-loading'
 import { isProcessInactive } from '@/lib/process-status'
@@ -589,6 +590,8 @@ function LogsTab({
   const tail = logs?.tail ?? LOGS_DEFAULT_TAIL
   const setTail = useProcessLogsStore((state) => state.setTail)
   const refreshLogs = useProcessLogsStore((state) => state.refresh)
+  const access = useAccess()
+  const canFlush = access.canDo('logs.flush')
 
   const lines = logs?.lines ?? []
   const errorCount = lines.filter((line) => line.stream === 'error').length
@@ -626,7 +629,7 @@ function LogsTab({
   }
 
   const confirmFlush = async () => {
-    if (pendingStream === null) return
+    if (pendingStream === null || !canFlush) return
 
     const stream = pendingStream
     const selectedScope = scope
@@ -705,34 +708,36 @@ function LogsTab({
           </div>
         </div>
         <div className='flex items-center justify-end gap-2 sm:justify-start'>
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button
-                  type='button'
-                  variant='outline'
-                  size='sm'
-                  aria-label='Flush logs'
-                  title='Flush logs'
-                  disabled={isFlushing}
-                />
-              }
-            >
-              {isFlushing ? <Spinner className='size-3.5' /> : <Eraser strokeWidth={2} />}
-              Flush
-              <ChevronDown strokeWidth={2} className='size-3.5' />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align='end' className='w-44'>
-              <DropdownMenuGroup>
-                <DropdownMenuLabel>Flush logs</DropdownMenuLabel>
-                {LOG_STREAM_OPTIONS.map((stream) => (
-                  <DropdownMenuItem key={stream} onClick={() => openConfirm(stream)}>
-                    {LOG_STREAM_LABELS[stream]}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {canFlush && (
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    type='button'
+                    variant='outline'
+                    size='sm'
+                    aria-label='Flush logs'
+                    title='Flush logs'
+                    disabled={isFlushing}
+                  />
+                }
+              >
+                {isFlushing ? <Spinner className='size-3.5' /> : <Eraser strokeWidth={2} />}
+                Flush
+                <ChevronDown strokeWidth={2} className='size-3.5' />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align='end' className='w-44'>
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel>Flush logs</DropdownMenuLabel>
+                  {LOG_STREAM_OPTIONS.map((stream) => (
+                    <DropdownMenuItem key={stream} onClick={() => openConfirm(stream)}>
+                      {LOG_STREAM_LABELS[stream]}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           <Button
             type='button'
             variant='ghost'
@@ -810,7 +815,7 @@ function LogsTab({
       )}
 
       <AlertDialog
-        open={isConfirmOpen}
+        open={canFlush && isConfirmOpen}
         onOpenChange={(open) => {
           if (!open && !isFlushing) {
             setIsConfirmOpen(false)

@@ -62,7 +62,7 @@ import { ProcessCard } from '@/components/custom/process-card'
 import { ProcessDetails } from '@/components/custom/process-details'
 import { ServerHeader } from '@/components/custom/server-header'
 import { useFlipReorder } from '@/hooks/use-flip-reorder'
-import { useCanManage } from '@/hooks/use-can-manage'
+import { useAccess } from '@/hooks/use-access'
 import { useProcessDescribe } from '@/hooks/use-process-describe'
 import { errorCodeLabel, toApiError } from '@/lib/error-code'
 import { canRunProcessCommand } from '@/lib/process-runtime'
@@ -126,7 +126,8 @@ export function Dashboard() {
   const sortOrder = useDashboardStore((state) => state.sortOrder)
   const setSortOrder = useDashboardStore((state) => state.setSortOrder)
   const processesStatus = useProcessesStatus()
-  const canManage = useCanManage()
+  const access = useAccess()
+  const canOpenDetails = access.isAuthenticated
 
   const [selected, setSelected] = useState<{
     server: RegisteredServer
@@ -170,6 +171,13 @@ export function Dashboard() {
 
   const showReload =
     selectedProcess !== null && canRunProcessCommand(selectedProcess, 'reload')
+  const canStart = access.canDo('process.start')
+  const canStop = access.canDo('process.stop')
+  const canRestart = access.canDo('process.restart')
+  const canReload = access.canDo('process.reload')
+  const canDelete = access.canDo('process.delete')
+  const showReloadButton = showReload && canReload
+  const hasProcessActions = canStart || canStop || canRestart || canReload || canDelete
 
   const toggleSortKey = (key: ProcessSortKey) => {
     if (sortOrder.includes(key)) {
@@ -182,6 +190,14 @@ export function Dashboard() {
 
   const runAction = async (command: Exclude<ProcessCommand, 'delete'>) => {
     if (!selected || !selectedProcess) return
+
+    const permission = {
+      start: 'process.start',
+      stop: 'process.stop',
+      restart: 'process.restart',
+      reload: 'process.reload',
+    } as const
+    if (!access.canDo(permission[command])) return
 
     const commands = {
       start: startProcess,
@@ -213,7 +229,7 @@ export function Dashboard() {
   }
 
   const confirmDelete = async () => {
-    if (!selected || !selectedProcess) return
+    if (!selected || !selectedProcess || !access.canDo('process.delete')) return
 
     const request = deleteProcess(selected.server, selectedProcess).then((result) => {
       if (!result.success) throw toApiError(result)
@@ -353,11 +369,11 @@ export function Dashboard() {
               </EmptyDescription>
             </EmptyHeader>
             <EmptyContent>
-              {canManage ? (
+              {access.canVisit('servers') && access.canDo('server.create') ? (
                 <Button render={<Link to='/server' />}>Register a server</Button>
               ) : (
                 <p className='text-xs text-muted-foreground'>
-                  Sign in to register a server.
+                  You don&apos;t have permission to register a server.
                 </p>
               )}
             </EmptyContent>
@@ -385,26 +401,22 @@ export function Dashboard() {
               })}
             </div>
 
-            <div className='mt-6 space-y-3'>
-              <div className='flex items-center gap-3'>
-                <p className='shrink-0 text-xs font-medium text-muted-foreground'>
-                  {showProcessesLoader
-                    ? 'Loading…'
-                    : `Processes (${sortedProcessItems.length}${
-                        query !== '' ? `/${processItems.length}` : ''
-                      })`}
-                </p>
-                <Separator className='flex-1' />
-              </div>
-
-              <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end'>
+            <div className='mt-6 flex flex-wrap items-center gap-3'>
+              <p className='shrink-0 text-xs font-medium text-muted-foreground'>
+                {showProcessesLoader
+                  ? 'Loading…'
+                  : `Processes (${sortedProcessItems.length}${
+                      query !== '' ? `/${processItems.length}` : ''
+                    })`}
+              </p>
+              <Separator className='flex-1' />
+              <div className='flex shrink-0 items-center gap-2'>
                 <DropdownMenu>
                   <DropdownMenuTrigger
                     render={
                       <Button
                         variant='outline'
                         size='sm'
-                        className='w-full sm:w-auto'
                         aria-label={`Sort by, ${sortOrder.length} active`}
                       />
                     }
@@ -439,35 +451,35 @@ export function Dashboard() {
                     </DropdownMenuGroup>
                   </DropdownMenuContent>
                 </DropdownMenu>
+              </div>
 
-                <div className='relative w-full sm:max-w-56'>
-                  <Search
-                    className='pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground'
-                    strokeWidth={2}
-                  />
-                  <Input
-                    size='xs'
-                    className='pl-7'
-                    value={searchQuery}
-                    placeholder='Search name or namespace…'
-                    aria-label='Search processes by name or namespace'
-                    onChange={(event) => setSearchQuery(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Escape') setSearchQuery('')
-                    }}
-                  />
-                  {searchQuery !== '' && (
-                    <button
-                      type='button'
-                      aria-label='Clear search'
-                      title='Clear search'
-                      className='absolute top-1/2 right-2 -translate-y-1/2 rounded-sm p-1 text-muted-foreground transition-colors hover:text-foreground'
-                      onClick={() => setSearchQuery('')}
-                    >
-                      <X className='size-3.5' strokeWidth={2} />
-                    </button>
-                  )}
-                </div>
+              <div className='relative w-full max-w-56 shrink-0'>
+                <Search
+                  className='pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground'
+                  strokeWidth={2}
+                />
+                <Input
+                  size='xs'
+                  className='pl-7'
+                  value={searchQuery}
+                  placeholder='Search name or namespace…'
+                  aria-label='Search processes by name or namespace'
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape') setSearchQuery('')
+                  }}
+                />
+                {searchQuery !== '' && (
+                  <button
+                    type='button'
+                    aria-label='Clear search'
+                    title='Clear search'
+                    className='absolute top-1/2 right-2 -translate-y-1/2 rounded-sm p-1 text-muted-foreground transition-colors hover:text-foreground'
+                    onClick={() => setSearchQuery('')}
+                  >
+                    <X className='size-3.5' strokeWidth={2} />
+                  </button>
+                )}
               </div>
             </div>
 
@@ -487,7 +499,7 @@ export function Dashboard() {
                         totalMemoryBytes={overview?.memory.totalBytes ?? null}
                         cpuCores={overview?.cpu.cores ?? null}
                         onSelect={
-                          canManage
+                          canOpenDetails
                             ? () => {
                                 setSelected({
                                   server: item.server,
@@ -555,7 +567,7 @@ export function Dashboard() {
         )}
 
       <Sheet
-        open={canManage && selected !== null}
+        open={canOpenDetails && selected !== null}
         onOpenChange={(open) => {
           if (!open) setSelected(null)
         }}
@@ -631,79 +643,103 @@ export function Dashboard() {
             )}
           </div>
 
-          <SheetFooter className='grid grid-cols-2 gap-2'>
-            {selectedProcess?.status === 'online' ? (
-              <Button
-                type='button'
-                variant='outline'
-                className='w-full'
-                disabled={isActionDisabled}
-                onClick={() => void runAction('stop')}
-              >
-                {isStopping ? <Spinner className='size-4' /> : <Pause strokeWidth={2} />}
-                Pause
-              </Button>
-            ) : (
-              <Button
-                type='button'
-                variant='outline'
-                className='w-full'
-                disabled={
-                  !selectedProcess ||
-                  isActionDisabled ||
-                  !canRunProcessCommand(selectedProcess, 'start')
-                }
-                onClick={() => void runAction('start')}
-              >
-                {isStarting ? <Spinner className='size-4' /> : <Play strokeWidth={2} />}
-                Start
-              </Button>
-            )}
+          {hasProcessActions && (
+            <SheetFooter className='grid grid-cols-2 gap-2'>
+              {selectedProcess?.status === 'online'
+                ? canStop && (
+                    <Button
+                      type='button'
+                      variant='outline'
+                      className='w-full'
+                      disabled={isActionDisabled}
+                      onClick={() => void runAction('stop')}
+                    >
+                      {isStopping ? (
+                        <Spinner className='size-4' />
+                      ) : (
+                        <Pause strokeWidth={2} />
+                      )}
+                      Pause
+                    </Button>
+                  )
+                : canStart && (
+                    <Button
+                      type='button'
+                      variant='outline'
+                      className='w-full'
+                      disabled={
+                        !selectedProcess ||
+                        isActionDisabled ||
+                        !canRunProcessCommand(selectedProcess, 'start')
+                      }
+                      onClick={() => void runAction('start')}
+                    >
+                      {isStarting ? (
+                        <Spinner className='size-4' />
+                      ) : (
+                        <Play strokeWidth={2} />
+                      )}
+                      Start
+                    </Button>
+                  )}
 
-            {showReload && (
-              <Button
-                type='button'
-                variant='outline'
-                className='w-full'
-                disabled={isActionDisabled}
-                onClick={() => void runAction('reload')}
-              >
-                {isReloading ? <Spinner className='size-4' /> : <RotateCw strokeWidth={2} />}
-                Reload
-              </Button>
-            )}
+              {showReloadButton && (
+                <Button
+                  type='button'
+                  variant='outline'
+                  className='w-full'
+                  disabled={isActionDisabled}
+                  onClick={() => void runAction('reload')}
+                >
+                  {isReloading ? (
+                    <Spinner className='size-4' />
+                  ) : (
+                    <RotateCw strokeWidth={2} />
+                  )}
+                  Reload
+                </Button>
+              )}
 
-            <Button
-              type='button'
-              variant='outline'
-              className='w-full'
-              disabled={
-                !selectedProcess ||
-                isActionDisabled ||
-                !canRunProcessCommand(selectedProcess, 'restart')
-              }
-              onClick={() => void runAction('restart')}
-            >
-              {isRestarting ? <Spinner className='size-4' /> : <RotateCcw strokeWidth={2} />}
-              Restart
-            </Button>
+              {canRestart && (
+                <Button
+                  type='button'
+                  variant='outline'
+                  className='w-full'
+                  disabled={
+                    !selectedProcess ||
+                    isActionDisabled ||
+                    !canRunProcessCommand(selectedProcess, 'restart')
+                  }
+                  onClick={() => void runAction('restart')}
+                >
+                  {isRestarting ? (
+                    <Spinner className='size-4' />
+                  ) : (
+                    <RotateCcw strokeWidth={2} />
+                  )}
+                  Restart
+                </Button>
+              )}
 
-            <Button
-              type='button'
-              variant='destructive'
-              className={cn('w-full', !showReload && 'col-span-2')}
-              disabled={!selectedProcess || isActionDisabled}
-              onClick={() => setIsDeleteOpen(true)}
-            >
-              <Trash2 strokeWidth={2} />
-              Delete
-            </Button>
-          </SheetFooter>
+              {canDelete && (
+                <Button
+                  type='button'
+                  variant='destructive'
+                  className={cn('w-full', !showReloadButton && 'col-span-2')}
+                  disabled={!selectedProcess || isActionDisabled}
+                  onClick={() => setIsDeleteOpen(true)}
+                >
+                  <Trash2 strokeWidth={2} />
+                  Delete
+                </Button>
+              )}
+            </SheetFooter>
+          )}
         </SheetContent>
       </Sheet>
 
       <AlertDialog
-        open={canManage && isDeleteOpen}
+        open={canDelete && isDeleteOpen}
         onOpenChange={(open) => {
           if (!open && !isDeleting) setIsDeleteOpen(false)
         }}

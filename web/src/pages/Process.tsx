@@ -55,6 +55,7 @@ import { toast } from '@/components/ui/toast'
 import { ErrorAlert } from '@/components/custom/error-alert'
 import { ProcessForm } from '@/components/custom/process-form'
 import { useDismissedFlag } from '@/hooks/use-dismissed-flag'
+import { useAccess } from '@/hooks/use-access'
 import { errorCodeLabel, toApiError } from '@/lib/error-code'
 import { isCatalogField, validateRegisterValues } from '@/lib/process-fields'
 import { buildTemplatePayload } from '@/lib/template-payload'
@@ -293,6 +294,10 @@ export function Process() {
 
   const [clientErrors, setClientErrors] = useState<Record<string, string>>({})
   const { isDismissed, dismiss } = useDismissedFlag('process-tested-reminder')
+  const access = useAccess()
+  const canStart = access.canDo('process.start')
+  const canRegisterServer =
+    access.canVisit('servers') && access.canDo('server.create')
 
   useEffect(() => {
     void loadServers()
@@ -352,7 +357,7 @@ export function Process() {
   )
 
   const handleSubmit = async () => {
-    if (!server || status === 'loading') return
+    if (!server || status === 'loading' || !canStart) return
 
     const validationErrors = validateRegisterValues(values)
     setClientErrors(validationErrors)
@@ -431,7 +436,13 @@ export function Process() {
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
-            <Button render={<Link to='/server' />}>Register a server</Button>
+            {canRegisterServer ? (
+              <Button render={<Link to='/server' />}>Register a server</Button>
+            ) : (
+              <p className='text-xs text-muted-foreground'>
+                You don&apos;t have permission to register a server.
+              </p>
+            )}
           </EmptyContent>
         </Empty>
       )}
@@ -624,13 +635,18 @@ export function Process() {
               <Button
                 type='button'
                 className='w-full sm:w-auto'
-                disabled={status === 'loading'}
+                disabled={status === 'loading' || !canStart}
                 onClick={() => void handleSubmit()}
               >
                 {status === 'loading' && <Spinner className='size-4' />}
                 Register service
               </Button>
             </div>
+            {!canStart && (
+              <p className='text-xs text-muted-foreground'>
+                You don&apos;t have permission to start processes.
+              </p>
+            )}
           </div>
 
           <Card className='hidden h-fit lg:sticky lg:top-4 lg:block'>

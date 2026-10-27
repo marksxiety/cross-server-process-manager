@@ -19,9 +19,10 @@ type TemplateCardProps = {
   template: ProcessTemplate
   onOpen: (template: ProcessTemplate) => void
   onUse: (template: ProcessTemplate) => void
+  canUse: boolean
 }
 
-export function TemplateCard({ template, onOpen, onUse }: TemplateCardProps) {
+export function TemplateCard({ template, onOpen, onUse, canUse }: TemplateCardProps) {
   const fieldCount = Object.keys(template.values).length
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -65,19 +66,21 @@ export function TemplateCard({ template, onOpen, onUse }: TemplateCardProps) {
         <TemplatePreview template={template} />
       </CardContent>
 
-      <CardFooter className='mt-auto'>
-        <Button
-          size='sm'
-          className='w-full'
-          onClick={(event) => {
-            event.stopPropagation()
-            onUse(template)
-          }}
-        >
-          <Wand2 strokeWidth={2} />
-          Use template
-        </Button>
-      </CardFooter>
+      {canUse && (
+        <CardFooter className='mt-auto'>
+          <Button
+            size='sm'
+            className='w-full'
+            onClick={(event) => {
+              event.stopPropagation()
+              onUse(template)
+            }}
+          >
+            <Wand2 strokeWidth={2} />
+            Use template
+          </Button>
+        </CardFooter>
+      )}
     </Card>
   )
 }
