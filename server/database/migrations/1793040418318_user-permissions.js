@@ -1,5 +1,5 @@
 /**
- * AUTH MVP: replaces the coarse `role` with an `is_admin` flag and stores
+ * User permissions: replaces the coarse `role` with an `is_admin` flag and stores
  * per-user page/event grants by stable code-level keys.
  *
  * Every existing account keeps dashboard (implicit) and gets the
