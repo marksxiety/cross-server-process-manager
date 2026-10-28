@@ -17,6 +17,7 @@ import { ForgotPassword } from './pages/auth/forgot-password.tsx'
 import { ResetPassword } from './pages/auth/reset-password.tsx'
 import { Forbidden } from './pages/Forbidden.tsx'
 import { AdminPanel } from './pages/admin/AdminPanel.tsx'
+import { AuditLogPage } from './pages/admin/Audit.tsx'
 import {
   redirectIfAuthenticated,
   requireAdmin,
@@ -72,6 +73,11 @@ const router = createBrowserRouter([
           {
             path: 'admin',
             element: <AdminPanel />,
+            loader: requireAdmin,
+          },
+          {
+            path: 'admin/audit',
+            element: <AuditLogPage />,
             loader: requireAdmin,
           },
         ],

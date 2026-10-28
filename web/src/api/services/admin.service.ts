@@ -1,5 +1,6 @@
 import { registryConnection } from '@/api/registry'
 import type { ApiResponse } from '@/types/api'
+import type { AuditEntry } from '@/types/audit'
 import type {
   AdminAccessUpdate,
   AdminCatalog,
@@ -31,6 +32,14 @@ export function adminService() {
     catalog: async (): Promise<ApiResponse<AdminCatalog>> => {
       try {
         return await api.get<AdminCatalog>('/admin/catalog')
+      } catch (cause) {
+        return unreachable(cause)
+      }
+    },
+
+    audit: async (limit = 200): Promise<ApiResponse<AuditEntry[]>> => {
+      try {
+        return await api.get<AuditEntry[]>(`/admin/audit?limit=${limit}`)
       } catch (cause) {
         return unreachable(cause)
       }

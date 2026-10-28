@@ -2,6 +2,7 @@ import { NavLink, useLocation } from 'react-router'
 import {
   Cog,
   FileText,
+  History,
   LayoutDashboard,
   Server,
   ShieldCheck,
@@ -48,6 +49,12 @@ const navItems: NavItem[] = [
     title: 'Admin',
     url: '/admin',
     icon: ShieldCheck,
+    adminOnly: true,
+  },
+  {
+    title: 'Audit',
+    url: '/admin/audit',
+    icon: History,
     adminOnly: true,
   },
 ]
