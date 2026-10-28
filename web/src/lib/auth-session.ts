@@ -15,6 +15,8 @@ export interface StorageLike {
 const storedSessionSchema = z.object({
   token: z.string().min(1),
   expiresAt: z.number(),
+  refreshToken: z.string().min(1),
+  refreshExpiresAt: z.number(),
   user: authUserSchema,
 })
 
@@ -30,6 +32,11 @@ function defaultStorage(): StorageLike | null {
   }
 }
 
+/**
+ * Returns the stored session while the refresh token is still valid. The
+ * access token inside may already be expired; callers that need to make a
+ * request should use getAccessToken() or refresh first.
+ */
 export function readSession(
   storage: StorageLike | null = defaultStorage(),
   now = Date.now(),
@@ -55,7 +62,7 @@ export function readSession(
   }
 
   const parsed = storedSessionSchema.safeParse(value)
-  if (!parsed.success || parsed.data.expiresAt <= now) {
+  if (!parsed.success || parsed.data.refreshExpiresAt <= now) {
     removeSession(storage)
     return null
   }
@@ -79,6 +86,8 @@ export function writeSession(
   const session: StoredSession = {
     token: payload.token,
     expiresAt: now + payload.expires_in * 1000,
+    refreshToken: payload.refresh_token,
+    refreshExpiresAt: now + payload.refresh_expires_in * 1000,
     user: payload.user,
   }
 
@@ -109,11 +118,25 @@ export function clearSession(storage: StorageLike | null = defaultStorage()): vo
   if (storage) removeSession(storage)
 }
 
+export function isAccessExpired(session: StoredSession, now = Date.now()): boolean {
+  return session.expiresAt <= now
+}
+
+/** Returns the access token only while it is still valid. */
 export function getAccessToken(
   storage: StorageLike | null = defaultStorage(),
   now = Date.now(),
 ): string | null {
-  return readSession(storage, now)?.token ?? null
+  const session = readSession(storage, now)
+  if (!session || isAccessExpired(session, now)) return null
+  return session.token
+}
+
+export function getRefreshToken(
+  storage: StorageLike | null = defaultStorage(),
+  now = Date.now(),
+): string | null {
+  return readSession(storage, now)?.refreshToken ?? null
 }
 
 export function isGuestSession(storage: StorageLike | null = defaultStorage()): boolean {
