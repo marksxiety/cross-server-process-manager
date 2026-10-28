@@ -33,9 +33,21 @@ const router = createBrowserRouter([
     children: [
       { path: 'login', element: <Login />, loader: redirectIfAuthenticated },
       { path: 'register', element: <Register />, loader: redirectIfAuthenticated },
-      { path: 'verify-email', element: <VerifyEmail /> },
-      { path: 'forgot-password', element: <ForgotPassword /> },
-      { path: 'reset-password', element: <ResetPassword /> },
+      {
+        path: 'verify-email',
+        element: <VerifyEmail />,
+        loader: redirectIfAuthenticated,
+      },
+      {
+        path: 'forgot-password',
+        element: <ForgotPassword />,
+        loader: redirectIfAuthenticated,
+      },
+      {
+        path: 'reset-password',
+        element: <ResetPassword />,
+        loader: redirectIfAuthenticated,
+      },
       { path: 'forbidden', element: <Forbidden /> },
       {
         path: '/',

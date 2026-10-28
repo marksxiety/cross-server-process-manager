@@ -1,7 +1,11 @@
 import { useEffect } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
 import { useAuthSync } from '@/hooks/use-auth-sync'
-import { isAuthPath, isCredentialPath, isMemberPath } from '@/lib/auth-paths'
+import {
+  isAuthPath,
+  isAuthenticatedRedirectPath,
+  isMemberPath,
+} from '@/lib/auth-paths'
 import { onUnauthorized } from '@/lib/auth-events'
 import { isDemoMode } from '@/lib/demo-mode'
 import { useAuthStore } from '@/stores/auth.store'
@@ -32,7 +36,7 @@ export function AuthRoot() {
       return
     }
 
-    if (status === 'authenticated' && isCredentialPath(pathname)) {
+    if (status === 'authenticated' && isAuthenticatedRedirectPath(pathname)) {
       navigate('/', { replace: true })
     }
   }, [status, location, navigate])

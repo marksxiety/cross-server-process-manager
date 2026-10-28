@@ -7,16 +7,25 @@ const AUTH_PATHS = new Set([
   '/forbidden',
 ])
 
-const CREDENTIAL_PATHS = new Set(['/login', '/register'])
+const AUTHENTICATED_REDIRECT_PATHS = new Set([
+  '/login',
+  '/register',
+  '/verify-email',
+  '/forgot-password',
+  '/reset-password',
+])
 
 /** Public auth screens: an unauthenticated visitor may stay here. */
 export function isAuthPath(pathname: string): boolean {
   return AUTH_PATHS.has(pathname)
 }
 
-/** Screens that a signed-in user should be redirected away from. */
-export function isCredentialPath(pathname: string): boolean {
-  return CREDENTIAL_PATHS.has(pathname)
+/**
+ * Auth screens a signed-in user must be redirected away from. Visitors without
+ * a session - including guests - may stay on these pages.
+ */
+export function isAuthenticatedRedirectPath(pathname: string): boolean {
+  return AUTHENTICATED_REDIRECT_PATHS.has(pathname)
 }
 
 /**
