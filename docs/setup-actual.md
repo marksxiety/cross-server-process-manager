@@ -155,6 +155,7 @@ MAIL_FROM=you@gmail.com
 | `JWT_EXPIRES_IN`             | Access-token lifetime in seconds (max `604800`). The dashboard renews it silently before it expires.                  | `3600` (1h)                |
 | `REFRESH_TOKEN_TTL_DAYS`     | Refresh-token lifetime in days. Each refresh extends the window, so inactive sessions end after this long.            | `30`                       |
 | `REFRESH_REUSE_GRACE_SECONDS`| Window in which a replayed rotated token is treated as a concurrent tab rather than theft.                            | `30`                       |
+| `TRUST_PROXY`                | Express `trust proxy` value when the API sits behind nginx or another reverse proxy. Required for correct audit IPs.    | empty (direct)             |
 | `AUTH_LINK_TTL_MINUTES`      | How long email links stay valid                                                                                       | `30`                       |
 | `AUTH_LINK_BASE_URL`         | Base URL used in emailed links. Set it only if your public dashboard URL differs (reverse proxy, different hostname). | built from `VITE_*` values |
 

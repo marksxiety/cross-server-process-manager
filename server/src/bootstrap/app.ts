@@ -5,9 +5,20 @@ import apiRoutes from '../../routes/api';
 import { handleException } from '../Exceptions/Handler';
 import { fail } from '../Http/Responses/ApiResponse';
 
+function trustProxySetting(): boolean | number | string {
+    const raw = process.env.TRUST_PROXY?.trim();
+    if (!raw) return false;
+    if (raw === 'true') return true;
+    if (raw === 'false') return false;
+
+    const hops = Number(raw);
+    return Number.isInteger(hops) && hops >= 0 ? hops : raw;
+}
+
 export function createApp(): express.Express {
     const app = express();
 
+    app.set('trust proxy', trustProxySetting());
     app.use(cors());
     app.use(express.json());
     app.use(apiRoutes);
