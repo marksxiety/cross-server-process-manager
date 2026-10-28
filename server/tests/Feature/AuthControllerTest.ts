@@ -67,6 +67,8 @@ interface AuthBody {
         token: string;
         token_type: string;
         expires_in: number;
+        refresh_token: string;
+        refresh_expires_in: number;
         user: Record<string, unknown>;
     };
 }
@@ -118,6 +120,8 @@ describe('AuthController.login', () => {
             userId: 1,
             tokenVersion: 0,
         });
+        expect(body.info.refresh_token).toEqual(expect.stringMatching(/^[A-Za-z0-9_-]{43}$/));
+        expect(body.info.refresh_expires_in).toBe(30 * 24 * 60 * 60);
         expect(body.info.user).toMatchObject({
             is_admin: false,
             pages: ['dashboard', 'server_metrics'],
