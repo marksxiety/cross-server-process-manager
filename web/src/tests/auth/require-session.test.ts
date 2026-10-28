@@ -4,7 +4,12 @@ vi.mock('@/api/services/auth.service', () => ({
   authService: vi.fn(),
 }))
 
+vi.mock('@/lib/auth-refresh', () => ({
+  refreshSession: vi.fn(),
+}))
+
 import { authService } from '@/api/services/auth.service'
+import { refreshSession as requestRefresh } from '@/lib/auth-refresh'
 import {
   redirectIfAuthenticated,
   requireAdmin,
@@ -40,6 +45,8 @@ const PAYLOAD: AuthSessionPayload = {
   token: 'jwt-token',
   token_type: 'Bearer',
   expires_in: 60,
+  refresh_token: 'refresh-token',
+  refresh_expires_in: 2_592_000,
   user: USER,
 }
 
@@ -85,6 +92,8 @@ beforeEach(() => {
   storage = new FakeStorage()
   vi.stubGlobal('localStorage', storage)
   vi.mocked(authService).mockReset()
+  vi.mocked(requestRefresh).mockReset()
+  vi.mocked(requestRefresh).mockResolvedValue({ status: 'missing' })
   useAuthStore.setState(createInitialAuthState())
 })
 
@@ -142,6 +151,52 @@ describe('requireSession', () => {
     expect(response.headers.get('Location')).toBe('/login')
     expect(readSession(storage)).toBeNull()
     expect(useAuthStore.getState().status).toBe('unauthenticated')
+  })
+
+  test('refreshes and retries when /auth/me rejects the access token', async () => {
+    const service = mockAuthService()
+    service.me
+      .mockResolvedValueOnce({
+        success: false,
+        message: 'Token is invalid',
+        code: 'INVALID_TOKEN',
+        info: null,
+        status: 401,
+      })
+      .mockResolvedValueOnce(success(USER))
+    vi.mocked(requestRefresh).mockImplementation(async () => {
+      const session = writeSession(
+        { ...PAYLOAD, token: 'next-jwt-token', refresh_token: 'next-refresh-token' },
+        storage
+      )
+      return { status: 'refreshed', session }
+    })
+    writeSession(PAYLOAD, storage)
+
+    const data = await requireSession()
+
+    expect(data).toEqual({ mode: 'user', stale: false })
+    expect(service.me).toHaveBeenCalledTimes(2)
+    expect(useAuthStore.getState().token).toBe('next-jwt-token')
+    expect(readSession(storage)?.token).toBe('next-jwt-token')
+  })
+
+  test('keeps the cached session when the refresh fails transiently', async () => {
+    const service = mockAuthService()
+    service.me.mockResolvedValue({
+      success: false,
+      message: 'Unauthorized',
+      info: null,
+      status: 401,
+    })
+    vi.mocked(requestRefresh).mockResolvedValue({ status: 'unreachable' })
+    writeSession(PAYLOAD, storage)
+
+    const data = await requireSession()
+
+    expect(data).toEqual({ mode: 'user', stale: true })
+    expect(useAuthStore.getState().status).toBe('authenticated')
+    expect(readSession(storage)).not.toBeNull()
   })
 
   test('falls back to the cached user when /auth/me is unreachable', async () => {
@@ -237,6 +292,10 @@ describe('redirectIfAuthenticated', () => {
   test('allows guests to see /login', () => {
     startGuestSession(storage)
 
+    expect(redirectIfAuthenticated()).toBeNull()
+  })
+
+  test('allows a first-time visitor with no session and no guest flag', () => {
     expect(redirectIfAuthenticated()).toBeNull()
   })
 

@@ -4,7 +4,12 @@ vi.mock('@/api/services/auth.service', () => ({
   authService: vi.fn(),
 }))
 
+vi.mock('@/lib/auth-refresh', () => ({
+  refreshSession: vi.fn(),
+}))
+
 import { authService } from '@/api/services/auth.service'
+import { refreshSession as requestRefresh } from '@/lib/auth-refresh'
 import {
   clearGuestSession,
   clearSession,
@@ -36,6 +41,8 @@ const PAYLOAD: AuthSessionPayload = {
   token: 'jwt-token',
   token_type: 'Bearer',
   expires_in: 60,
+  refresh_token: 'refresh-token',
+  refresh_expires_in: 2_592_000,
   user: USER,
 }
 
@@ -77,6 +84,8 @@ beforeEach(() => {
   storage = new FakeStorage()
   vi.stubGlobal('localStorage', storage)
   vi.mocked(authService).mockReset()
+  vi.mocked(requestRefresh).mockReset()
+  vi.mocked(requestRefresh).mockResolvedValue({ status: 'missing' })
   useAuthStore.setState(createInitialAuthState())
 })
 
@@ -214,6 +223,93 @@ describe('auth store restore', () => {
 
     expect(useAuthStore.getState().status).toBe('guest')
     expect(service.me).not.toHaveBeenCalled()
+  })
+
+  test('retries /auth/me after a successful refresh', async () => {
+    const service = mockAuthService()
+    const fresh = { ...USER, name: 'Fresh Name' }
+    service.me
+      .mockResolvedValueOnce(failure('Token has expired', 401, 'TOKEN_EXPIRED'))
+      .mockResolvedValueOnce(success(fresh))
+    vi.mocked(requestRefresh).mockResolvedValue({
+      status: 'refreshed',
+      session: {
+        token: 'next-jwt-token',
+        expiresAt: Date.now() + 60_000,
+        refreshToken: 'next-refresh-token',
+        refreshExpiresAt: Date.now() + 2_592_000_000,
+        user: USER,
+      },
+    })
+    writeSession(PAYLOAD, storage)
+    useAuthStore.setState({ token: PAYLOAD.token, user: USER, status: 'idle' })
+
+    await useAuthStore.getState().restore()
+
+    expect(service.me).toHaveBeenCalledTimes(2)
+    expect(useAuthStore.getState().status).toBe('authenticated')
+    expect(useAuthStore.getState().user?.name).toBe('Fresh Name')
+    expect(useAuthStore.getState().token).toBe('next-jwt-token')
+  })
+})
+
+describe('auth store refresh', () => {
+  test('promotes the rotated session to state', async () => {
+    const refreshed = {
+      token: 'next-jwt-token',
+      expiresAt: Date.now() + 3_600_000,
+      refreshToken: 'next-refresh-token',
+      refreshExpiresAt: Date.now() + 2_592_000_000,
+      user: USER,
+    }
+    vi.mocked(requestRefresh).mockResolvedValue({ status: 'refreshed', session: refreshed })
+    writeSession(PAYLOAD, storage)
+
+    const ok = await useAuthStore.getState().refreshSession()
+
+    expect(ok).toBe(true)
+    expect(useAuthStore.getState()).toMatchObject({
+      status: 'authenticated',
+      token: 'next-jwt-token',
+      expiresAt: refreshed.expiresAt,
+      user: USER,
+    })
+  })
+
+  test('marks the session expired when the refresh token is rejected', async () => {
+    vi.mocked(requestRefresh).mockResolvedValue({ status: 'expired' })
+    writeSession(PAYLOAD, storage)
+    useAuthStore.setState({ status: 'authenticated', token: PAYLOAD.token, user: USER })
+
+    const ok = await useAuthStore.getState().refreshSession()
+
+    expect(ok).toBe(false)
+    expect(useAuthStore.getState().status).toBe('expired')
+    expect(readSession(storage)).toBeNull()
+  })
+
+  test('clears the session when there is nothing to refresh', async () => {
+    vi.mocked(requestRefresh).mockResolvedValue({ status: 'missing' })
+    writeSession(PAYLOAD, storage)
+    useAuthStore.setState({ status: 'authenticated', token: PAYLOAD.token, user: USER })
+
+    const ok = await useAuthStore.getState().refreshSession()
+
+    expect(ok).toBe(false)
+    expect(useAuthStore.getState().status).toBe('unauthenticated')
+    expect(readSession(storage)).toBeNull()
+  })
+
+  test('keeps the session when the registry is unreachable', async () => {
+    vi.mocked(requestRefresh).mockResolvedValue({ status: 'unreachable' })
+    writeSession(PAYLOAD, storage)
+    useAuthStore.setState({ status: 'authenticated', token: PAYLOAD.token, user: USER })
+
+    const ok = await useAuthStore.getState().refreshSession()
+
+    expect(ok).toBe(false)
+    expect(useAuthStore.getState().status).toBe('authenticated')
+    expect(readSession(storage)?.token).toBe('jwt-token')
   })
 })
 
