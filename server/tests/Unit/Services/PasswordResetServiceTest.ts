@@ -66,7 +66,11 @@ describe('PasswordResetService.request', () => {
         expect(mailer.send).toHaveBeenCalledWith(
             expect.objectContaining({
                 to: 'user@example.com',
+                subject: 'Reset your XPM password',
                 text: expect.stringContaining(
+                    'https://app.test/reset-password?token=raw-token'
+                ),
+                html: expect.stringContaining(
                     'https://app.test/reset-password?token=raw-token'
                 ),
             })

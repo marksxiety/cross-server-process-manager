@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { HttpException } from '../../src/Exceptions/HttpException';
 import { PasswordResetController } from '../../src/Http/Controllers/PasswordResetController';
 import { RegistrationController } from '../../src/Http/Controllers/RegistrationController';
 import type { PasswordResetService } from '../../src/Services/PasswordResetService';
@@ -50,6 +51,27 @@ describe('RegistrationController', () => {
         });
         expect(responseBody(res).success).toBe(true);
         expect(responseBody(res).message).toMatch(/Check your email/);
+    });
+
+    it('reports a verification email delivery failure', async () => {
+        registrationFns.request.mockRejectedValueOnce(
+            new HttpException(
+                502,
+                'Verification email not sent. We could not send the verification email.',
+                'MAIL_DELIVERY_FAILED'
+            )
+        );
+        const res = createResponse();
+
+        await invoke(
+            registration.register,
+            createRequest({ body: { email: 'user@example.com', name: 'User' } }),
+            res
+        );
+
+        expect(res.status).toHaveBeenCalledWith(502);
+        expect(responseBody(res).code).toBe('MAIL_DELIVERY_FAILED');
+        expect(responseBody(res).message).toMatch(/Verification email not sent/);
     });
 
     it('always returns the generic resend response', async () => {

@@ -140,10 +140,26 @@ describe('RegistrationService.request', () => {
         expect(mailer.send).toHaveBeenCalledWith(
             expect.objectContaining({
                 to: 'user@example.com',
+                subject: 'Verify your email address for XPM',
                 text: expect.stringContaining('https://app.test/verify-email?token='),
+                html: expect.stringContaining('https://app.test/verify-email?token='),
             })
         );
         expect(result).toEqual({ email: 'user@example.com' });
+    });
+
+    it('rejects when the verification email cannot be sent', async () => {
+        vi.mocked(User.findByEmail).mockResolvedValue(undefined);
+        vi.mocked(mailer.send).mockRejectedValueOnce(new Error('smtp unavailable'));
+
+        await expect(
+            service.request({ email: 'user@example.com', name: 'User' })
+        ).rejects.toMatchObject({
+            status: 502,
+            code: 'MAIL_DELIVERY_FAILED',
+        });
+
+        expect(RegistrationRequest.upsert).toHaveBeenCalled();
     });
 });
 
