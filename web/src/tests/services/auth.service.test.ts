@@ -28,6 +28,8 @@ const PAYLOAD: AuthSessionPayload = {
   token: 'jwt-token',
   token_type: 'Bearer',
   expires_in: 60,
+  refresh_token: 'refresh-token',
+  refresh_expires_in: 2_592_000,
   user: USER,
 }
 

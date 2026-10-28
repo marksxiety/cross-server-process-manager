@@ -73,4 +73,80 @@ describe('createConnection', () => {
 
     expect(onUnauthorized).not.toHaveBeenCalled()
   })
+
+  test('retries once with the refreshed token after a 401', async () => {
+    const authorizations: (string | null)[] = []
+    let attempt = 0
+    vi.stubGlobal('fetch', async (_url: string, init?: RequestInit) => {
+      authorizations.push(new Headers(init?.headers).get('Authorization'))
+      attempt += 1
+      return new Response(
+        JSON.stringify({ success: attempt > 1, message: 'ok', info: null }),
+        { status: attempt === 1 ? 401 : 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    })
+    const refreshAuth = vi.fn().mockResolvedValue({ token: 'fresh-token' })
+    const onUnauthorized = vi.fn()
+
+    const result = await createConnection({
+      protocol: 'http',
+      host: 'localhost',
+      port: 4000,
+      authToken: 'expired-token',
+      refreshAuth,
+      onUnauthorized,
+    }).get('/auth/me')
+
+    expect(refreshAuth).toHaveBeenCalledWith('expired-token')
+    expect(authorizations).toEqual(['Bearer expired-token', 'Bearer fresh-token'])
+    expect(result.status).toBe(200)
+    expect(onUnauthorized).not.toHaveBeenCalled()
+  })
+
+  test('calls onUnauthorized when the refresh fails', async () => {
+    vi.stubGlobal('fetch', async () =>
+      new Response(JSON.stringify({ success: false, message: 'Unauthorized', info: null }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    )
+    const refreshAuth = vi.fn().mockResolvedValue({ token: null, terminal: true })
+    const onUnauthorized = vi.fn()
+
+    const result = await createConnection({
+      protocol: 'http',
+      host: 'localhost',
+      port: 4000,
+      authToken: 'expired-token',
+      refreshAuth,
+      onUnauthorized,
+    }).get('/auth/me')
+
+    expect(result.status).toBe(401)
+    expect(refreshAuth).toHaveBeenCalledTimes(1)
+    expect(onUnauthorized).toHaveBeenCalledTimes(1)
+  })
+
+  test('keeps the session on a transient refresh failure', async () => {
+    vi.stubGlobal('fetch', async () =>
+      new Response(JSON.stringify({ success: false, message: 'Unauthorized', info: null }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    )
+    const refreshAuth = vi.fn().mockResolvedValue({ token: null, terminal: false })
+    const onUnauthorized = vi.fn()
+
+    const result = await createConnection({
+      protocol: 'http',
+      host: 'localhost',
+      port: 4000,
+      authToken: 'expired-token',
+      refreshAuth,
+      onUnauthorized,
+    }).get('/auth/me')
+
+    expect(result.status).toBe(401)
+    expect(onUnauthorized).not.toHaveBeenCalled()
+  })
 })

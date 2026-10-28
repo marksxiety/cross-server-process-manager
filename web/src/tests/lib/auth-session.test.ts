@@ -5,6 +5,8 @@ import {
   clearGuestSession,
   clearSession,
   getAccessToken,
+  getRefreshToken,
+  isAccessExpired,
   isGuestSession,
   readSession,
   startGuestSession,
@@ -32,8 +34,12 @@ const PAYLOAD: AuthSessionPayload = {
   token: 'jwt-token',
   token_type: 'Bearer',
   expires_in: 60,
+  refresh_token: 'refresh-token',
+  refresh_expires_in: 2_592_000,
   user: USER,
 }
+
+const REFRESH_EXPIRY_MS = 2_592_000_000
 
 afterEach(() => {
   vi.restoreAllMocks()
@@ -47,15 +53,29 @@ describe('session storage', () => {
     const written = writeSession(PAYLOAD, storage, 1_000)
 
     expect(written.expiresAt).toBe(61_000)
+    expect(written.refreshExpiresAt).toBe(1_000 + REFRESH_EXPIRY_MS)
     expect(readSession(storage, 2_000)).toEqual(written)
     expect(getAccessToken(storage, 2_000)).toBe('jwt-token')
+    expect(getRefreshToken(storage, 2_000)).toBe('refresh-token')
   })
 
-  test('treats an expired session as absent and removes it', () => {
+  test('keeps the session after the access token expires', () => {
     const storage = new FakeStorage()
     writeSession(PAYLOAD, storage, 1_000)
 
-    expect(readSession(storage, 61_000)).toBeNull()
+    const session = readSession(storage, 61_000)
+
+    expect(session?.token).toBe('jwt-token')
+    expect(isAccessExpired(session!, 61_000)).toBe(true)
+    expect(getAccessToken(storage, 61_000)).toBeNull()
+    expect(getRefreshToken(storage, 61_000)).toBe('refresh-token')
+  })
+
+  test('treats an expired refresh token as absent and removes it', () => {
+    const storage = new FakeStorage()
+    writeSession(PAYLOAD, storage, 1_000)
+
+    expect(readSession(storage, 1_000 + REFRESH_EXPIRY_MS)).toBeNull()
     expect(storage.size).toBe(0)
   })
 
