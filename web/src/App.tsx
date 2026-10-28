@@ -27,7 +27,8 @@ function AppLayout() {
   const { isFullscreen, toggleFullscreen } = useFullscreen()
   const { setOpenMobile } = useSidebar()
   const { pathname } = useLocation()
-  const showFullscreenToggle = pathname === '/'
+  const isDashboard = pathname === '/'
+  const showFullscreenToggle = isDashboard
 
   const handleToggleFullscreen = () => {
     if (!isFullscreen) setOpenMobile(false)
@@ -75,7 +76,12 @@ function AppLayout() {
         {/* Scrollable Page Content */}
         <div className="min-h-0 flex-1 overflow-hidden bg-muted/30">
           <ScrollArea className="h-full">
-            <div className="mx-auto flex min-h-full w-full max-w-7xl min-w-0 flex-col px-4 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6">
+            <div
+              className={cn(
+                'flex min-h-full w-full min-w-0 flex-col px-4 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6',
+                !isDashboard && 'mx-auto max-w-7xl',
+              )}
+            >
               <div className="min-w-0 flex-1">
                 <Outlet />
               </div>
