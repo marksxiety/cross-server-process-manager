@@ -32,7 +32,7 @@ const ERROR_CODE_LABELS: Record<string, string> = {
     LINK_EXPIRED: "Link expired",
     LINK_ALREADY_USED: "Link already used",
     LINK_INVALID: "Invalid link",
-    MAIL_DELIVERY_FAILED: "Could not send email",
+    MAIL_DELIVERY_FAILED: "Email not sent",
     DATABASE_UNAVAILABLE: "Database unavailable",
     PARSE: "Malformed request body",
     INVALID_COOKIE_SIGNATURE: "Invalid cookie signature",
