@@ -419,10 +419,14 @@ export function Server() {
       </PageHeader>
 
       {status === 'loading' && (
-        <div className='flex items-center gap-2 text-sm text-muted-foreground py-6'>
-          <Spinner className='size-4' />
-          Loading servers…
-        </div>
+        <ServerTable
+          servers={[]}
+          loading
+          onEdit={openEdit}
+          onDelete={setDeletingServer}
+          canEdit={canUpdate}
+          canDelete={canDelete}
+        />
       )}
 
       {status === 'error' && requestError && (
