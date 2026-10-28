@@ -3,6 +3,7 @@ import { HttpException } from '../../Exceptions/HttpException';
 import type { PublicUser } from '../../Models/User';
 import { AuthService, type AuthResult } from '../../Services/AuthService';
 import { LoginRequest } from '../Requests/LoginRequest';
+import { RefreshTokenRequest } from '../Requests/RefreshTokenRequest';
 import { ok } from '../Responses/ApiResponse';
 
 function authInfo(result: AuthResult): Record<string, unknown> {
@@ -10,6 +11,8 @@ function authInfo(result: AuthResult): Record<string, unknown> {
         token: result.token,
         token_type: result.tokenType,
         expires_in: result.expiresIn,
+        refresh_token: result.refreshToken,
+        refresh_expires_in: result.refreshExpiresIn,
         user: result.user,
     };
 }
@@ -21,6 +24,12 @@ export class AuthController {
         const data = LoginRequest.validate(req.body);
         const result = await this.auth.login(data);
         ok(res, 'Login successful', authInfo(result));
+    };
+
+    refresh = async (req: Request, res: Response): Promise<void> => {
+        const data = RefreshTokenRequest.validate(req.body);
+        const result = await this.auth.refresh(data.refreshToken);
+        ok(res, 'Session refreshed', authInfo(result));
     };
 
     me = async (_req: Request, res: Response): Promise<void> => {

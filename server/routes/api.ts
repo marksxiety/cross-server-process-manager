@@ -43,7 +43,12 @@ const passwordReset = new PasswordResetService(
     mailConfig.linkBaseUrl,
     mailConfig.linkTtlMinutes
 );
-const authService = new AuthService(tokens, accessService);
+const authService = new AuthService(
+    tokens,
+    accessService,
+    authConfig.refreshTokenTtlDays,
+    authConfig.refreshReuseGraceSeconds
+);
 const adminService = new AdminService(accessService, adminConfig.email);
 const authed = authenticate(tokens, authService);
 
@@ -60,6 +65,7 @@ router.post('/auth/register', registration.register);
 router.post('/auth/verify-email/request', registration.resend);
 router.post('/auth/verify-email', registration.verify);
 router.post('/auth/login', auth.login);
+router.post('/auth/refresh', auth.refresh);
 router.get('/auth/me', authed, auth.me);
 router.post('/auth/logout', authed, auth.logout);
 router.post('/auth/forgot-password', reset.request);
