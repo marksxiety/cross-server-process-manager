@@ -1,7 +1,9 @@
 /**
- * Append-only record of privileged actions. `user_id` is nullable and cleared
- * (SET NULL) when the acting account is deleted, so history survives account
- * removal. Indexes cover the "recent activity" and "activity by user" reads.
+ * Append-only record of user actions. `category` groups the domain
+ * (auth/server/process/template/admin/mail), `action` is the short verb, and
+ * `details` is the human-readable sentence shown in the admin audit page.
+ * `user_id` is nullable and cleared (SET NULL) when the acting account is
+ * deleted, so history survives account removal.
  *
  * @param {import('../../src/Persistence/Migrator').MigrationContext} query
  * @returns {Promise<void>}
@@ -11,12 +13,11 @@ exports.up = async (query) => {
     CREATE TABLE dbo.audit_log (
       id BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT audit_log_pkey PRIMARY KEY,
       user_id INT NULL,
-      action VARCHAR(50) NOT NULL,
-      target_type VARCHAR(30) NULL,
-      target VARCHAR(255) NULL,
+      category VARCHAR(20) NOT NULL,
+      action VARCHAR(30) NOT NULL,
       details NVARCHAR(MAX) NULL,
       ip_address VARCHAR(45) NULL,
-      created_at DATETIME2(3) NOT NULL CONSTRAINT audit_log_created_at_default DEFAULT SYSDATETIME(),
+      created_at DATETIME2(3) NOT NULL CONSTRAINT audit_log_created_at_default DEFAULT SYSUTCDATETIME(),
       CONSTRAINT audit_log_user_id_foreign FOREIGN KEY (user_id) REFERENCES dbo.users (id) ON DELETE SET NULL
     );
   `);
