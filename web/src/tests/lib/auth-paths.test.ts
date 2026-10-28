@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'vitest'
-import { isAuthPath, isCredentialPath, isMemberPath } from '@/lib/auth-paths'
+import {
+  isAuthPath,
+  isAuthenticatedRedirectPath,
+  isMemberPath,
+} from '@/lib/auth-paths'
 
 describe('isMemberPath', () => {
   test('matches the member-only pages', () => {
@@ -38,11 +42,23 @@ describe('isAuthPath', () => {
   })
 })
 
-describe('isCredentialPath', () => {
-  test('only redirects authenticated users away from login and register', () => {
-    expect(isCredentialPath('/login')).toBe(true)
-    expect(isCredentialPath('/register')).toBe(true)
-    expect(isCredentialPath('/forgot-password')).toBe(false)
-    expect(isCredentialPath('/')).toBe(false)
+describe('isAuthenticatedRedirectPath', () => {
+  test('redirects authenticated users away from every auth screen', () => {
+    for (const path of [
+      '/login',
+      '/register',
+      '/verify-email',
+      '/forgot-password',
+      '/reset-password',
+    ]) {
+      expect(isAuthenticatedRedirectPath(path)).toBe(true)
+    }
+  })
+
+  test('leaves the forbidden page and application pages alone', () => {
+    expect(isAuthenticatedRedirectPath('/forbidden')).toBe(false)
+    expect(isAuthenticatedRedirectPath('/')).toBe(false)
+    expect(isAuthenticatedRedirectPath('/server')).toBe(false)
+    expect(isAuthenticatedRedirectPath('/process')).toBe(false)
   })
 })
