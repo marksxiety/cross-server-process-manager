@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ChevronUp, LogIn, LogOut } from 'lucide-react'
 import { useNavigate } from 'react-router'
-import { GuestSignInDialog } from '@/components/auth/guest-sign-in-dialog'
+import { GuestAuthDialog } from '@/components/auth/guest-auth-dialog'
 import { UserAvatar } from '@/components/custom/user-avatar'
 import {
   AlertDialog,
@@ -99,7 +99,7 @@ export function SidebarUserMenu() {
             <LogIn className='size-4' strokeWidth={2} />
           </button>
         )}
-        <GuestSignInDialog open={isSignInOpen} onOpenChange={setIsSignInOpen} />
+        <GuestAuthDialog open={isSignInOpen} onOpenChange={setIsSignInOpen} />
       </>
     )
   }
