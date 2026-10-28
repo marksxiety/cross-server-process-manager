@@ -3,6 +3,7 @@ import { generateLinkToken, hashLinkToken } from '../Auth/LinkTokens';
 import { hashPassword } from '../Auth/PasswordHasher';
 import { DuplicateResourceException } from '../Exceptions/DuplicateResourceException';
 import { HttpException } from '../Exceptions/HttpException';
+import { verificationEmail } from '../Mail/emailTemplates';
 import type { Mailer } from '../Mail/Mailer';
 import { RegistrationRequest } from '../Models/RegistrationRequest';
 import { User } from '../Models/User';
@@ -14,7 +15,10 @@ import { AccessService } from './AccessService';
 const EMAIL_TAKEN_CODE = 'EMAIL_TAKEN';
 const EMAIL_TAKEN_MESSAGE =
     'An account with this email already exists. Sign in or reset your password.';
-const MAIL_SUBJECT = 'Complete your XPM registration';
+const MAIL_DELIVERY_FAILED_CODE = 'MAIL_DELIVERY_FAILED';
+const MAIL_DELIVERY_FAILED_MESSAGE =
+    'Verification email not sent. We could not send the verification email. ' +
+    'Check your connection and try again, or contact your administrator.';
 
 export interface RegistrationInput {
     email: string;
@@ -57,7 +61,15 @@ export class RegistrationService {
             throw databaseException(error, 'Failed to start registration');
         }
 
-        await this.sendEmail(data.email, token);
+        const sent = await this.sendEmail(data.name, data.email, token);
+        if (!sent) {
+            throw new HttpException(
+                502,
+                MAIL_DELIVERY_FAILED_MESSAGE,
+                MAIL_DELIVERY_FAILED_CODE
+            );
+        }
+
         return { email: data.email };
     }
 
@@ -95,7 +107,7 @@ export class RegistrationService {
             throw databaseException(error, 'Failed to resend the registration email');
         }
 
-        await this.sendEmail(pending.email, token);
+        await this.sendEmail(pending.name, pending.email, token);
     }
 
     async verify(token: string, password: string): Promise<RegistrationResult> {
@@ -190,21 +202,21 @@ export class RegistrationService {
         throw linkInvalid();
     }
 
-    private async sendEmail(email: string, token: string): Promise<void> {
+    private async sendEmail(name: string, email: string, token: string): Promise<boolean> {
         const link = `${this.linkBaseUrl}/verify-email?token=${encodeURIComponent(token)}`;
+        const rendered = verificationEmail({
+            name,
+            email,
+            link,
+            expiresInMinutes: this.linkTtlMinutes,
+        });
 
         try {
-            await this.mailer.send({
-                to: email,
-                subject: MAIL_SUBJECT,
-                text:
-                    'Continue creating your XPM account by opening this link:\n\n' +
-                    `${link}\n\n` +
-                    `This link expires in ${this.linkTtlMinutes} minutes and can only be used once. ` +
-                    'If you did not request this, you can ignore this email.',
-            });
+            await this.mailer.send({ to: email, ...rendered });
+            return true;
         } catch (error) {
             console.error('Failed to send the registration email', error);
+            return false;
         }
     }
 }

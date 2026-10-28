@@ -1,12 +1,12 @@
 import { hashPassword } from '../Auth/PasswordHasher';
 import { AuthTokenService } from '../Auth/AuthTokenService';
 import { linkAlreadyUsed, linkExpired, linkInvalid } from '../Auth/LinkErrors';
+import { passwordResetEmail } from '../Mail/emailTemplates';
 import type { Mailer } from '../Mail/Mailer';
 import { User } from '../Models/User';
 import { databaseException } from '../Persistence/DbException';
 
 const RESET_PURPOSE = 'reset' as const;
-const MAIL_SUBJECT = 'Reset your XPM password';
 
 export const PASSWORD_RESET_GENERIC_MESSAGE =
     'If an account exists for that email, we sent a password reset link.';
@@ -34,17 +34,15 @@ export class PasswordResetService {
 
         const token = await this.tokens.issue(user.id, RESET_PURPOSE);
         const link = `${this.linkBaseUrl}/reset-password?token=${encodeURIComponent(token)}`;
+        const rendered = passwordResetEmail({
+            name: user.name,
+            email: user.email,
+            link,
+            expiresInMinutes: this.linkTtlMinutes,
+        });
 
         try {
-            await this.mailer.send({
-                to: user.email,
-                subject: MAIL_SUBJECT,
-                text:
-                    'Reset your password by opening this link:\n\n' +
-                    `${link}\n\n` +
-                    `This link expires in ${this.linkTtlMinutes} minutes and can only be used once. ` +
-                    'If you did not request a password reset, you can ignore this email.',
-            });
+            await this.mailer.send({ to: user.email, ...rendered });
         } catch (error) {
             console.error('Failed to send the password reset email', error);
         }
