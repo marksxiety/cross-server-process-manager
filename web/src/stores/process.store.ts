@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { processService } from "@/api/services/process.service";
+import { queueAudit } from "@/api/services/audit.service";
 import { toApiError, toUnreachableError } from "@/lib/error-code";
 import { clearDisabledValues, createDefaultValues } from "@/lib/process-fields";
 import { useDashboardStore } from "@/stores/dashboard.store";
@@ -166,6 +167,15 @@ export const useProcessStore = create<ProcessState>()((set, get) => ({
         const started = Array.isArray(result.info) ? (result.info as ProcessSummary[]) : [];
         set({ status: "success", requestError: null, issues: [], started });
         void useDashboardStore.getState().refreshServer(server);
+
+        const created = started[0];
+        queueAudit({
+            action: "process.create",
+            server_id: server.id,
+            pm_id: created?.pm_id ?? 0,
+            process_name: created?.name ?? payload.name,
+        });
+
         return result;
     },
 

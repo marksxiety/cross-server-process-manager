@@ -43,6 +43,7 @@ import { toast } from '@/components/ui/toast'
 import { ErrorAlert } from '@/components/custom/error-alert'
 import { PageLoader } from '@/components/custom/page-loader'
 import { processService } from '@/api/services/process.service'
+import { queueAudit } from '@/api/services/audit.service'
 import { useAccess } from '@/hooks/use-access'
 import { errorCodeLabel, toApiError } from '@/lib/error-code'
 import { metricsLoadingDescription } from '@/lib/metrics-loading'
@@ -635,8 +636,10 @@ function LogsTab({
     const selectedScope = scope
     setIsFlushing(true)
 
+    let bytesFreed: number | undefined
     const request = requestFlush(stream, selectedScope).then(({ result, usedFallback }) => {
       if (!result.success) throw toApiError(result)
+      bytesFreed = result.info?.bytesFreed
       return { result, usedFallback }
     })
 
@@ -659,6 +662,16 @@ function LogsTab({
       setIsConfirmOpen(false)
       setPendingStream(null)
       await refreshLogs(server, pmId)
+
+      queueAudit({
+        action: 'logs.flush',
+        server_id: server.id,
+        pm_id: pmId,
+        process_name: processName,
+        stream,
+        scope: selectedScope,
+        ...(bytesFreed !== undefined ? { bytes_freed: bytesFreed } : {}),
+      })
     } catch {
       // toast.promise already surfaced the error; keep the dialog open.
     } finally {
