@@ -1,29 +1,47 @@
 import './env';
 
 const MIN_SECRET_LENGTH = 32;
-const DEFAULT_EXPIRES_IN_SECONDS = 12 * 60 * 60;
+const DEFAULT_EXPIRES_IN_SECONDS = 60 * 60;
 const MAX_EXPIRES_IN_SECONDS = 7 * 24 * 60 * 60;
+const DEFAULT_REFRESH_TTL_DAYS = 30;
+const MAX_REFRESH_TTL_DAYS = 365;
+const DEFAULT_REFRESH_REUSE_GRACE_SECONDS = 30;
+const MAX_REFRESH_REUSE_GRACE_SECONDS = 5 * 60;
 
 export interface AuthConfig {
     jwtSecret: string;
     jwtExpiresInSeconds: number;
+    refreshTokenTtlDays: number;
+    refreshReuseGraceSeconds: number;
 }
 
 type Env = Record<string, string | undefined>;
 
-function expiresInFromEnv(raw: string | undefined): number {
+interface BoundedIntegerOptions {
+    name: string;
+    defaultValue: number;
+    min: number;
+    max: number;
+    unit: string;
+}
+
+function boundedIntegerFromEnv(raw: string | undefined, options: BoundedIntegerOptions): number {
     if (raw === undefined || raw.trim() === '') {
-        return DEFAULT_EXPIRES_IN_SECONDS;
+        return options.defaultValue;
     }
 
-    const seconds = Number(raw);
-    if (!Number.isInteger(seconds) || seconds <= 0 || seconds > MAX_EXPIRES_IN_SECONDS) {
+    const value = Number(raw);
+    if (
+        !Number.isInteger(value) ||
+        value < options.min ||
+        value > options.max
+    ) {
         throw new Error(
-            `JWT_EXPIRES_IN must be a whole number of seconds between 1 and ${MAX_EXPIRES_IN_SECONDS} ` +
+            `${options.name} must be a whole number of ${options.unit} between ${options.min} and ${options.max} ` +
                 `(received "${raw}") - check .env`
         );
     }
-    return seconds;
+    return value;
 }
 
 export function loadAuthConfig(env: Env = process.env): AuthConfig {
@@ -38,6 +56,26 @@ export function loadAuthConfig(env: Env = process.env): AuthConfig {
 
     return {
         jwtSecret,
-        jwtExpiresInSeconds: expiresInFromEnv(env.JWT_EXPIRES_IN),
+        jwtExpiresInSeconds: boundedIntegerFromEnv(env.JWT_EXPIRES_IN, {
+            name: 'JWT_EXPIRES_IN',
+            defaultValue: DEFAULT_EXPIRES_IN_SECONDS,
+            min: 1,
+            max: MAX_EXPIRES_IN_SECONDS,
+            unit: 'seconds',
+        }),
+        refreshTokenTtlDays: boundedIntegerFromEnv(env.REFRESH_TOKEN_TTL_DAYS, {
+            name: 'REFRESH_TOKEN_TTL_DAYS',
+            defaultValue: DEFAULT_REFRESH_TTL_DAYS,
+            min: 1,
+            max: MAX_REFRESH_TTL_DAYS,
+            unit: 'days',
+        }),
+        refreshReuseGraceSeconds: boundedIntegerFromEnv(env.REFRESH_REUSE_GRACE_SECONDS, {
+            name: 'REFRESH_REUSE_GRACE_SECONDS',
+            defaultValue: DEFAULT_REFRESH_REUSE_GRACE_SECONDS,
+            min: 0,
+            max: MAX_REFRESH_REUSE_GRACE_SECONDS,
+            unit: 'seconds',
+        }),
     };
 }
