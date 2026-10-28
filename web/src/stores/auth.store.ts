@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { authService } from '@/api/services/auth.service'
+import { refreshSession as requestRefresh } from '@/lib/auth-refresh'
 import {
   clearGuestSession,
   clearSession,
@@ -36,6 +37,7 @@ interface AuthState extends AuthSnapshot {
   register: (input: RegisterInput) => Promise<boolean>
   continueAsGuest: () => void
   restore: () => Promise<void>
+  refreshSession: () => Promise<boolean>
   expireSession: () => void
   logout: () => void
   signOut: () => Promise<void>
@@ -159,6 +161,23 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     if (get().token !== token) return
 
     if (result.status === 401 || result.status === 403) {
+      const refreshed = await requestRefresh()
+
+      if (refreshed.status === 'refreshed') {
+        const retry = await authService().me()
+        if (retry.success && retry.info) {
+          updateSessionUser(retry.info)
+          set({
+            user: retry.info,
+            token: refreshed.session.token,
+            expiresAt: refreshed.session.expiresAt,
+            status: 'authenticated',
+            error: null,
+          })
+          return
+        }
+      }
+
       clearSession()
       clearGuestSession()
       set({
@@ -180,7 +199,57 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     }
 
     updateSessionUser(result.info)
-    set({ user: result.info, status: 'authenticated', error: null })
+    const latest = readSession()
+    set({
+      user: result.info,
+      token: latest?.token ?? token,
+      expiresAt: latest?.expiresAt ?? get().expiresAt,
+      status: 'authenticated',
+      error: null,
+    })
+  },
+
+  refreshSession: async () => {
+    const result = await requestRefresh()
+
+    switch (result.status) {
+      case 'refreshed':
+        set({
+          user: result.session.user,
+          token: result.session.token,
+          expiresAt: result.session.expiresAt,
+          status: 'authenticated',
+          error: null,
+          isSubmitting: false,
+        })
+        return true
+
+      case 'missing':
+        get().logout()
+        return false
+
+      case 'expired':
+        get().expireSession()
+        return false
+
+      case 'rejected':
+        clearSession()
+        clearGuestSession()
+        set({
+          user: null,
+          token: null,
+          expiresAt: null,
+          status: 'unauthenticated',
+          error: null,
+          isSubmitting: false,
+        })
+        return false
+
+      case 'unreachable':
+        return false
+    }
+
+    return false
   },
 
   expireSession: () => {
