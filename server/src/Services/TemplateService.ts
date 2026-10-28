@@ -28,6 +28,31 @@ function databaseError(error: unknown, fallback: string): DatabaseException {
     );
 }
 
+export interface TemplateUpdateResult {
+    template: TemplateRecord;
+    changes: Record<string, unknown>;
+}
+
+function templateChanges(
+    previous: TemplateValues,
+    next: TemplateValues
+): Record<string, unknown> {
+    const keys = new Set([...Object.keys(previous), ...Object.keys(next)]);
+    const changed: string[] = [];
+    const changes: Record<string, unknown> = {};
+
+    for (const key of keys) {
+        const from = previous[key];
+        const to = next[key];
+        if (JSON.stringify(from) === JSON.stringify(to)) continue;
+        changed.push(key);
+        changes[key] = { from: from ?? null, to: to ?? null };
+    }
+
+    if (changed.length > 0) changes.changed = changed;
+    return changes;
+}
+
 export class TemplateService {
     async list(withInactive: boolean): Promise<TemplateRecord[]> {
         try {
@@ -103,7 +128,7 @@ export class TemplateService {
         }
     }
 
-    async update(id: number, values: TemplateValues): Promise<TemplateRecord | null> {
+    async update(id: number, values: TemplateValues): Promise<TemplateUpdateResult | null> {
         let session: DbSession;
         try {
             session = await db.beginTransaction();
@@ -119,16 +144,25 @@ export class TemplateService {
                 throw new NotFoundException('Template');
             }
 
+            const previousValues = TemplateKey.fromStoredValues(
+                await TemplateKey.forTemplate(id, session)
+            );
+
             await TemplateKey.replaceAll(id, values, session);
             await Template.touch(id, session);
 
             const summary = await Template.findSummary(id, session);
-            const keyRows = await TemplateKey.forTemplate(id, session);
+            const nextValues = TemplateKey.fromStoredValues(
+                await TemplateKey.forTemplate(id, session)
+            );
 
             await session.commit();
 
             return summary
-                ? { ...summary, values: TemplateKey.fromStoredValues(keyRows) }
+                ? {
+                      template: { ...summary, values: nextValues },
+                      changes: templateChanges(previousValues, nextValues),
+                  }
                 : null;
         } catch (error) {
             await session.rollback().catch(() => undefined);
