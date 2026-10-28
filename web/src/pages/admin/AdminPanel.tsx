@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Pencil, Search, ShieldCheck, X } from 'lucide-react'
 import { adminService } from '@/api/services/admin.service'
+import { CustomTable, MobileCard } from '@/components/custom/custom-table'
 import { ErrorAlert } from '@/components/custom/error-alert'
 import { PageHeader } from '@/components/custom/page-header'
 import { UserAvatar } from '@/components/custom/user-avatar'
@@ -31,16 +32,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
-import { Spinner } from '@/components/ui/spinner'
 import { Switch } from '@/components/ui/switch'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { TableCell, TableHead, TableRow } from '@/components/ui/table'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from '@/components/ui/toast'
 import { buildActionGroups } from '@/lib/admin-access'
@@ -299,6 +292,47 @@ export function AdminPanel() {
     { key: 'inactive', label: 'Inactive' },
   ]
 
+  const userCards = visibleUsers.map((user) => (
+    <MobileCard key={user.id}>
+      <div className='flex items-start justify-between gap-3'>
+        <div className='flex min-w-0 items-center gap-3'>
+          <UserAvatar name={user.name} />
+          <div className='min-w-0'>
+            <p className='truncate text-sm font-medium' title={user.name}>
+              {user.name}
+            </p>
+            <p
+              className='truncate text-xs text-muted-foreground'
+              title={user.email}
+            >
+              {user.email}
+            </p>
+          </div>
+        </div>
+        <StatusBadge isActive={user.is_active} />
+      </div>
+
+      <div className='mt-3 flex items-end justify-between gap-2 border-t pt-3'>
+        <div className='min-w-0 space-y-1'>
+          <RoleBadges user={user} />
+          <p className='text-xs text-muted-foreground'>
+            {accessSummary(user)}
+          </p>
+        </div>
+        <Button
+          type='button'
+          variant='ghost'
+          size='icon-sm'
+          aria-label={`Manage ${user.name}`}
+          title={`Manage ${user.name}`}
+          onClick={() => openManage(user)}
+        >
+          <Pencil strokeWidth={2} />
+        </Button>
+      </div>
+    </MobileCard>
+  ))
+
   return (
     <div className='min-w-0'>
       <PageHeader
@@ -352,16 +386,7 @@ export function AdminPanel() {
         </div>
       </PageHeader>
 
-      {isLoading && (
-        <div className='flex items-center gap-2 py-6 text-sm text-muted-foreground'>
-          <Spinner className='size-4' />
-          Loading users…
-        </div>
-      )}
-
-      {!isLoading && requestError && (
-        <ErrorAlert error={requestError} className='my-6' />
-      )}
+      {requestError && <ErrorAlert error={requestError} className='my-6' />}
 
       {!isLoading && !requestError && users.length === 0 && (
         <Empty>
@@ -377,117 +402,69 @@ export function AdminPanel() {
         </Empty>
       )}
 
-      {!isLoading &&
-        !requestError &&
-        users.length > 0 &&
-        (visibleUsers.length > 0 ? (
-          <>
-            <div className='space-y-3 sm:hidden'>
-              {visibleUsers.map((user) => (
-                <div
-                  key={user.id}
-                  className='rounded-lg bg-card p-3 ring-1 ring-foreground/10'
-                >
-                  <div className='flex items-start justify-between gap-3'>
-                    <div className='flex min-w-0 items-center gap-3'>
-                      <UserAvatar name={user.name} />
-                      <div className='min-w-0'>
-                        <p className='truncate text-sm font-medium' title={user.name}>
-                          {user.name}
-                        </p>
-                        <p
-                          className='truncate text-xs text-muted-foreground'
-                          title={user.email}
-                        >
-                          {user.email}
-                        </p>
-                      </div>
-                    </div>
-                    <StatusBadge isActive={user.is_active} />
-                  </div>
-
-                  <div className='mt-3 flex items-end justify-between gap-2 border-t pt-3'>
-                    <div className='min-w-0 space-y-1'>
-                      <RoleBadges user={user} />
-                      <p className='text-xs text-muted-foreground'>
-                        {accessSummary(user)}
+      {!requestError &&
+        (isLoading || users.length > 0) &&
+        (visibleUsers.length > 0 || (isLoading && users.length === 0) ? (
+          <CustomTable
+            head={
+              <>
+                <TableHead>User</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead className='hidden md:table-cell'>Access</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className='w-0 text-right'>Actions</TableHead>
+              </>
+            }
+            mobile={userCards}
+            loading={isLoading && users.length === 0}
+            loadingLabel='Loading users…'
+            colSpan={5}
+          >
+            {visibleUsers.map((user) => (
+              <TableRow key={user.id}>
+                <TableCell>
+                  <div className='flex min-w-0 items-center gap-3'>
+                    <UserAvatar name={user.name} />
+                    <div className='min-w-0'>
+                      <p
+                        className='max-w-48 truncate text-sm font-medium'
+                        title={user.name}
+                      >
+                        {user.name}
+                      </p>
+                      <p
+                        className='max-w-48 truncate text-xs text-muted-foreground'
+                        title={user.email}
+                      >
+                        {user.email}
                       </p>
                     </div>
-                    <Button
-                      type='button'
-                      variant='ghost'
-                      size='icon-sm'
-                      aria-label={`Manage ${user.name}`}
-                      title={`Manage ${user.name}`}
-                      onClick={() => openManage(user)}
-                    >
-                      <Pencil strokeWidth={2} />
-                    </Button>
                   </div>
-                </div>
-              ))}
-            </div>
-
-            <div className='hidden sm:block'>
-              <Table>
-                <TableHeader>
-                  <TableRow className='bg-muted/50'>
-                    <TableHead>User</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead className='hidden md:table-cell'>Access</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className='w-0 text-right'>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {visibleUsers.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell>
-                        <div className='flex min-w-0 items-center gap-3'>
-                          <UserAvatar name={user.name} />
-                          <div className='min-w-0'>
-                            <p
-                              className='max-w-48 truncate text-sm font-medium'
-                              title={user.name}
-                            >
-                              {user.name}
-                            </p>
-                            <p
-                              className='max-w-48 truncate text-xs text-muted-foreground'
-                              title={user.email}
-                            >
-                              {user.email}
-                            </p>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <RoleBadges user={user} />
-                      </TableCell>
-                      <TableCell className='hidden max-w-56 truncate text-xs text-muted-foreground md:table-cell'>
-                        {accessSummary(user)}
-                      </TableCell>
-                      <TableCell>
-                        <StatusBadge isActive={user.is_active} />
-                      </TableCell>
-                      <TableCell className='text-right'>
-                        <Button
-                          type='button'
-                          variant='ghost'
-                          size='icon-sm'
-                          aria-label={`Manage ${user.name}`}
-                          title={`Manage ${user.name}`}
-                          onClick={() => openManage(user)}
-                        >
-                          <Pencil strokeWidth={2} />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </>
+                </TableCell>
+                <TableCell>
+                  <RoleBadges user={user} />
+                </TableCell>
+                <TableCell className='hidden max-w-56 truncate text-xs text-muted-foreground md:table-cell'>
+                  {accessSummary(user)}
+                </TableCell>
+                <TableCell>
+                  <StatusBadge isActive={user.is_active} />
+                </TableCell>
+                <TableCell className='text-right'>
+                  <Button
+                    type='button'
+                    variant='ghost'
+                    size='icon-sm'
+                    aria-label={`Manage ${user.name}`}
+                    title={`Manage ${user.name}`}
+                    onClick={() => openManage(user)}
+                  >
+                    <Pencil strokeWidth={2} />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </CustomTable>
         ) : (
           <p className='py-6 text-sm text-muted-foreground'>
             No {filter} users.
