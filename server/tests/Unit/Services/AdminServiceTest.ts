@@ -101,9 +101,10 @@ describe('AdminService', () => {
             is_active: true,
             is_admin: true,
         });
-        expect(updated.name).toBe('Renamed');
-        expect(updated.is_admin).toBe(true);
-        expect(updated.events).toEqual(['process.delete']);
+        expect(updated.view.name).toBe('Renamed');
+        expect(updated.view.is_admin).toBe(true);
+        expect(updated.view.events).toEqual(['process.delete']);
+        expect(updated.previous.name).toBe('User');
     });
 
     it('revokes existing tokens when an account is disabled', async () => {
@@ -117,7 +118,7 @@ describe('AdminService', () => {
         const updated = await service.updateUser(1, { is_active: false });
 
         expect(User.bumpTokenVersion).toHaveBeenCalledWith(1);
-        expect(updated.is_active).toBe(false);
+        expect(updated.view.is_active).toBe(false);
     });
 
     it('refuses to modify the ENV admin', async () => {
@@ -157,7 +158,8 @@ describe('AdminService', () => {
             ['servers'],
             ['server.create']
         );
-        expect(updated.pages).toEqual(['servers']);
-        expect(updated.events).toEqual(['server.create']);
+        expect(updated.view.pages).toEqual(['servers']);
+        expect(updated.view.events).toEqual(['server.create']);
+        expect(updated.previous).toEqual({ pages: ['servers'], events: ['server.create'] });
     });
 });

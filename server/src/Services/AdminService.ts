@@ -32,6 +32,16 @@ export interface AdminUserUpdate {
     is_admin?: boolean | undefined;
 }
 
+export interface AdminUserUpdateResult {
+    view: AdminUserView;
+    previous: UserRecord;
+}
+
+export interface AdminAccessUpdateResult {
+    view: AdminUserView;
+    previous: UserAccess;
+}
+
 export interface AdminUserView {
     id: number;
     email: string;
@@ -92,7 +102,7 @@ export class AdminService {
         };
     }
 
-    async updateUser(id: number, data: AdminUserUpdate): Promise<AdminUserView> {
+    async updateUser(id: number, data: AdminUserUpdate): Promise<AdminUserUpdateResult> {
         const user = await this.requireUser(id);
         if (this.isEnvAdmin(user)) {
             throw new HttpException(
@@ -125,14 +135,14 @@ export class AdminService {
             throw new NotFoundException('User');
         }
 
-        return this.viewFor(updated);
+        return { view: await this.viewFor(updated), previous: user };
     }
 
     async replaceAccess(
         id: number,
         pages: PageKey[],
         events: EventKey[]
-    ): Promise<AdminUserView> {
+    ): Promise<AdminAccessUpdateResult> {
         const user = await this.requireUser(id);
         if (this.isEnvAdmin(user)) {
             throw new HttpException(
@@ -142,13 +152,20 @@ export class AdminService {
             );
         }
 
+        let previous: UserAccess;
+        try {
+            previous = await this.access.grantsFor(id);
+        } catch (error) {
+            throw databaseException(error, 'Failed to retrieve user access');
+        }
+
         try {
             await this.access.replaceGrants(id, pages, events);
         } catch (error) {
             throw databaseException(error, 'Failed to update user access');
         }
 
-        return this.viewFor(user);
+        return { view: await this.viewFor(user), previous };
     }
 
     private async requireUser(id: number): Promise<UserRecord> {
