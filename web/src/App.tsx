@@ -8,11 +8,11 @@ import { ThemeToggle } from '@/components/custom/ThemeToggle'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useFullscreen } from '@/hooks/use-fullscreen'
-import { useSessionExpiry } from '@/hooks/use-session-expiry'
+import { useSessionRefresh } from '@/hooks/use-session-refresh'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
 export function App() {
-  useSessionExpiry()
+  useSessionRefresh()
 
   return (
     <SidebarProvider className="h-dvh overflow-hidden">
