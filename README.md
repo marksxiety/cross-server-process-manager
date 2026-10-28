@@ -70,7 +70,7 @@ Ready to connect your own servers → **[docs/setup-actual.md](docs/setup-actual
 - **Inspect anything, anywhere** — open any process and get its full story: how it's running, how it's been behaving, and what it's saying
 - **Follow live logs** — watch stdout/stderr stream in as it happens, no terminal required
 - **Register new services in minutes** — guided setup with ready-made templates and a production-ready config you can copy in one click
-- **Control access** — email-verified accounts, admin-managed page/action grants, and revocable 12-hour sessions
+- **Control access** — email-verified accounts, admin-managed page/action grants, and revocable sessions that renew silently via rotating refresh tokens
 - **Watch it anywhere** — including fullscreen, for a dedicated ops screen
 
 ## What you can monitor

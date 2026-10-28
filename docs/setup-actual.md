@@ -122,7 +122,7 @@ Only change these if you are using different ports or a different hostname. `VIT
 
 ### 3.6 Email (required for user accounts)
 
-XPM uses email for account verification and password reset. Self-registered users cannot sign in until they open the verification link, and password reset also requires email.
+XPM uses email for account verification and password reset. Self-registered users cannot sign in until they open the verification link, and password reset also requires email. Messages are sent as HTML with a plain-text fallback.
 
 For local development only, leave `MAIL_HOST` empty and the server prints the links to its console. In production (`NODE_ENV=production`), the server refuses to start without `MAIL_HOST`.
 
@@ -150,11 +150,13 @@ MAIL_FROM=you@gmail.com
 <details>
 <summary>Token and link lifetimes, link base URL</summary>
 
-| Variable                | What it does                                                                                                          | Default                    |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------- | -------------------------- |
-| `JWT_EXPIRES_IN`        | Login lifetime in seconds (max `604800`)                                                                              | `43200` (12h)              |
-| `AUTH_LINK_TTL_MINUTES` | How long email links stay valid                                                                                       | `30`                       |
-| `AUTH_LINK_BASE_URL`    | Base URL used in emailed links. Set it only if your public dashboard URL differs (reverse proxy, different hostname). | built from `VITE_*` values |
+| Variable                     | What it does                                                                                                          | Default                    |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| `JWT_EXPIRES_IN`             | Access-token lifetime in seconds (max `604800`). The dashboard renews it silently before it expires.                  | `3600` (1h)                |
+| `REFRESH_TOKEN_TTL_DAYS`     | Refresh-token lifetime in days. Each refresh extends the window, so inactive sessions end after this long.            | `30`                       |
+| `REFRESH_REUSE_GRACE_SECONDS`| Window in which a replayed rotated token is treated as a concurrent tab rather than theft.                            | `30`                       |
+| `AUTH_LINK_TTL_MINUTES`      | How long email links stay valid                                                                                       | `30`                       |
+| `AUTH_LINK_BASE_URL`         | Base URL used in emailed links. Set it only if your public dashboard URL differs (reverse proxy, different hostname). | built from `VITE_*` values |
 
 </details>
 
