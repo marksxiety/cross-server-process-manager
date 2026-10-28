@@ -1,3 +1,4 @@
+import { EventEmitter } from 'node:events';
 import type { NextFunction, Request, Response } from 'express';
 import { vi, type Mock } from 'vitest';
 import { handleException } from '../../src/Exceptions/Handler';
@@ -17,11 +18,19 @@ export function createRequest(overrides: {
 }
 
 export function createResponse(): MockResponse {
+    const emitter = new EventEmitter();
     const res = {
         status: vi.fn(),
         json: vi.fn(),
+        once: emitter.once.bind(emitter),
+        locals: {},
     };
     res.status.mockReturnValue(res);
+    res.json.mockImplementation(() => {
+        // Mirror Express: a response that has been written emits `finish`.
+        emitter.emit('finish');
+        return res;
+    });
     return res as unknown as MockResponse;
 }
 

@@ -4,6 +4,11 @@ vi.mock('../../src/Persistence/Connection', () => ({
     default: { query: vi.fn(), beginTransaction: vi.fn() },
 }));
 
+vi.mock('../../src/Services/AuditService', () => ({
+    auditAfter: vi.fn(),
+    recordAudit: vi.fn(),
+}));
+
 import db from '../../src/Persistence/Connection';
 import { TokenService } from '../../src/Auth/TokenService';
 import { AuthController } from '../../src/Http/Controllers/AuthController';
