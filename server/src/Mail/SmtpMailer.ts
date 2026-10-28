@@ -24,6 +24,7 @@ export class SmtpMailer implements Mailer {
             to: message.to,
             subject: message.subject,
             text: message.text,
+            html: message.html,
         });
     }
 }
