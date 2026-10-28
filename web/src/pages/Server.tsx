@@ -52,6 +52,7 @@ import { ErrorAlert } from '@/components/custom/error-alert'
 import { PageHeader } from '@/components/custom/page-header'
 import { ServerTable } from '@/components/custom/server-table'
 import { useServerStore } from '@/stores/server.store'
+import { useAccess } from '@/hooks/use-access'
 import { probeAgent } from '@/api/services/agent.service'
 import { serverService } from '@/api/services/server.service'
 import {
@@ -94,6 +95,10 @@ export function Server() {
   const requestError = useServerStore((state) => state.requestError)
   const load = useServerStore((state) => state.load)
   const reload = useServerStore((state) => state.reload)
+  const access = useAccess()
+  const canCreate = access.canDo('server.create')
+  const canUpdate = access.canDo('server.update')
+  const canDelete = access.canDo('server.delete')
 
   const {
     register,
@@ -111,12 +116,14 @@ export function Server() {
   }, [load])
 
   const openRegister = () => {
+    if (!canCreate) return
     setEditingServer(null)
     reset(DEFAULT_FORM_VALUES)
     setIsSheetOpen(true)
   }
 
   const openEdit = (server: RegisteredServer) => {
+    if (!canUpdate) return
     setEditingServer(server)
     reset(toFormValues(server))
     setIsSheetOpen(true)
@@ -130,6 +137,7 @@ export function Server() {
   const onSubmit = handleSubmit(async (values) => {
     const target = editingServer
     const isEditing = target !== null
+    if (isEditing ? !canUpdate : !canCreate) return
 
     // New registrations are gated on the target answering the agent's public
     // root route, so an unreachable (or non-agent) host:port can't be added.
@@ -174,7 +182,7 @@ export function Server() {
 
   const confirmDelete = async () => {
     const target = deletingServer
-    if (!target || isDeleting) return
+    if (!target || isDeleting || !canDelete) return
 
     setIsDeleting(true)
 
@@ -246,10 +254,12 @@ export function Server() {
         </Tabs>
 
         <Sheet open={isSheetOpen} onOpenChange={handleSheetOpenChange}>
-          <Button size='sm' className='w-full sm:w-auto' onClick={openRegister}>
-            <Plus strokeWidth={2} />
-            Register server
-          </Button>
+          {canCreate && (
+            <Button size='sm' className='w-full sm:w-auto' onClick={openRegister}>
+              <Plus strokeWidth={2} />
+              Register server
+            </Button>
+          )}
           <SheetContent size='md'>
             <SheetHeader className='shrink-0 pr-8'>
               <SheetTitle>
@@ -409,10 +419,14 @@ export function Server() {
       </PageHeader>
 
       {status === 'loading' && (
-        <div className='flex items-center gap-2 text-sm text-muted-foreground py-6'>
-          <Spinner className='size-4' />
-          Loading servers…
-        </div>
+        <ServerTable
+          servers={[]}
+          loading
+          onEdit={openEdit}
+          onDelete={setDeletingServer}
+          canEdit={canUpdate}
+          canDelete={canDelete}
+        />
       )}
 
       {status === 'error' && requestError && (
@@ -440,6 +454,8 @@ export function Server() {
             servers={filteredServers}
             onEdit={openEdit}
             onDelete={setDeletingServer}
+            canEdit={canUpdate}
+            canDelete={canDelete}
           />
         ) : (
           <p className='text-sm text-muted-foreground py-6'>

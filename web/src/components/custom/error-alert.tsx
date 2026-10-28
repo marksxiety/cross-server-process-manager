@@ -13,9 +13,26 @@ type ErrorAlertProps = {
   error: ApiError
   onRetry?: () => void
   className?: string
+  showDetails?: boolean
 }
 
-export function ErrorAlert({ error, onRetry, className }: ErrorAlertProps) {
+export function ErrorAlert({
+  error,
+  onRetry,
+  className,
+  showDetails = true,
+}: ErrorAlertProps) {
+  if (!showDetails) {
+    return (
+      <Alert variant='destructive' className={className}>
+        <TriangleAlert strokeWidth={2} />
+        <AlertDescription className='col-start-2'>
+          {error.message}
+        </AlertDescription>
+      </Alert>
+    )
+  }
+
   return (
     <Alert variant='destructive' className={className}>
       <TriangleAlert strokeWidth={2} />

@@ -1,6 +1,6 @@
 {
   "name": "xpm-web",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -24,6 +24,7 @@
     "cn": "^0.3.0",
     "cronstrue": "^3.32.0",
     "echarts": "^6.1.0",
+    "input-otp": "^1.5.0",
     "lucide-react": "^1.33.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

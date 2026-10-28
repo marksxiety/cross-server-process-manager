@@ -2,16 +2,23 @@ import { Outlet, useLocation } from 'react-router'
 import { Maximize, Minimize2 } from 'lucide-react'
 import { SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/custom/AppSidebar'
+import { SessionExpiredDialog } from '@/components/auth/session-expired-dialog'
+import { SignedOutDialog } from '@/components/auth/signed-out-dialog'
 import { ThemeToggle } from '@/components/custom/ThemeToggle'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useFullscreen } from '@/hooks/use-fullscreen'
+import { useSessionRefresh } from '@/hooks/use-session-refresh'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
 export function App() {
+  useSessionRefresh()
+
   return (
     <SidebarProvider className="h-dvh overflow-hidden">
       <AppLayout />
+      <SessionExpiredDialog />
+      <SignedOutDialog />
     </SidebarProvider>
   )
 }
@@ -20,7 +27,8 @@ function AppLayout() {
   const { isFullscreen, toggleFullscreen } = useFullscreen()
   const { setOpenMobile } = useSidebar()
   const { pathname } = useLocation()
-  const showFullscreenToggle = pathname === '/'
+  const isDashboard = pathname === '/'
+  const showFullscreenToggle = isDashboard
 
   const handleToggleFullscreen = () => {
     if (!isFullscreen) setOpenMobile(false)
@@ -44,7 +52,7 @@ function AppLayout() {
           </div>
 
           {/* Theme & Fullscreen Triggers */}
-          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+          <div className='flex shrink-0 items-center gap-1 sm:gap-2'>
             <ThemeToggle />
             {showFullscreenToggle && (
               <Button
@@ -68,7 +76,12 @@ function AppLayout() {
         {/* Scrollable Page Content */}
         <div className="min-h-0 flex-1 overflow-hidden bg-muted/30">
           <ScrollArea className="h-full">
-            <div className="mx-auto flex min-h-full w-full max-w-7xl min-w-0 flex-col px-4 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6">
+            <div
+              className={cn(
+                'flex min-h-full w-full min-w-0 flex-col px-4 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6',
+                !isDashboard && 'mx-auto max-w-7xl',
+              )}
+            >
               <div className="min-w-0 flex-1">
                 <Outlet />
               </div>

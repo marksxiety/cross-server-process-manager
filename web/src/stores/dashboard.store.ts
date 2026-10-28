@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { serverService } from "@/api/services/server.service";
 import { processService } from "@/api/services/process.service";
+import { queueAudit, type AuditAction } from "@/api/services/audit.service";
 import { isDemoMode } from "@/lib/demo-mode";
 import { PROCESS_STATE_CONFLICT_CODE, toApiError, toUnreachableError } from "@/lib/error-code";
 import { canRunProcessCommand } from "@/lib/process-runtime";
@@ -271,7 +272,15 @@ export const useDashboardStore = create<DashboardState>()(
 
                 try {
                     const result = await call();
-                    if (result.success) await get().refreshServer(server);
+                    if (result.success) {
+                        await get().refreshServer(server);
+                        queueAudit({
+                            action: `process.${command}` as AuditAction,
+                            server_id: server.id,
+                            pm_id: process.pm_id,
+                            ...(cached?.name ? { process_name: cached.name } : {}),
+                        });
+                    }
                     return result;
                 } catch (cause) {
                     const requestError = toUnreachableError(cause);

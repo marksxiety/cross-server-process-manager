@@ -64,6 +64,15 @@ describe('errorCodeLabel', () => {
     expect(errorCodeLabel('DUPLICATE_HOST')).toBe('Host already registered')
     expect(errorCodeLabel('DUPLICATE_TEMPLATE')).toBe('Template already registered')
     expect(errorCodeLabel('DATABASE_UNAVAILABLE')).toBe('Database unavailable')
+    expect(errorCodeLabel('EMAIL_TAKEN')).toBe('Email already registered')
+    expect(errorCodeLabel('INVALID_CREDENTIALS')).toBe('Invalid email or password')
+    expect(errorCodeLabel('ACCOUNT_DISABLED')).toBe('Account disabled')
+    expect(errorCodeLabel('EMAIL_NOT_VERIFIED')).toBe('Email not verified')
+    expect(errorCodeLabel('TOKEN_EXPIRED')).toBe('Session expired')
+    expect(errorCodeLabel('INVALID_TOKEN')).toBe('Invalid session')
+    expect(errorCodeLabel('LINK_EXPIRED')).toBe('Link expired')
+    expect(errorCodeLabel('LINK_ALREADY_USED')).toBe('Link already used')
+    expect(errorCodeLabel('LINK_INVALID')).toBe('Invalid link')
   })
 
   test('falls back to the code itself when no label exists', () => {

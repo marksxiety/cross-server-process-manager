@@ -30,7 +30,7 @@
         --xpm-primary: oklch(0.922 0 0);
       }
 
-      #initial-loader {
+      .xpm-initial-loader {
         position: fixed;
         inset: 0;
         display: flex;
@@ -40,12 +40,12 @@
         z-index: 9999;
         transition: opacity 0.2s ease;
       }
-      #initial-loader .icon-wrap {
+      .xpm-initial-loader .icon-wrap {
         width: 64px;
         height: 64px;
         animation: xpm-breathe 2.4s ease-in-out infinite;
       }
-      #initial-loader .progress-track {
+      .xpm-initial-loader .progress-track {
         position: absolute;
         top: calc(50% + 52px);
         left: 50%;
@@ -56,7 +56,7 @@
         overflow: hidden;
         background: var(--xpm-border);
       }
-      #initial-loader .progress-fill {
+      .xpm-initial-loader .progress-fill {
         position: absolute;
         top: 0;
         left: -45%;
@@ -73,7 +73,7 @@
         animation: xpm-slide 1.3s ease-in-out infinite;
       }
 
-      #initial-loader .xpm-icon {
+      .xpm-initial-loader .xpm-icon {
         display: block;
         width: 100%;
         height: 100%;
@@ -100,7 +100,7 @@
   </head>
   <body>
     <div id="root">
-      <div id="initial-loader">
+      <div class="xpm-initial-loader">
         <div class="icon-wrap">
           <img
             src="./src/assets/xpm-icon.svg"

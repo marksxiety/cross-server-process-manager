@@ -54,6 +54,7 @@ import { ProcessForm } from '@/components/custom/process-form'
 import { TemplateCard } from '@/components/custom/template-card'
 import { TemplatePreview } from '@/components/custom/template-preview'
 import { useTemplateStore } from '@/stores/template.store'
+import { useAccess } from '@/hooks/use-access'
 import { errorCodeLabel, toApiError } from '@/lib/error-code'
 import { clearDisabledValues } from '@/lib/process-fields'
 import { toSavableValues } from '@/lib/template-keys'
@@ -135,6 +136,11 @@ export function Template() {
   const save = useTemplateStore((state) => state.save)
   const remove = useTemplateStore((state) => state.remove)
   const navigate = useNavigate()
+  const access = useAccess()
+  const canCreate = access.canDo('template.create')
+  const canUpdate = access.canDo('template.update')
+  const canDelete = access.canDo('template.delete')
+  const canUseTemplate = access.canVisit('process') && access.canDo('process.start')
 
   useEffect(() => {
     void load()
@@ -169,6 +175,7 @@ export function Template() {
   const payloadJson = useMemo(() => JSON.stringify(payload, null, 2), [payload])
 
   const handleUse = (template: ProcessTemplate) => {
+    if (!canUseTemplate) return
     void navigate(`/process?template=${template.id}`)
   }
 
@@ -181,6 +188,7 @@ export function Template() {
   }
 
   const openCreate = () => {
+    if (!canCreate) return
     setDraft(EMPTY_DRAFT)
     setNameError(false)
     setValues({})
@@ -219,7 +227,7 @@ export function Template() {
   }
 
   const saveKeys = async () => {
-    if (saving || deleting) return
+    if (saving || deleting || !canUpdate) return
     setSaving(true)
     try {
       const result = await handleSave(values)
@@ -239,7 +247,7 @@ export function Template() {
   }
 
   const registerTemplate = async () => {
-    if (creating || saving) return
+    if (creating || saving || !canCreate) return
 
     const templateName = draft.template_name.trim()
     if (templateName === '') {
@@ -276,7 +284,7 @@ export function Template() {
   }
 
   const confirmDelete = async () => {
-    if (deleting || saving || !selected) return
+    if (deleting || saving || !selected || !canDelete) return
     setDeleting(true)
     try {
       const result = await handleDelete(selected)
@@ -327,10 +335,12 @@ export function Template() {
           >
             <RefreshCw strokeWidth={2} />
           </Button>
-          <Button size='sm' className='flex-1 sm:flex-none' onClick={openCreate}>
-            <Plus strokeWidth={2} />
-            New Template
-          </Button>
+          {canCreate && (
+            <Button size='sm' className='flex-1 sm:flex-none' onClick={openCreate}>
+              <Plus strokeWidth={2} />
+              New Template
+            </Button>
+          )}
         </div>
       </PageHeader>
 
@@ -373,6 +383,7 @@ export function Template() {
                       template={template}
                       onOpen={openTemplate}
                       onUse={handleUse}
+                      canUse={canUseTemplate}
                     />
                   ))}
                 </div>
@@ -442,39 +453,47 @@ export function Template() {
           </div>
 
           <SheetFooter className='flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
-            <Button
-              type='button'
-              className='w-full sm:w-auto'
-              onClick={() => {
-                if (!selected) return
-                handleUse(selected)
-                setSelected(null)
-              }}
-            >
-              <Wand2 strokeWidth={2} />
-              Use template
-            </Button>
-            <div className='grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto'>
-              <Button
-                type='button'
-                variant='destructive'
-                className='w-full sm:w-auto'
-                disabled={deleting}
-                onClick={() => setConfirmOpen(true)}
-              >
-                <Trash2 strokeWidth={2} />
-                Delete
-              </Button>
+            {canUseTemplate && (
               <Button
                 type='button'
                 className='w-full sm:w-auto'
-                disabled={saving}
-                onClick={() => void saveKeys()}
+                onClick={() => {
+                  if (!selected) return
+                  handleUse(selected)
+                  setSelected(null)
+                }}
               >
-                {saving && <Spinner className='size-3.5' />}
-                Save
+                <Wand2 strokeWidth={2} />
+                Use template
               </Button>
-            </div>
+            )}
+            {(canDelete || canUpdate) && (
+              <div className='grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto'>
+                {canDelete && (
+                  <Button
+                    type='button'
+                    variant='destructive'
+                    className='w-full sm:w-auto'
+                    disabled={deleting}
+                    onClick={() => setConfirmOpen(true)}
+                  >
+                    <Trash2 strokeWidth={2} />
+                    Delete
+                  </Button>
+                )}
+                {canUpdate && (
+                  <Button
+                    type='button'
+                    className='w-full sm:w-auto'
+                    disabled={saving}
+                    onClick={() => void saveKeys()}
+                  >
+                    {saving && <Spinner className='size-3.5' />}
+                    Save
+                  </Button>
+                )}
+              </div>
+            )}
           </SheetFooter>
 
           <AlertDialog
