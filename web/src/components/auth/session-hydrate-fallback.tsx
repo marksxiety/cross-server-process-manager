@@ -1,10 +1,19 @@
-import { PageLoader } from '@/components/custom/page-loader'
+import xpmIcon from '@/assets/xpm-icon.svg'
 
 /** Shown by the router while the initial /auth/me check resolves. */
 export function SessionHydrateFallback() {
   return (
-    <div className='flex min-h-dvh items-center justify-center bg-muted/30 p-4 sm:p-6'>
-      <PageLoader title='Loading XPM.' />
+    <div
+      className='xpm-initial-loader'
+      role='status'
+      aria-label='Loading XPM'
+    >
+      <div className='icon-wrap'>
+        <img src={xpmIcon} className='xpm-icon' alt='' />
+      </div>
+      <div className='progress-track'>
+        <div className='progress-fill' />
+      </div>
     </div>
   )
 }
