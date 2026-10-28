@@ -5,6 +5,7 @@ import { loadMailConfig } from '../config/mail';
 import { AuthTokenService } from '../src/Auth/AuthTokenService';
 import { TokenService } from '../src/Auth/TokenService';
 import { AdminController } from '../src/Http/Controllers/AdminController';
+import { AuditController } from '../src/Http/Controllers/AuditController';
 import { AuthController } from '../src/Http/Controllers/AuthController';
 import { HealthController } from '../src/Http/Controllers/HealthController';
 import { PasswordResetController } from '../src/Http/Controllers/PasswordResetController';
@@ -57,7 +58,9 @@ const auth = new AuthController(authService);
 const registration = new RegistrationController(registrationService);
 const reset = new PasswordResetController(passwordReset);
 const admin = new AdminController(adminService);
-const servers = new ServerController(new ServerService());
+const serverService = new ServerService();
+const servers = new ServerController(serverService);
+const audit = new AuditController(serverService);
 const templates = new TemplateController(new TemplateService());
 
 router.get('/', health.check);
@@ -71,6 +74,8 @@ router.post('/auth/logout', authed, auth.logout);
 router.post('/auth/forgot-password', reset.request);
 router.post('/auth/reset-password', reset.reset);
 
+router.post('/audit/events', authed, audit.recordEvent);
+
 router.get('/servers', servers.index);
 router.post('/register', authed, requireEvent('server.create'), servers.store);
 router.put('/servers/:id', authed, requireEvent('server.update'), servers.update);
@@ -83,6 +88,7 @@ router.delete('/templates/:id', authed, requireEvent('template.delete'), templat
 
 router.get('/admin/users', authed, requireAdmin(), admin.index);
 router.get('/admin/catalog', authed, requireAdmin(), admin.catalog);
+router.get('/admin/audit', authed, requireAdmin(), audit.recent);
 router.put('/admin/users/:id', authed, requireAdmin(), admin.updateUser);
 router.put('/admin/users/:id/access', authed, requireAdmin(), admin.updateAccess);
 
