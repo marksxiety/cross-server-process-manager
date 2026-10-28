@@ -4,6 +4,11 @@ vi.mock('../../src/Persistence/Connection', () => ({
     default: { query: vi.fn() },
 }));
 
+vi.mock('../../src/Services/AuditService', () => ({
+    auditAfter: vi.fn(),
+    recordAudit: vi.fn(),
+}));
+
 import db from '../../src/Persistence/Connection';
 import { ServerController } from '../../src/Http/Controllers/ServerController';
 import { ServerService } from '../../src/Services/ServerService';

@@ -15,6 +15,12 @@ export interface ServerState {
     target_exists: boolean;
     name_taken: boolean;
     host_taken: boolean;
+    /** Present when the target row exists; used to build the audit diff. */
+    previous_server?: string | null;
+    previous_protocol?: string | null;
+    previous_host?: string | null;
+    previous_port?: number | null;
+    previous_is_active?: boolean | null;
 }
 
 export interface ServerData {
@@ -59,9 +65,21 @@ export class Server {
         const { rows } = await db.query<ServerState>(
             `SELECT CAST(CASE WHEN EXISTS (SELECT 1 FROM servers WHERE id = @p2) THEN 1 ELSE 0 END AS BIT) AS target_exists,
                     CAST(CASE WHEN EXISTS (SELECT 1 FROM servers WHERE server = @p1 AND id <> @p2) THEN 1 ELSE 0 END AS BIT) AS name_taken,
-                    CAST(CASE WHEN EXISTS (SELECT 1 FROM servers WHERE host = @p3 AND id <> @p2) THEN 1 ELSE 0 END AS BIT) AS host_taken`,
+                    CAST(CASE WHEN EXISTS (SELECT 1 FROM servers WHERE host = @p3 AND id <> @p2) THEN 1 ELSE 0 END AS BIT) AS host_taken,
+                    (SELECT server FROM servers WHERE id = @p2) AS previous_server,
+                    (SELECT protocol FROM servers WHERE id = @p2) AS previous_protocol,
+                    (SELECT host FROM servers WHERE id = @p2) AS previous_host,
+                    (SELECT port FROM servers WHERE id = @p2) AS previous_port,
+                    (SELECT is_active FROM servers WHERE id = @p2) AS previous_is_active`,
             [server, id, host]
         );
+        return rows[0];
+    }
+
+    static async findById(id: number): Promise<ServerRecord | undefined> {
+        const { rows } = await db.query<ServerRecord>('SELECT * FROM servers WHERE id = @p1', [
+            id,
+        ]);
         return rows[0];
     }
 

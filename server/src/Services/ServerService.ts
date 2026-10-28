@@ -2,7 +2,7 @@ import { describeDbError, isUniqueViolation } from '../Persistence/DatabaseError
 import { DatabaseException } from '../Exceptions/DatabaseException';
 import { DuplicateResourceException } from '../Exceptions/DuplicateResourceException';
 import { NotFoundException } from '../Exceptions/NotFoundException';
-import { Server, type ServerData, type ServerRecord } from '../Models/Server';
+import { Server, type ServerData, type ServerRecord, type ServerState } from '../Models/Server';
 
 const DUPLICATE_SERVER_CODE = 'DUPLICATE_SERVER';
 const DUPLICATE_HOST_CODE = 'DUPLICATE_HOST';
@@ -40,6 +40,38 @@ function databaseError(error: unknown, fallback: string): DatabaseException {
     );
 }
 
+export interface ServerUpdateResult {
+    server: ServerRecord;
+    changes: Record<string, unknown>;
+}
+
+function updateChanges(state: ServerState, updated: ServerRecord): Record<string, unknown> {
+    // The test doubles (and very old rows) may not return the snapshot columns.
+    if (state.previous_server === undefined) return {};
+
+    const changed: string[] = [];
+    const changes: Record<string, unknown> = {};
+    const compare = (field: string, from: unknown, to: unknown): void => {
+        if (from !== to) {
+            changed.push(field);
+            changes[field] = { from, to };
+        }
+    };
+
+    compare('server', state.previous_server, updated.server);
+    compare('protocol', state.previous_protocol, updated.protocol);
+    compare('host', state.previous_host, updated.host);
+    compare('port', state.previous_port, updated.port);
+    compare(
+        'is_active',
+        state.previous_is_active === undefined ? undefined : Boolean(state.previous_is_active),
+        updated.is_active
+    );
+
+    if (changed.length > 0) changes.changed = changed;
+    return changes;
+}
+
 export class ServerService {
     async list(withInactive: boolean): Promise<ServerRecord[]> {
         try {
@@ -74,7 +106,15 @@ export class ServerService {
         }
     }
 
-    async update(id: number, data: ServerData): Promise<ServerRecord> {
+    async findById(id: number): Promise<ServerRecord | undefined> {
+        try {
+            return await Server.findById(id);
+        } catch (error) {
+            throw databaseError(error, 'Failed to retrieve server');
+        }
+    }
+
+    async update(id: number, data: ServerData): Promise<ServerUpdateResult> {
         try {
             const state = await Server.state(id, data.server, data.host);
 
@@ -106,7 +146,7 @@ export class ServerService {
                 throw new NotFoundException('Server');
             }
 
-            return updated;
+            return { server: updated, changes: updateChanges(state, updated) };
         } catch (error) {
             if (error instanceof NotFoundException || error instanceof DuplicateResourceException) {
                 throw error;
