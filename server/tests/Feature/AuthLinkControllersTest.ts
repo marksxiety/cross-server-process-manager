@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('../../src/Services/AuditService', () => ({
+    auditAfter: vi.fn(),
+    recordAudit: vi.fn(),
+}));
+
 import { HttpException } from '../../src/Exceptions/HttpException';
 import { PasswordResetController } from '../../src/Http/Controllers/PasswordResetController';
 import { RegistrationController } from '../../src/Http/Controllers/RegistrationController';
@@ -31,8 +36,8 @@ beforeEach(() => {
     registrationFns.request.mockReset().mockResolvedValue({ email: 'user@example.com' });
     registrationFns.resend.mockReset().mockResolvedValue(undefined);
     registrationFns.verify.mockReset().mockResolvedValue({ email: 'user@example.com' });
-    resetFns.request.mockReset().mockResolvedValue(undefined);
-    resetFns.reset.mockReset().mockResolvedValue(undefined);
+    resetFns.request.mockReset().mockResolvedValue({ userId: null, sent: true });
+    resetFns.reset.mockReset().mockResolvedValue({ userId: 1 });
 });
 
 describe('RegistrationController', () => {
