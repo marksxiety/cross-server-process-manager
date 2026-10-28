@@ -27,6 +27,8 @@ export interface RegistrationInput {
 
 export interface RegistrationResult {
     email: string;
+    /** Present once an account exists; used for audit attribution only. */
+    userId?: number;
 }
 
 export class RegistrationService {
@@ -132,7 +134,7 @@ export class RegistrationService {
             if (existing) {
                 await RegistrationRequest.attachUser(pending.id, existing.id, session);
                 await session.commit();
-                return { email: existing.email };
+                return { email: existing.email, userId: existing.id };
             }
 
             const user = await User.createVerified(
@@ -153,7 +155,7 @@ export class RegistrationService {
             await this.access.grantDefaults(user.id, session);
             await RegistrationRequest.attachUser(pending.id, user.id, session);
             await session.commit();
-            return { email: user.email };
+            return { email: user.email, userId: user.id };
         } catch (error) {
             await session.rollback().catch(() => undefined);
 
@@ -166,7 +168,7 @@ export class RegistrationService {
                 if (pending) {
                     const existing = await User.findByEmail(pending.email);
                     if (existing) {
-                        return { email: existing.email };
+                        return { email: existing.email, userId: existing.id };
                     }
                 }
                 throw new DuplicateResourceException(EMAIL_TAKEN_MESSAGE, EMAIL_TAKEN_CODE);
@@ -191,7 +193,7 @@ export class RegistrationService {
             if (pending.user_id !== null) {
                 const user = await User.findById(pending.user_id);
                 if (user) {
-                    return { email: user.email };
+                    return { email: user.email, userId: user.id };
                 }
             }
             throw linkAlreadyUsed();

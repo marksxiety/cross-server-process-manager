@@ -222,7 +222,7 @@ describe('RegistrationService.verify', () => {
         expect(access.grantDefaults).toHaveBeenCalledWith(1, session);
         expect(RegistrationRequest.attachUser).toHaveBeenCalledWith(10, 1, session);
         expect(session.commit).toHaveBeenCalledTimes(1);
-        expect(result).toEqual({ email: 'user@example.com' });
+        expect(result).toEqual({ email: 'user@example.com', userId: 1 });
     });
 
     it('attaches an existing verified user and succeeds', async () => {
@@ -234,7 +234,7 @@ describe('RegistrationService.verify', () => {
         expect(User.createVerified).not.toHaveBeenCalled();
         expect(RegistrationRequest.attachUser).toHaveBeenCalledWith(10, 1, session);
         expect(session.commit).toHaveBeenCalledTimes(1);
-        expect(result).toEqual({ email: 'user@example.com' });
+        expect(result).toEqual({ email: 'user@example.com', userId: 1 });
     });
 
     it('reports an already-used token as idempotent success', async () => {
@@ -247,6 +247,7 @@ describe('RegistrationService.verify', () => {
 
         await expect(service.verify('raw-token', 'new-password')).resolves.toEqual({
             email: 'user@example.com',
+            userId: 1,
         });
     });
 
@@ -296,6 +297,7 @@ describe('RegistrationService.verify', () => {
 
         await expect(service.verify('raw-token', 'new-password')).resolves.toEqual({
             email: 'user@example.com',
+            userId: 1,
         });
         expect(session.rollback).toHaveBeenCalled();
     });
