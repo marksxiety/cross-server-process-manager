@@ -34,3 +34,21 @@ export function partitionXpmProcesses(
 
   return { standard, xpm }
 }
+
+/**
+ * Filters by process name or namespace, case-insensitively. An empty query
+ * leaves the list untouched so refreshes never shuffle the result.
+ */
+export function filterProcessItemsByQuery(
+  items: readonly ProcessListItem[],
+  query: string,
+): ProcessListItem[] {
+  const normalized = query.trim().toLowerCase()
+  if (normalized === '') return [...items]
+
+  return items.filter(
+    (item) =>
+      item.process.name.toLowerCase().includes(normalized) ||
+      item.process.namespace.toLowerCase().includes(normalized),
+  )
+}
