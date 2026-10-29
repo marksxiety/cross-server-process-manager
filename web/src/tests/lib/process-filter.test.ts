@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'vitest'
-import { isXpmProcess, partitionXpmProcesses } from '../../lib/process-filter'
+import {
+  filterProcessItemsByQuery,
+  isXpmProcess,
+  partitionXpmProcesses,
+} from '../../lib/process-filter'
 import type { ProcessListItem } from '../../lib/sort-processes'
 import type { ProcessSummary } from '../../types/process'
 import type { RegisteredServer } from '../../types/server'
@@ -67,5 +71,28 @@ describe('partitionXpmProcesses', () => {
 
   test('returns empty groups for an empty list', () => {
     expect(partitionXpmProcesses([])).toEqual({ standard: [], xpm: [] })
+  })
+})
+
+describe('filterProcessItemsByQuery', () => {
+  const api = makeItem(makeProcess({ pm_id: 1, name: 'api-gateway' }))
+  const worker = makeItem(
+    makeProcess({ pm_id: 2, name: 'checkout-worker', namespace: 'payments' }),
+  )
+
+  test('matches the process name case-insensitively', () => {
+    expect(filterProcessItemsByQuery([api, worker], 'API')).toEqual([api])
+  })
+
+  test('matches the namespace case-insensitively', () => {
+    expect(filterProcessItemsByQuery([api, worker], 'PAYMENTS')).toEqual([worker])
+  })
+
+  test('trims the query and treats an empty query as no filter', () => {
+    expect(filterProcessItemsByQuery([api, worker], '   ')).toEqual([api, worker])
+  })
+
+  test('returns no items when nothing matches', () => {
+    expect(filterProcessItemsByQuery([api, worker], 'redis')).toEqual([])
   })
 })
