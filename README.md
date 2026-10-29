@@ -4,7 +4,9 @@
 
 <p align="center"><b>Running your processes with PM2? This one's for you.</b></p>
 
-<p align="center"><img src="web/src/assets/images/demo.png" width="100%" alt="XPM dashboard showing five servers and 28 processes across online, errored, stopped, scheduled, and degraded states" /></p>
+<p align="center"><img src="web/src/assets/images/dashboard.png" width="100%" alt="XPM dashboard showing five servers and 28 processes across online, errored, stopped, scheduled, and degraded states" /></p>
+
+<p align="center"><img src="web/src/assets/images/metrics.png" width="100%" alt="XPM server metrics page for prod-api-us showing CPU and memory gauges plus CPU, memory, status, and uptime charts on a 6-hour window" /></p>
 
 ## The 2 AM problem
 
