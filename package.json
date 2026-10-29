@@ -13,7 +13,9 @@
     "build": "npm run build --workspace=web && npm run build --workspace=server",
     "build:web": "npm run build --workspace=web",
     "build:server": "npm run build --workspace=server",
-    "lint": "npm run lint --workspace=web",
+    "lint": "npm run lint --workspace=web && npm run lint --workspace=server",
+    "lint:web": "npm run lint --workspace=web",
+    "lint:server": "npm run lint --workspace=server",
     "test": "npm run test --workspace=web && npm run test --workspace=server",
     "preview": "npm run preview --workspace=web",
     "run:built": "concurrently -n web,api -c cyan,magenta \"npm run preview --workspace=web\" \"npm run start --workspace=server\""
