@@ -31,6 +31,7 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { useChartTheme } from '@/hooks/use-chart-theme'
 import { useMetricChartSeries } from '@/hooks/use-metric-chart-series'
+import { useMetricsZoom } from '@/hooks/use-metrics-zoom'
 import { useStatusTimeline } from '@/hooks/use-status-timeline'
 import { formatBytes, formatPercent, memorySharePercent } from '@/lib/format'
 import {
@@ -120,6 +121,7 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
   const setMemoryBasis = useMetricsStore((state) => state.setMemoryBasis)
   const theme = useChartTheme()
   const toChartSeries = useMetricChartSeries(metrics)
+  const { selectTimeRange, resetTimeRange } = useMetricsZoom()
   const configured = isPrometheusConfigured()
   const metricsEnabled = configured && serverName !== ''
 
@@ -647,6 +649,9 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
               title='CPU'
               description={cpuDescription}
               series={cpuChartSeries}
+              timeRange={metrics.range}
+              onTimeRangeSelect={selectTimeRange}
+              onResetTimeRange={resetTimeRange}
               theme={theme}
               valueFormatter={formatCpuValue}
               yAxisFormatter={cpuAxisFormatter}
@@ -668,6 +673,9 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
               title='Memory'
               description={memoryDescription}
               series={memoryChartSeries}
+              timeRange={metrics.range}
+              onTimeRangeSelect={selectTimeRange}
+              onResetTimeRange={resetTimeRange}
               theme={theme}
               valueFormatter={memoryValueFormatter}
               yAxisFormatter={memoryAxisFormatter}
@@ -692,6 +700,8 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
                 statusSummary(statusCounts),
               )}
               data={timelineData}
+              onTimeRangeSelect={selectTimeRange}
+              onResetTimeRange={resetTimeRange}
               theme={theme}
               chartClassName='h-56'
               status={metrics.status.pm2_status}
@@ -712,6 +722,9 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
                 filled: true,
                 label: formatSeriesLabel,
               })}
+              timeRange={metrics.range}
+              onTimeRangeSelect={selectTimeRange}
+              onResetTimeRange={resetTimeRange}
               theme={theme}
               valueFormatter={formatUptimeValue}
               yAxisFormatter={formatUptimeAxis}
