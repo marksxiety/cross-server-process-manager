@@ -11,7 +11,6 @@ import type {
 } from "@/types/prometheus";
 
 export const PROMETHEUS_SERVER_LABEL = "app";
-export const PROMETHEUS_RETENTION_MS = 15 * 24 * 60 * 60 * 1000;
 export const MAX_DATA_POINTS = 500;
 export const MIN_STEP_SECONDS = 15;
 export const DEFAULT_METRICS_REFRESH_MS = 30_000;
@@ -176,8 +175,7 @@ export function resolveMetricsRange(
     const end = range.kind === "relative" ? now : Math.min(range.end, now);
     const requestedStart =
         range.kind === "relative" ? end - range.durationMs : range.start;
-    const earliest = now - PROMETHEUS_RETENTION_MS;
-    const start = Math.max(requestedStart, earliest);
+    const start = Math.max(0, Math.min(requestedStart, end - 1000));
     const safeEnd = Math.max(end, start + 1000);
 
     return {
