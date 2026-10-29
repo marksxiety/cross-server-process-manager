@@ -198,7 +198,7 @@ export class RegistrationService {
             }
             throw linkAlreadyUsed();
         }
-        if (Boolean(pending.is_expired)) {
+        if (pending.is_expired) {
             throw linkExpired();
         }
         throw linkInvalid();
