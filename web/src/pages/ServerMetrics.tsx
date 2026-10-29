@@ -10,6 +10,7 @@ import {
 import { ErrorAlert } from '@/components/custom/error-alert'
 import { MetricBasisSwitch } from '@/components/custom/metric-basis-switch'
 import { PageLoader } from '@/components/custom/page-loader'
+import { ProcessesSection } from '@/components/custom/processes-section'
 import { Button } from '@/components/ui/button'
 import {
   Empty,
@@ -155,6 +156,14 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
     if (isInitial) return
     void refreshServer(server)
   }, [metrics.lastUpdated, refreshServer, server])
+
+  const serverProcessItems = useMemo(
+    () =>
+      server && serverEntry?.status === 'success'
+        ? serverEntry.processes.map((process) => ({ server, process }))
+        : [],
+    [server, serverEntry],
+  )
 
   const namespaces = useMemo(() => {
     const values = new Set<string>()
@@ -438,20 +447,72 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
     [namespaces],
   )
 
-  if (!configured) {
-    return (
-      <Empty className='my-10'>
+  const processesEmptyState =
+    serverEntry?.status === 'error' ? (
+      serverEntry.requestError ? (
+        <ErrorAlert
+          error={serverEntry.requestError}
+          onRetry={server ? () => void refreshServer(server) : undefined}
+          className='mt-4'
+        />
+      ) : (
+        <Empty className='mt-4'>
+          <EmptyHeader>
+            <EmptyMedia variant='icon'>
+              <ServerOff strokeWidth={2} />
+            </EmptyMedia>
+            <EmptyTitle>Processes unavailable</EmptyTitle>
+            <EmptyDescription>
+              Could not load processes from {serverName}.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      )
+    ) : (
+      <Empty className='mt-4'>
         <EmptyHeader>
           <EmptyMedia variant='icon'>
-            <Activity strokeWidth={2} />
+            <ServerOff strokeWidth={2} />
           </EmptyMedia>
-          <EmptyTitle>Prometheus not configured</EmptyTitle>
+          <EmptyTitle>No processes</EmptyTitle>
           <EmptyDescription>
-            Set VITE_PROMETHEUS_URL in .env to the browser-reachable Prometheus
-            URL, then restart the dashboard.
+            No processes are reporting on {serverName}.
           </EmptyDescription>
         </EmptyHeader>
       </Empty>
+    )
+
+  const processesSection = server ? (
+    <ProcessesSection
+      className='mt-8'
+      items={serverProcessItems}
+      processesByServer={processesByServer}
+      isLoading={overviewStatus === 'loading' || overviewStatus === 'idle'}
+      isError={overviewStatus === 'error'}
+      empty={processesEmptyState}
+      loadingDescription={`Fetching processes from ${serverName}…`}
+      gridClassName='xl:grid-cols-3 2xl:grid-cols-4'
+    />
+  ) : null
+
+  if (!configured) {
+    return (
+      <div className='min-w-0'>
+        {registryError && <ErrorAlert error={registryError} className='mb-3' />}
+        <Empty className='my-10'>
+          <EmptyHeader>
+            <EmptyMedia variant='icon'>
+              <Activity strokeWidth={2} />
+            </EmptyMedia>
+            <EmptyTitle>Prometheus not configured</EmptyTitle>
+            <EmptyDescription>
+              Set VITE_PROMETHEUS_URL in .env to the browser-reachable Prometheus
+              URL, then restart the dashboard.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+        {processesSection}
+      </div>
     )
   }
 
@@ -484,6 +545,7 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
           title='Loading metrics…'
           description={metricsLoadingDescription(serverName)}
         />
+        {processesSection}
       </div>
     )
   }
@@ -661,6 +723,8 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
           </div>
         </>
       )}
+
+      {processesSection}
     </div>
   )
 }
