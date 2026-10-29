@@ -1,0 +1,35 @@
+name: Unit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Config modules validate these at import time; tests never reach a real
+  # database, so fixed CI-only values keep the suite hermetic without secrets.
+  DB_CONNECTION: sqlsrv
+  DB_DATABASE: xpm_ci
+  DB_USERNAME: xpm_ci
+  JWT_SECRET: ci-only-secret-that-is-longer-than-thirty-two-chars
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.17.0
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - run: npm test
