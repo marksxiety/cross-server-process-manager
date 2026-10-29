@@ -31,6 +31,7 @@ interface DashboardState {
     requestError: ApiError | null;
     processesByServer: Record<string, ServerProcesses>;
     sortOrder: ProcessSortKey[];
+    hideXpmProcesses: boolean;
     isRefreshing: boolean;
     isStarting: boolean;
     isStopping: boolean;
@@ -42,6 +43,7 @@ interface DashboardState {
     refreshServer: (server: RegisteredServer) => Promise<void>;
     reload: () => Promise<void>;
     setSortOrder: (order: ProcessSortKey[]) => void;
+    setHideXpmProcesses: (hide: boolean) => void;
     startProcess: (server: RegisteredServer, process: ProcessCommandTarget) => Promise<ApiResponse<ProcessSummary[]>>;
     stopProcess: (server: RegisteredServer, process: ProcessCommandTarget) => Promise<ApiResponse<ProcessSummary[]>>;
     restartProcess: (server: RegisteredServer, process: ProcessCommandTarget) => Promise<ApiResponse<ProcessSummary[]>>;
@@ -52,7 +54,7 @@ interface DashboardState {
 /** The slice kept in localStorage (see `partialize`). */
 type PersistedDashboardState = Pick<
     DashboardState,
-    "servers" | "serversFetchedAt" | "sortOrder"
+    "servers" | "serversFetchedAt" | "sortOrder" | "hideXpmProcesses"
 >;
 
 /**
@@ -305,6 +307,8 @@ export const useDashboardStore = create<DashboardState>()(
                 // Status (severity grouping) is on by default, pinned to the
                 // front of the order, but the user can uncheck and recheck it.
                 sortOrder: ["status"],
+                // XPM's own processes clutter the dashboard, so they start hidden.
+                hideXpmProcesses: true,
                 isRefreshing: false,
                 isStarting: false,
                 isStopping: false,
@@ -379,6 +383,10 @@ export const useDashboardStore = create<DashboardState>()(
                 // order survives reloads. Called by Dashboard.tsx.
                 setSortOrder: (order) => set({ sortOrder: order }),
 
+                // Stores whether XPM-owned processes are hidden. Persisted so the
+                // dashboard keeps the user's choice across reloads.
+                setHideXpmProcesses: (hide) => set({ hideXpmProcesses: hide }),
+
                 // Lifecycle commands. Each sets its own pending flag (read by the
                 // dashboard to disable/spin the matching button) and is guarded by
                 // runCommand before any request reaches the agent.
@@ -423,12 +431,13 @@ export const useDashboardStore = create<DashboardState>()(
                     sortOrder: ["status", ...previous.filter((key) => key !== "status")],
                 };
             },
-            // Only the server list, its fetch timestamp and the sort preference are
-            // cached; process data is volatile.
+            // Only the server list, its fetch timestamp and the display preferences
+            // are cached; process data is volatile.
             partialize: (state) => ({
                 servers: state.servers,
                 serversFetchedAt: state.serversFetchedAt,
                 sortOrder: state.sortOrder,
+                hideXpmProcesses: state.hideXpmProcesses,
             }),
             // Sanitizes the persisted slice after hydration so corrupt data can never put
             // a non-array into servers or an unknown key into the sort order; invalid
@@ -441,6 +450,10 @@ export const useDashboardStore = create<DashboardState>()(
                     serversFetchedAt:
                         typeof persisted?.serversFetchedAt === "number" ? persisted.serversFetchedAt : null,
                     sortOrder: sanitizeSortOrder(persisted?.sortOrder),
+                    hideXpmProcesses:
+                        typeof persisted?.hideXpmProcesses === "boolean"
+                            ? persisted.hideXpmProcesses
+                            : true,
                 };
             },
             // Reports hydration failures (corrupt JSON, storage unavailable).
