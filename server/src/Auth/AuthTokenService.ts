@@ -86,7 +86,7 @@ export class AuthTokenService {
         if (row.used_at !== null) {
             return { status: 'used', userId: row.user_id };
         }
-        if (Boolean(row.is_expired)) {
+        if (row.is_expired) {
             return { status: 'expired', userId: row.user_id };
         }
         return { status: 'invalid' };
