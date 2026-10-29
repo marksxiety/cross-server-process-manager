@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Calendar } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -12,10 +12,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { formatUptime } from '@/lib/format'
-import {
-  METRICS_RANGE_PRESETS,
-  PROMETHEUS_RETENTION_MS,
-} from '@/lib/prometheus'
+import { METRICS_RANGE_PRESETS } from '@/lib/prometheus'
 import { cn } from '@/lib/utils'
 import type { MetricsRange } from '@/types/prometheus'
 
@@ -64,6 +61,17 @@ export function TimeRangePicker({
   const [to, setTo] = useState('')
   const [dialogNow, setDialogNow] = useState(0)
 
+  useEffect(() => {
+    if (!customOpen) return
+
+    const intervalId = window.setInterval(
+      () => setDialogNow(Date.now()),
+      30_000,
+    )
+
+    return () => window.clearInterval(intervalId)
+  }, [customOpen])
+
   const isCustom = value.kind === 'absolute'
   const customLabel = absoluteRangeLabel(value)
 
@@ -96,8 +104,6 @@ export function TimeRangePicker({
     validationError = 'The start must be before the end.'
   } else if (toValue - fromValue < 60_000) {
     validationError = 'Choose a range of at least one minute.'
-  } else if (fromValue < now - PROMETHEUS_RETENTION_MS) {
-    validationError = 'Prometheus only retains 15 days of history.'
   } else if (toValue > now) {
     validationError = 'The end cannot be in the future.'
   }
@@ -173,12 +179,13 @@ export function TimeRangePicker({
         </Button>
       </div>
 
-      <Dialog open={customOpen && !disabled} onOpenChange={setCustomOpen}>
+      <Dialog open={customOpen} onOpenChange={setCustomOpen}>
         <DialogContent className='sm:max-w-md'>
           <DialogHeader>
             <DialogTitle>Custom time range</DialogTitle>
             <DialogDescription>
-              Times are local. Prometheus retains 15 days of metric history.
+              Times are local. Only the samples Prometheus still retains are
+              shown.
             </DialogDescription>
           </DialogHeader>
 
@@ -190,9 +197,11 @@ export function TimeRangePicker({
                 size='xs'
                 step={60}
                 value={from}
-                min={toLocalInputValue(now - PROMETHEUS_RETENTION_MS)}
                 max={toLocalInputValue(now)}
-                onChange={(event) => setFrom(event.target.value)}
+                onChange={(event) => {
+                  setDialogNow(Date.now())
+                  setFrom(event.target.value)
+                }}
               />
             </label>
             <label className='grid gap-1.5 text-xs'>
@@ -215,9 +224,11 @@ export function TimeRangePicker({
                 size='xs'
                 step={60}
                 value={to}
-                min={toLocalInputValue(now - PROMETHEUS_RETENTION_MS)}
                 max={toLocalInputValue(now)}
-                onChange={(event) => setTo(event.target.value)}
+                onChange={(event) => {
+                  setDialogNow(Date.now())
+                  setTo(event.target.value)
+                }}
               />
             </label>
           </div>
