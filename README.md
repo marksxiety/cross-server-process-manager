@@ -4,6 +4,20 @@
 
 <p align="center"><b>Running your processes with PM2? This one's for you.</b></p>
 
+<p align="center">
+  <a href="https://github.com/marksxiety/cross-server-process-manager/actions/workflows/tests.yml"><img src="https://github.com/marksxiety/cross-server-process-manager/actions/workflows/tests.yml/badge.svg" alt="Unit"></a>
+  <a href="https://github.com/marksxiety/cross-server-process-manager/actions/workflows/build.yml"><img src="https://github.com/marksxiety/cross-server-process-manager/actions/workflows/build.yml/badge.svg" alt="Build"></a>
+  <a href="https://github.com/marksxiety/cross-server-process-manager/actions/workflows/lint.yml"><img src="https://github.com/marksxiety/cross-server-process-manager/actions/workflows/lint.yml/badge.svg" alt="Lint"></a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/MSSQL-12.7-CC2927?logo=microsoftsqlserver&logoColor=white" alt="MSSQL 12.7">
+  <img src="https://img.shields.io/badge/Node-22.17-5FA04E?logo=nodedotjs&logoColor=white" alt="Node 22.17">
+  <img src="https://img.shields.io/badge/React-19.2-61DAFB?logo=react&logoColor=black" alt="React 19.2">
+  <img src="https://img.shields.io/badge/Express-5.2-000000?logo=express&logoColor=white" alt="Express 5.2">
+  <img src="https://img.shields.io/badge/Vite-8.3-646CFF?logo=vite&logoColor=white" alt="Vite 8.3">
+</p>
+
 <p align="center"><img src="web/src/assets/images/dashboard.png" width="100%" alt="XPM dashboard showing five servers and 28 processes across online, errored, stopped, scheduled, and degraded states" /></p>
 
 <p align="center"><img src="web/src/assets/images/metrics.png" width="100%" alt="XPM server metrics page for prod-api-us showing CPU and memory gauges plus CPU, memory, status, and uptime charts on a 6-hour window" /></p>
