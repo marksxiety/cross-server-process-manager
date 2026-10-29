@@ -340,7 +340,6 @@ export function ProcessMetricsTab({
           onRefreshMsChange={setRefreshMs}
           onRefresh={metrics.refresh}
           layout='stacked'
-          disabled={showInitialLoader}
         />
       </div>
 
