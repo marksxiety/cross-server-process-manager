@@ -16,7 +16,6 @@ import {
   latestPoints,
   normalizeCpu,
   parseMatrixResult,
-  PROMETHEUS_RETENTION_MS,
   resolveMetricsRange,
   seriesIdentity,
   sumLastValues,
@@ -178,7 +177,7 @@ describe('computeStep', () => {
     expect(computeStep(6 * HOUR)).toBe(60)
     expect(computeStep(DAY)).toBe(300)
     expect(computeStep(7 * DAY)).toBe(1800)
-    expect(computeStep(PROMETHEUS_RETENTION_MS)).toBe(3600)
+    expect(computeStep(15 * DAY)).toBe(3600)
   })
 })
 
@@ -206,13 +205,36 @@ describe('resolveMetricsRange', () => {
     })
   })
 
-  test('clamps the start to the retention window', () => {
+  test('keeps a relative range longer than the old retention window', () => {
+    expect(
+      resolveMetricsRange({ kind: 'relative', durationMs: 30 * DAY }, now),
+    ).toEqual({
+      start: now - 30 * DAY,
+      end: now,
+      step: computeStep(30 * DAY),
+    })
+  })
+
+  test('keeps a historical absolute range older than the old retention window', () => {
+    expect(
+      resolveMetricsRange(
+        { kind: 'absolute', start: now - 30 * DAY, end: now - DAY },
+        now,
+      ),
+    ).toEqual({
+      start: now - 30 * DAY,
+      end: now - DAY,
+      step: computeStep(29 * DAY),
+    })
+  })
+
+  test('clamps a future absolute end to now', () => {
     const resolved = resolveMetricsRange(
-      { kind: 'relative', durationMs: 30 * DAY },
+      { kind: 'absolute', start: now - HOUR, end: now + HOUR },
       now,
     )
 
-    expect(resolved.start).toBe(now - PROMETHEUS_RETENTION_MS)
+    expect(resolved.start).toBe(now - HOUR)
     expect(resolved.end).toBe(now)
   })
 })

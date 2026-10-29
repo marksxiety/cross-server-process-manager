@@ -12,18 +12,21 @@ import type {
   StatusTimelineData,
   StatusTimelineKind,
 } from '@/types/prometheus'
+import { STATUS_LANE_LABEL_WIDTH, TIME_SERIES_GRID } from './chart-config'
 import { EChart } from './echart'
 
 export type StatusTimelineProps = {
   data: StatusTimelineData
   theme: ChartTheme
+  onTimeRangeSelect?: (start: number, end: number) => void
+  onResetTimeRange?: () => void
   ariaLabel: string
   className?: string
 }
 
 type StatusTimelineOptionInput = Omit<
   StatusTimelineProps,
-  'ariaLabel' | 'className'
+  'ariaLabel' | 'className' | 'onTimeRangeSelect' | 'onResetTimeRange'
 >
 
 type TimelineDatum = {
@@ -231,13 +234,7 @@ function buildStatusTimelineOption({
       enabled: true,
       decal: { show: true },
     },
-    grid: {
-      left: 8,
-      right: 14,
-      top: 12,
-      bottom: showLegend ? 42 : 6,
-      containLabel: true,
-    },
+    grid: TIME_SERIES_GRID,
     tooltip: {
       trigger: 'item',
       confine: true,
@@ -278,7 +275,7 @@ function buildStatusTimelineOption({
         color: theme.mutedText,
         fontSize: 10,
         interval: 0,
-        width: 140,
+        width: STATUS_LANE_LABEL_WIDTH,
         overflow: 'truncate',
       },
       splitLine: { show: false },
@@ -290,6 +287,8 @@ function buildStatusTimelineOption({
 export function StatusTimeline({
   data,
   theme,
+  onTimeRangeSelect,
+  onResetTimeRange,
   ariaLabel,
   className,
 }: StatusTimelineProps) {
@@ -298,5 +297,20 @@ export function StatusTimeline({
     [data, theme],
   )
 
-  return <EChart option={option} ariaLabel={ariaLabel} className={className} />
+  return (
+    <EChart
+      option={option}
+      ariaLabel={ariaLabel}
+      className={className}
+      selection={
+        onTimeRangeSelect
+          ? {
+              enabled: true,
+              onSelect: onTimeRangeSelect,
+              onReset: onResetTimeRange,
+            }
+          : undefined
+      }
+    />
+  )
 }

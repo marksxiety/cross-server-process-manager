@@ -24,6 +24,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useChartTheme } from '@/hooks/use-chart-theme'
 import { useMetricChartSeries } from '@/hooks/use-metric-chart-series'
+import { useMetricsZoom } from '@/hooks/use-metrics-zoom'
 import { useProcessMetrics } from '@/hooks/use-process-metrics'
 import { useStatusTimeline } from '@/hooks/use-status-timeline'
 import { formatBytes, formatPercent, memorySharePercent } from '@/lib/format'
@@ -125,6 +126,7 @@ export function ProcessMetricsTab({
     enabled: configured && active,
   })
   const toChartSeries = useMetricChartSeries(metrics)
+  const { selectTimeRange, resetTimeRange } = useMetricsZoom()
   const styleMap = useMemo(
     () => buildProcessStyleMap(Object.values(metrics.data), theme.palette),
     [metrics.data, theme.palette],
@@ -340,7 +342,6 @@ export function ProcessMetricsTab({
           onRefreshMsChange={setRefreshMs}
           onRefresh={metrics.refresh}
           layout='stacked'
-          disabled={showInitialLoader}
         />
       </div>
 
@@ -374,6 +375,9 @@ export function ProcessMetricsTab({
                 title='CPU'
                 description={cpuDescription}
                 series={cpuChartSeries}
+                timeRange={metrics.range}
+                onTimeRangeSelect={selectTimeRange}
+                onResetTimeRange={resetTimeRange}
                 theme={theme}
                 valueFormatter={formatCpuValue}
                 yAxisFormatter={cpuAxisFormatter}
@@ -394,6 +398,9 @@ export function ProcessMetricsTab({
                 title='Memory'
                 description={memoryDescription}
                 series={memoryChartSeries}
+                timeRange={metrics.range}
+                onTimeRangeSelect={selectTimeRange}
+                onResetTimeRange={resetTimeRange}
                 theme={theme}
                 valueFormatter={memoryValueFormatter}
                 yAxisFormatter={memoryAxisFormatter}
@@ -419,6 +426,8 @@ export function ProcessMetricsTab({
                     : statusLabelFromCode(statusLast),
                 )}
                 data={timelineData}
+                onTimeRangeSelect={selectTimeRange}
+                onResetTimeRange={resetTimeRange}
                 theme={theme}
                 status={metrics.status.pm2_status}
                 error={metricError(metrics.errors, 'pm2_status')}
@@ -445,6 +454,9 @@ export function ProcessMetricsTab({
                     label: () => 'Unstable',
                   }),
                 ]}
+                timeRange={metrics.range}
+                onTimeRangeSelect={selectTimeRange}
+                onResetTimeRange={resetTimeRange}
                 theme={theme}
                 valueFormatter={formatRestartsValue}
                 yAxisFormatter={formatRestartsAxis}
@@ -463,6 +475,9 @@ export function ProcessMetricsTab({
                   color: colorFor,
                   filled: true,
                 })}
+                timeRange={metrics.range}
+                onTimeRangeSelect={selectTimeRange}
+                onResetTimeRange={resetTimeRange}
                 theme={theme}
                 valueFormatter={formatUptimeValue}
                 yAxisFormatter={formatUptimeAxis}

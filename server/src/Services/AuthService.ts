@@ -144,14 +144,14 @@ export class AuthService {
         }
 
         if (record.used_at !== null) {
-            if (Boolean(record.is_reuse)) {
+            if (record.is_reuse) {
                 await this.revokeFamily(record.family_id);
                 throw refreshTokenReused();
             }
             throw refreshInProgress();
         }
 
-        if (Boolean(record.is_expired)) {
+        if (record.is_expired) {
             throw refreshTokenExpired();
         }
 
@@ -292,13 +292,13 @@ export class AuthService {
             return invalidRefreshToken();
         }
         if (record.used_at !== null) {
-            if (Boolean(record.is_reuse)) {
+            if (record.is_reuse) {
                 await this.revokeFamily(record.family_id);
                 return refreshTokenReused();
             }
             return refreshInProgress();
         }
-        if (Boolean(record.is_expired)) {
+        if (record.is_expired) {
             return refreshTokenExpired();
         }
         return invalidRefreshToken();

@@ -1,6 +1,6 @@
 {
   "name": "xpm-server",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "description": "",
   "main": "dist/src/index.js",
@@ -9,6 +9,7 @@
     "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
     "build": "npm run clean && tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
     "start": "node dist/src/index.js",
@@ -37,14 +38,18 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/mssql": "^12.3.0",
     "@types/node": "^26.6.2",
     "@types/nodemailer": "^8.0.2",
+    "eslint": "^10.8.0",
+    "globals": "^17.7.0",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
+    "typescript-eslint": "^8.65.0",
     "vitest": "^5.0.1"
   }
 }

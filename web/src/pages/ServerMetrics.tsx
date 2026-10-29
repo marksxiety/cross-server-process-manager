@@ -10,6 +10,7 @@ import {
 import { ErrorAlert } from '@/components/custom/error-alert'
 import { MetricBasisSwitch } from '@/components/custom/metric-basis-switch'
 import { PageLoader } from '@/components/custom/page-loader'
+import { ProcessesSection } from '@/components/custom/processes-section'
 import { Button } from '@/components/ui/button'
 import {
   Empty,
@@ -30,6 +31,7 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { useChartTheme } from '@/hooks/use-chart-theme'
 import { useMetricChartSeries } from '@/hooks/use-metric-chart-series'
+import { useMetricsZoom } from '@/hooks/use-metrics-zoom'
 import { useStatusTimeline } from '@/hooks/use-status-timeline'
 import { formatBytes, formatPercent, memorySharePercent } from '@/lib/format'
 import {
@@ -119,6 +121,7 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
   const setMemoryBasis = useMetricsStore((state) => state.setMemoryBasis)
   const theme = useChartTheme()
   const toChartSeries = useMetricChartSeries(metrics)
+  const { selectTimeRange, resetTimeRange } = useMetricsZoom()
   const configured = isPrometheusConfigured()
   const metricsEnabled = configured && serverName !== ''
 
@@ -155,6 +158,14 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
     if (isInitial) return
     void refreshServer(server)
   }, [metrics.lastUpdated, refreshServer, server])
+
+  const serverProcessItems = useMemo(
+    () =>
+      server && serverEntry?.status === 'success'
+        ? serverEntry.processes.map((process) => ({ server, process }))
+        : [],
+    [server, serverEntry],
+  )
 
   const namespaces = useMemo(() => {
     const values = new Set<string>()
@@ -438,20 +449,72 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
     [namespaces],
   )
 
-  if (!configured) {
-    return (
-      <Empty className='my-10'>
+  const processesEmptyState =
+    serverEntry?.status === 'error' ? (
+      serverEntry.requestError ? (
+        <ErrorAlert
+          error={serverEntry.requestError}
+          onRetry={server ? () => void refreshServer(server) : undefined}
+          className='mt-4'
+        />
+      ) : (
+        <Empty className='mt-4'>
+          <EmptyHeader>
+            <EmptyMedia variant='icon'>
+              <ServerOff strokeWidth={2} />
+            </EmptyMedia>
+            <EmptyTitle>Processes unavailable</EmptyTitle>
+            <EmptyDescription>
+              Could not load processes from {serverName}.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      )
+    ) : (
+      <Empty className='mt-4'>
         <EmptyHeader>
           <EmptyMedia variant='icon'>
-            <Activity strokeWidth={2} />
+            <ServerOff strokeWidth={2} />
           </EmptyMedia>
-          <EmptyTitle>Prometheus not configured</EmptyTitle>
+          <EmptyTitle>No processes</EmptyTitle>
           <EmptyDescription>
-            Set VITE_PROMETHEUS_URL in .env to the browser-reachable Prometheus
-            URL, then restart the dashboard.
+            No processes are reporting on {serverName}.
           </EmptyDescription>
         </EmptyHeader>
       </Empty>
+    )
+
+  const processesSection = server ? (
+    <ProcessesSection
+      className='mt-8'
+      items={serverProcessItems}
+      processesByServer={processesByServer}
+      isLoading={overviewStatus === 'loading' || overviewStatus === 'idle'}
+      isError={overviewStatus === 'error'}
+      empty={processesEmptyState}
+      loadingDescription={`Fetching processes from ${serverName}…`}
+      gridClassName='xl:grid-cols-3 2xl:grid-cols-4'
+    />
+  ) : null
+
+  if (!configured) {
+    return (
+      <div className='min-w-0'>
+        {registryError && <ErrorAlert error={registryError} className='mb-3' />}
+        <Empty className='my-10'>
+          <EmptyHeader>
+            <EmptyMedia variant='icon'>
+              <Activity strokeWidth={2} />
+            </EmptyMedia>
+            <EmptyTitle>Prometheus not configured</EmptyTitle>
+            <EmptyDescription>
+              Set VITE_PROMETHEUS_URL in .env to the browser-reachable Prometheus
+              URL, then restart the dashboard.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+        {processesSection}
+      </div>
     )
   }
 
@@ -484,6 +547,7 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
           title='Loading metrics…'
           description={metricsLoadingDescription(serverName)}
         />
+        {processesSection}
       </div>
     )
   }
@@ -585,6 +649,9 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
               title='CPU'
               description={cpuDescription}
               series={cpuChartSeries}
+              timeRange={metrics.range}
+              onTimeRangeSelect={selectTimeRange}
+              onResetTimeRange={resetTimeRange}
               theme={theme}
               valueFormatter={formatCpuValue}
               yAxisFormatter={cpuAxisFormatter}
@@ -606,6 +673,9 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
               title='Memory'
               description={memoryDescription}
               series={memoryChartSeries}
+              timeRange={metrics.range}
+              onTimeRangeSelect={selectTimeRange}
+              onResetTimeRange={resetTimeRange}
               theme={theme}
               valueFormatter={memoryValueFormatter}
               yAxisFormatter={memoryAxisFormatter}
@@ -630,6 +700,8 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
                 statusSummary(statusCounts),
               )}
               data={timelineData}
+              onTimeRangeSelect={selectTimeRange}
+              onResetTimeRange={resetTimeRange}
               theme={theme}
               chartClassName='h-56'
               status={metrics.status.pm2_status}
@@ -650,6 +722,9 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
                 filled: true,
                 label: formatSeriesLabel,
               })}
+              timeRange={metrics.range}
+              onTimeRangeSelect={selectTimeRange}
+              onResetTimeRange={resetTimeRange}
               theme={theme}
               valueFormatter={formatUptimeValue}
               yAxisFormatter={formatUptimeAxis}
@@ -661,6 +736,8 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
           </div>
         </>
       )}
+
+      {processesSection}
     </div>
   )
 }

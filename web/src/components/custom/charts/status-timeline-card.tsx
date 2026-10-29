@@ -15,6 +15,8 @@ export type StatusTimelineCardProps = ChartCardBaseProps & {
   theme: ChartTheme
   status?: LoadStatus
   data: StatusTimelineData
+  onTimeRangeSelect?: (start: number, end: number) => void
+  onResetTimeRange?: () => void
 }
 
 export function StatusTimelineCard({
@@ -22,6 +24,8 @@ export function StatusTimelineCard({
   chartClassName,
   data,
   theme,
+  onTimeRangeSelect,
+  onResetTimeRange,
   ...cardProps
 }: StatusTimelineCardProps) {
   const hasData = data.segments.length > 0
@@ -36,6 +40,8 @@ export function StatusTimelineCard({
       <LazyStatusTimeline
         data={data}
         theme={theme}
+        onTimeRangeSelect={onTimeRangeSelect}
+        onResetTimeRange={onResetTimeRange}
         ariaLabel={`${title} chart`}
         className={chartClassName}
       />

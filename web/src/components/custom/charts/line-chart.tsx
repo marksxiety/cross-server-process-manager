@@ -2,7 +2,11 @@ import { useMemo } from 'react'
 import type { EChartsCoreOption } from 'echarts/core'
 import type { ChartTheme } from '@/hooks/use-chart-theme'
 import { escapeHtml } from '@/lib/format'
-import type { MetricChartSeries } from '@/types/prometheus'
+import type {
+  MetricChartSeries,
+  ResolvedMetricsRange,
+} from '@/types/prometheus'
+import { TIME_SERIES_GRID } from './chart-config'
 import { EChart } from './echart'
 
 export type LineChartProps = {
@@ -12,6 +16,9 @@ export type LineChartProps = {
   yAxisFormatter?: (value: number) => string
   yAxisMax?: number
   yAxisCategories?: string[]
+  timeRange?: ResolvedMetricsRange | null
+  onTimeRangeSelect?: (start: number, end: number) => void
+  onResetTimeRange?: () => void
   ariaLabel: string
   className?: string
 }
@@ -25,6 +32,7 @@ function buildLineOption({
   yAxisFormatter,
   yAxisMax,
   yAxisCategories,
+  timeRange,
 }: LineChartOptionInput): EChartsCoreOption {
   const showLegend = series.length > 1
 
@@ -33,13 +41,7 @@ function buildLineOption({
     animationDuration: 300,
     animationDurationUpdate: 300,
     animationEasingUpdate: 'cubicOut',
-    grid: {
-      left: 8,
-      right: 14,
-      top: 12,
-      bottom: showLegend ? 42 : 6,
-      containLabel: true,
-    },
+    grid: TIME_SERIES_GRID,
     tooltip: {
       trigger: 'axis',
       confine: true,
@@ -63,7 +65,7 @@ function buildLineOption({
           textStyle: { color: theme.mutedText, fontSize: 10 },
         }
       : undefined,
-    xAxis: timeAxis(theme),
+    xAxis: timeAxis(theme, timeRange),
     yAxis: yAxisCategories
       ? {
           type: 'category',
@@ -109,9 +111,14 @@ function buildLineOption({
   }
 }
 
-function timeAxis(theme: ChartTheme) {
+function timeAxis(
+  theme: ChartTheme,
+  timeRange?: ResolvedMetricsRange | null,
+) {
   return {
     type: 'time',
+    min: timeRange?.start,
+    max: timeRange?.end,
     axisLine: { lineStyle: { color: theme.border } },
     axisTick: { show: false },
     axisLabel: { color: theme.mutedText, fontSize: 10, hideOverlap: true },
@@ -178,6 +185,9 @@ export function LineChart({
   yAxisFormatter,
   yAxisMax,
   yAxisCategories,
+  timeRange,
+  onTimeRangeSelect,
+  onResetTimeRange,
   ariaLabel,
   className,
 }: LineChartProps) {
@@ -190,6 +200,7 @@ export function LineChart({
         yAxisFormatter,
         yAxisMax,
         yAxisCategories,
+        timeRange,
       }),
     [
       series,
@@ -198,10 +209,24 @@ export function LineChart({
       yAxisFormatter,
       yAxisMax,
       yAxisCategories,
+      timeRange,
     ],
   )
 
   return (
-    <EChart option={option} ariaLabel={ariaLabel} className={className} />
+    <EChart
+      option={option}
+      ariaLabel={ariaLabel}
+      className={className}
+      selection={
+        onTimeRangeSelect
+          ? {
+              enabled: true,
+              onSelect: onTimeRangeSelect,
+              onReset: onResetTimeRange,
+            }
+          : undefined
+      }
+    />
   )
 }

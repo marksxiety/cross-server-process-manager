@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 vi.mock('../../src/Persistence/Connection', () => ({
     default: { query: vi.fn(), beginTransaction: vi.fn() },
@@ -33,7 +33,7 @@ const GRACE_SECONDS = 30;
 const tokens = new TokenService(SECRET, 3600);
 
 const access = {
-    effectiveFor: vi.fn(async (user: UserRecord) => defaultAccess()),
+    effectiveFor: vi.fn(async (_user: UserRecord) => defaultAccess()),
     publicUser: vi.fn(async (user: UserRecord) => toPublicUser(user, defaultAccess())),
 } as unknown as AccessService;
 

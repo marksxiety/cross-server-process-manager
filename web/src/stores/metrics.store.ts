@@ -4,7 +4,6 @@ import { isDemoMode } from "@/lib/demo-mode";
 import {
     DEFAULT_METRICS_RANGE,
     DEFAULT_METRICS_REFRESH_MS,
-    PROMETHEUS_RETENTION_MS,
 } from "@/lib/prometheus";
 import type { MetricBasis, MetricsRange } from "@/types/prometheus";
 
@@ -37,8 +36,7 @@ function isMetricsRange(value: unknown): value is MetricsRange {
         return (
             typeof candidate.durationMs === "number" &&
             Number.isFinite(candidate.durationMs) &&
-            candidate.durationMs > 0 &&
-            candidate.durationMs <= PROMETHEUS_RETENTION_MS
+            candidate.durationMs > 0
         );
     }
 
