@@ -1,7 +1,10 @@
 import { lazy } from 'react'
 import type { ChartTheme } from '@/hooks/use-chart-theme'
 import type { LoadStatus } from '@/types/dashboard'
-import type { MetricChartSeries } from '@/types/prometheus'
+import type {
+  MetricChartSeries,
+  ResolvedMetricsRange,
+} from '@/types/prometheus'
 import { ChartCard } from './chart-card'
 import type { ChartCardBaseProps } from './chart-card'
 
@@ -19,6 +22,9 @@ export type LineChartCardProps = ChartCardBaseProps & {
   yAxisFormatter?: (value: number) => string
   yAxisMax?: number
   yAxisCategories?: string[]
+  timeRange?: ResolvedMetricsRange | null
+  onTimeRangeSelect?: (start: number, end: number) => void
+  onResetTimeRange?: () => void
 }
 
 export function LineChartCard({
@@ -30,6 +36,9 @@ export function LineChartCard({
   yAxisFormatter,
   yAxisMax,
   yAxisCategories,
+  timeRange,
+  onTimeRangeSelect,
+  onResetTimeRange,
   ...cardProps
 }: LineChartCardProps) {
   const hasData = series.some((entry) => entry.points.length > 0)
@@ -48,6 +57,9 @@ export function LineChartCard({
         yAxisFormatter={yAxisFormatter}
         yAxisMax={yAxisMax}
         yAxisCategories={yAxisCategories}
+        timeRange={timeRange}
+        onTimeRangeSelect={onTimeRangeSelect}
+        onResetTimeRange={onResetTimeRange}
         ariaLabel={`${title} chart`}
         className={chartClassName}
       />
