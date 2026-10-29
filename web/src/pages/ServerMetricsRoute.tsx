@@ -4,10 +4,7 @@ import { isPrometheusConfigured } from '@/api/services/prometheus.service'
 import { PageLoader } from '@/components/custom/page-loader'
 import { ServerMetricsHeader } from '@/components/custom/server-metrics-header'
 import { useServerMetrics } from '@/hooks/use-server-metrics'
-import {
-  isMetricsInitialLoad,
-  metricsLoadingDescription,
-} from '@/lib/metrics-loading'
+import { metricsLoadingDescription } from '@/lib/metrics-loading'
 import { normalizeMetricsRefreshMs } from '@/lib/prometheus'
 import { useDashboardStore } from '@/stores/dashboard.store'
 import { useMetricsStore } from '@/stores/metrics.store'
@@ -43,13 +40,6 @@ export function ServerMetricsRoute() {
   }, [load])
 
   const server = servers.find((entry) => entry.server === serverName)
-  const isPageLoaded = metrics.hasLoaded
-  const isInitialLoad = isMetricsInitialLoad({
-    enabled: metricsEnabled,
-    status: metrics.status,
-    errors: metrics.errors,
-    data: metrics.data,
-  })
 
   return (
     <div className='min-w-0'>
@@ -59,7 +49,6 @@ export function ServerMetricsRoute() {
         port={server?.port ?? null}
         isRefreshing={metrics.isRefreshing}
         onRefresh={metrics.refresh}
-        disabled={!isPageLoaded && isInitialLoad}
       />
 
       <Suspense
