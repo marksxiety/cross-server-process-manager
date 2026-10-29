@@ -15,6 +15,8 @@ import {
 import {
   ArrowUpDown,
   Circle,
+  Eye,
+  EyeOff,
   Pause,
   Play,
   RefreshCw,
@@ -56,6 +58,7 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { Spinner } from '@/components/ui/spinner'
 import { toast } from '@/components/ui/toast'
+import { Toggle } from '@/components/ui/toggle'
 import { ErrorAlert } from '@/components/custom/error-alert'
 import { PageLoader } from '@/components/custom/page-loader'
 import { ProcessCard } from '@/components/custom/process-card'
@@ -65,6 +68,7 @@ import { useFlipReorder } from '@/hooks/use-flip-reorder'
 import { useAccess } from '@/hooks/use-access'
 import { useProcessDescribe } from '@/hooks/use-process-describe'
 import { errorCodeLabel, toApiError } from '@/lib/error-code'
+import { partitionXpmProcesses } from '@/lib/process-filter'
 import { canRunProcessCommand } from '@/lib/process-runtime'
 import { processItemKey, sortProcesses } from '@/lib/sort-processes'
 import type { ProcessSortKey } from '@/lib/sort-processes'
@@ -125,6 +129,8 @@ export function Dashboard() {
   const deleteProcess = useDashboardStore((state) => state.deleteProcess)
   const sortOrder = useDashboardStore((state) => state.sortOrder)
   const setSortOrder = useDashboardStore((state) => state.setSortOrder)
+  const hideXpmProcesses = useDashboardStore((state) => state.hideXpmProcesses)
+  const setHideXpmProcesses = useDashboardStore((state) => state.setHideXpmProcesses)
   const processesStatus = useProcessesStatus()
   const access = useAccess()
   const canOpenDetails = access.isAuthenticated
@@ -257,7 +263,7 @@ export function Dashboard() {
 
   // Flat, cross-server view of every process. Servers that are still loading or
   // unreachable are surfaced on their own tile instead.
-  const processItems = useMemo(
+  const allProcessItems = useMemo(
     () =>
       servers.flatMap((server) => {
         const entry = processesByServer[server.server]
@@ -266,6 +272,15 @@ export function Dashboard() {
       }),
     [servers, processesByServer],
   )
+
+  // XPM's own processes (namespace `XPM`) are split out so they can be hidden by
+  // default without losing the ability to reveal them.
+  const { standard: standardProcessItems, xpm: xpmProcessItems } = useMemo(
+    () => partitionXpmProcesses(allProcessItems),
+    [allProcessItems],
+  )
+
+  const processItems = hideXpmProcesses ? standardProcessItems : allProcessItems
 
   const query = searchQuery.trim().toLowerCase()
 
@@ -411,6 +426,31 @@ export function Dashboard() {
               </p>
               <Separator className='flex-1' />
               <div className='flex shrink-0 items-center gap-2'>
+                <Toggle
+                  variant='outline'
+                  size='sm'
+                  pressed={!hideXpmProcesses}
+                  onPressedChange={(pressed) => setHideXpmProcesses(!pressed)}
+                  aria-label={
+                    hideXpmProcesses ? 'Show XPM processes' : 'Hide XPM processes'
+                  }
+                  title={
+                    hideXpmProcesses ? 'Show XPM processes' : 'Hide XPM processes'
+                  }
+                  className='gap-1.5'
+                >
+                  {hideXpmProcesses ? (
+                    <EyeOff strokeWidth={2} />
+                  ) : (
+                    <Eye strokeWidth={2} />
+                  )}
+                  XPM
+                  {xpmProcessItems.length > 0 && (
+                    <Badge variant='secondary' className='px-1.5 tabular-nums'>
+                      {xpmProcessItems.length}
+                    </Badge>
+                  )}
+                </Toggle>
                 <DropdownMenu>
                   <DropdownMenuTrigger
                     render={
@@ -547,6 +587,23 @@ export function Dashboard() {
                 <EmptyContent>
                   <Button variant='outline' onClick={() => setSearchQuery('')}>
                     Clear search
+                  </Button>
+                </EmptyContent>
+              </Empty>
+            ) : hideXpmProcesses && xpmProcessItems.length > 0 ? (
+              <Empty className='mt-4'>
+                <EmptyHeader>
+                  <EmptyMedia variant='icon'>
+                    <EyeOff strokeWidth={2} />
+                  </EmptyMedia>
+                  <EmptyTitle>XPM processes hidden</EmptyTitle>
+                  <EmptyDescription>
+                    {`All processes on this dashboard belong to the XPM namespace (${xpmProcessItems.length} hidden).`}
+                  </EmptyDescription>
+                </EmptyHeader>
+                <EmptyContent>
+                  <Button variant='outline' onClick={() => setHideXpmProcesses(false)}>
+                    Show XPM processes
                   </Button>
                 </EmptyContent>
               </Empty>
