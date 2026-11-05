@@ -116,6 +116,28 @@ describe('queryRange', () => {
     expect(url.searchParams.get('query')).toBe('pm2_cpu{app="MYPC"}')
   })
 
+  test('builds a host selector with only the app label', async () => {
+    const calls = stubFetch(() =>
+      jsonResponse({
+        status: 'success',
+        data: { resultType: 'matrix', result: [] },
+      }),
+    )
+
+    await queryRange('host_cpu_usage_percent', SERVER_SCOPE, RANGE)
+
+    const url = new URL(calls[0]!.url)
+    expect(url.searchParams.get('query')).toBe(
+      'host_cpu_usage_percent{app="MYPC"}',
+    )
+  })
+
+  test('rejects host metrics with a process scope', async () => {
+    await expect(
+      queryRange('host_cpu_usage_percent', PROCESS_SCOPE, RANGE),
+    ).rejects.toThrow(/server scope/)
+  })
+
   test('throws a typed error for an error envelope', async () => {
     stubFetch(() =>
       jsonResponse(
