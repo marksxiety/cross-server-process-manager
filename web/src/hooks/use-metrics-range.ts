@@ -4,13 +4,17 @@ import {
   PrometheusError,
   queryRange,
 } from '@/api/services/prometheus.service'
-import { PROCESS_METRICS, resolveMetricsRange } from '@/lib/prometheus'
+import {
+  ALL_METRICS,
+  PROCESS_METRICS,
+  resolveMetricsRange,
+} from '@/lib/prometheus'
 import type { LoadStatus } from '@/types/dashboard'
 import type {
+  MetricName,
   MetricsData,
   MetricsRange,
   MetricsScope,
-  ProcessMetricName,
   PrometheusSeries,
   ResolvedMetricsRange,
 } from '@/types/prometheus'
@@ -20,12 +24,13 @@ type UseMetricsRangeOptions = {
   range: MetricsRange
   refreshMs: number
   enabled: boolean
+  metricNames?: MetricName[]
 }
 
 export interface MetricsRangeResult {
   data: MetricsData;
-  status: Record<ProcessMetricName, LoadStatus>;
-  errors: Partial<Record<ProcessMetricName, PrometheusError>>;
+  status: Record<MetricName, LoadStatus>;
+  errors: Partial<Record<MetricName, PrometheusError>>;
   isRefreshing: boolean;
   range: ResolvedMetricsRange | null;
   lastUpdated: number | null;
@@ -38,10 +43,10 @@ export interface MetricsRangeResult {
   refresh: () => void;
 }
 
-function statusMap(status: LoadStatus): Record<ProcessMetricName, LoadStatus> {
+function statusMap(status: LoadStatus): Record<MetricName, LoadStatus> {
   return Object.fromEntries(
-    PROCESS_METRICS.map((metric) => [metric, status]),
-  ) as Record<ProcessMetricName, LoadStatus>
+    ALL_METRICS.map((metric) => [metric, status]),
+  ) as Record<MetricName, LoadStatus>
 }
 
 function hasSeriesData(series: PrometheusSeries[] | undefined): boolean {
@@ -53,13 +58,14 @@ export function useMetricsRange({
   range,
   refreshMs,
   enabled,
+  metricNames = PROCESS_METRICS,
 }: UseMetricsRangeOptions): MetricsRangeResult {
   const [data, setData] = useState<MetricsData>({})
-  const [status, setStatus] = useState<Record<ProcessMetricName, LoadStatus>>(
+  const [status, setStatus] = useState<Record<MetricName, LoadStatus>>(
     () => statusMap('idle'),
   )
   const [errors, setErrors] = useState<
-    Partial<Record<ProcessMetricName, PrometheusError>>
+    Partial<Record<MetricName, PrometheusError>>
   >({})
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [hasLoaded, setHasLoaded] = useState(false)
@@ -95,7 +101,7 @@ export function useMetricsRange({
     scopeRef.current = scopeKey
 
     let active = true
-    let remaining = PROCESS_METRICS.length
+    let remaining = metricNames.length
     let successCount = 0
 
     const finishMetric = () => {
@@ -108,14 +114,14 @@ export function useMetricsRange({
       if (successCount > 0) setLastUpdated(Date.now())
     }
 
-    const metricHadData = (metric: ProcessMetricName) =>
+    const metricHadData = (metric: MetricName) =>
       !scopeChanged && hasSeriesData(previousData[metric])
 
     const load = async () => {
       setErrors({})
       setStatus((current) => {
         const next = { ...current }
-        for (const metric of PROCESS_METRICS) {
+        for (const metric of metricNames) {
           next[metric] = metricHadData(metric) ? 'success' : 'loading'
         }
         return next
@@ -127,7 +133,7 @@ export function useMetricsRange({
         setHasLoaded(false)
       }
 
-      for (const metric of PROCESS_METRICS) {
+      for (const metric of metricNames) {
         void queryRange(metric, currentScope, nextRange, controller.signal)
           .then((series) => {
             if (!active) return
@@ -178,6 +184,7 @@ export function useMetricsRange({
     absoluteStart,
     absoluteEnd,
     refreshToken,
+    metricNames,
   ])
 
   useEffect(() => {
