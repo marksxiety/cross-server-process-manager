@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router'
-import { Activity, Search, ServerOff } from 'lucide-react'
-import { isPrometheusConfigured } from '@/api/services/prometheus.service'
+import { Activity, Info, Search, ServerOff } from 'lucide-react'
+import {
+  isPrometheusConfigured,
+  toPrometheusApiError,
+} from '@/api/services/prometheus.service'
 import {
   LineChartCard,
   StatusTimelineCard,
@@ -9,6 +12,11 @@ import {
 } from '@/components/custom/charts'
 import { ErrorAlert } from '@/components/custom/error-alert'
 import { MetricBasisSwitch } from '@/components/custom/metric-basis-switch'
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from '@/components/ui/alert'
 import { PageLoader } from '@/components/custom/page-loader'
 import { ProcessesSection } from '@/components/custom/processes-section'
 import { Button } from '@/components/ui/button'
@@ -75,6 +83,7 @@ import {
 import { useDashboardStore } from '@/stores/dashboard.store'
 import { useMetricsStore } from '@/stores/metrics.store'
 import type { MetricsRangeResult } from '@/hooks/use-metrics-range'
+import type { ServerSeriesAvailabilityResult } from '@/hooks/use-server-series-availability'
 import type { ApiError } from '@/types/api'
 import type { LoadStatus } from '@/types/dashboard'
 import type {
@@ -124,9 +133,14 @@ function missingHostMetricsError(subject: 'CPU' | 'memory'): ApiError {
 export type ServerMetricsProps = {
   serverName: string
   metrics: MetricsRangeResult
+  availability: ServerSeriesAvailabilityResult
 }
 
-export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
+export function ServerMetrics({
+  serverName,
+  metrics,
+  availability,
+}: ServerMetricsProps) {
   const cpuBasis = useMetricsStore((state) => state.cpuBasis)
   const setCpuBasis = useMetricsStore((state) => state.setCpuBasis)
   const memoryBasis = useMetricsStore((state) => state.memoryBasis)
@@ -178,6 +192,10 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
   const hostMemoryPercent = lastValue(hostMemorySeries)
   const hostCpuCores = lastValue(hostCpuCoresSeries)
   const hostMemoryTotalBytes = lastValue(hostMemoryTotalSeries)
+  const rangeHasData = Object.values(metrics.data).some((seriesList) =>
+    seriesList?.some((series) => series.points.length > 0),
+  )
+  const showMissingHostErrors = rangeHasData
   const hostMemoryUsedBytes =
     hostMemoryPercent === null || hostMemoryTotalBytes === null
       ? null
@@ -325,28 +343,38 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
     metricError(metrics.errors, 'pm2_cpu') ??
     metricError(metrics.errors, 'host_cpu_usage_percent') ??
     metricError(metrics.errors, 'host_cpu_cores') ??
-    (hostCpuMissing || hostCpuCoresMissing
+    (showMissingHostErrors && (hostCpuMissing || hostCpuCoresMissing)
       ? missingHostMetricsError('CPU')
       : null)
   const memoryUsageError =
     metricError(metrics.errors, 'pm2_memory') ??
     metricError(metrics.errors, 'host_memory_usage_percent') ??
     metricError(metrics.errors, 'host_memory_total_bytes') ??
-    (hostMemoryMissing || hostMemoryTotalMissing
+    (showMissingHostErrors && (hostMemoryMissing || hostMemoryTotalMissing)
       ? missingHostMetricsError('memory')
       : null)
   const retryUsage = () => {
     void metrics.refresh()
+    availability.refresh()
   }
 
-  const metricsLoading = metrics.isRefreshing && visibleProcessCount === 0
-  const hasError = Object.keys(metrics.errors).length > 0
-  const allSettled = PROCESS_METRICS.every(
+  const metricConnectionError =
+    Object.values(metrics.errors).find(
+      (error) => error?.code === 'PROMETHEUS_UNREACHABLE',
+    ) ?? null
+  const allMetricsUnreachable = PROCESS_METRICS.every(
     (metric) =>
-      metrics.status[metric] === 'success' || metrics.status[metric] === 'error',
+      metrics.status[metric] === 'error' &&
+      metrics.errors[metric]?.code === 'PROMETHEUS_UNREACHABLE',
   )
-  const showEmptyState =
-    allSettled && visibleProcessCount === 0 && !hasError
+  const connectionError =
+    allMetricsUnreachable && metricConnectionError
+      ? toPrometheusApiError(metricConnectionError)
+      : null
+  const showNoSeriesBanner =
+    connectionError === null && availability.status === 'empty'
+
+  const metricsLoading = metrics.isRefreshing && visibleProcessCount === 0
   // The page loader only covers the very first load. Once the page has loaded
   // it stays mounted, so an auto refresh is reported by the charts themselves.
   const isPageLoaded = metrics.hasLoaded
@@ -371,10 +399,15 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
       ? 'loading'
       : cpuServerReady
         ? metrics.status.pm2_cpu
-        : 'error'
+        : showMissingHostErrors
+          ? 'error'
+          : metrics.status.pm2_cpu
     : metrics.status.pm2_cpu
   const cpuCardError: ApiError | null =
-    cpuBasisIsServer && !cpuServerPending && !cpuServerReady
+    cpuBasisIsServer &&
+    !cpuServerPending &&
+    !cpuServerReady &&
+    showMissingHostErrors
       ? {
           code: 'SERVER_CPU_UNAVAILABLE',
           message:
@@ -430,10 +463,15 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
       ? 'loading'
       : memoryServerReady
         ? metrics.status.pm2_memory
-        : 'error'
+        : showMissingHostErrors
+          ? 'error'
+          : metrics.status.pm2_memory
     : metrics.status.pm2_memory
   const memoryCardError: ApiError | null =
-    memoryBasisIsServer && !memoryServerPending && !memoryServerReady
+    memoryBasisIsServer &&
+    !memoryServerPending &&
+    !memoryServerReady &&
+    showMissingHostErrors
       ? {
           code: 'SERVER_MEMORY_UNAVAILABLE',
           message:
@@ -499,10 +537,14 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
 
   const hostCpuError: ApiError | null =
     metricError(metrics.errors, 'host_cpu_usage_percent') ??
-    (hostCpuMissing ? missingHostMetricsError('CPU') : null)
+    (showMissingHostErrors && hostCpuMissing
+      ? missingHostMetricsError('CPU')
+      : null)
   const hostMemoryError: ApiError | null =
     metricError(metrics.errors, 'host_memory_usage_percent') ??
-    (hostMemoryMissing ? missingHostMetricsError('memory') : null)
+    (showMissingHostErrors && hostMemoryMissing
+      ? missingHostMetricsError('memory')
+      : null)
   const hostCpuChartSeries = toChartSeries(hostCpuSeries, {
     color: theme.series.cpu,
     filled: true,
@@ -681,22 +723,26 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
         </div>
       </div>
 
-      {showEmptyState ? (
-        <Empty className='mt-4'>
-          <EmptyHeader>
-            <EmptyMedia variant='icon'>
-              <Activity strokeWidth={2} />
-            </EmptyMedia>
-            <EmptyTitle>No metrics for this server</EmptyTitle>
-            <EmptyDescription>
-              Prometheus has no data for {serverName}. Check that the scrape
-              target labels this server as{' '}
-              <code className='font-mono'>app=&quot;{serverName}&quot;</code>.
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+      {connectionError ? (
+        <ErrorAlert
+          error={connectionError}
+          onRetry={retryUsage}
+          className='mt-4'
+        />
       ) : (
         <>
+          {showNoSeriesBanner && (
+            <Alert className='mt-4'>
+              <Info strokeWidth={2} />
+              <AlertTitle>No samples in Prometheus</AlertTitle>
+              <AlertDescription>
+                Prometheus has no series for {serverName}. Check that the scrape
+                target labels this server as{' '}
+                <code className='font-mono'>app=&quot;{serverName}&quot;</code>.
+              </AlertDescription>
+            </Alert>
+          )}
+
           <div className='mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2'>
             <UsageTrendCard
               title='CPU'
