@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import {
+  hasServerSeries,
   isPrometheusConfigured,
   queryRange,
 } from '../../api/services/prometheus.service'
@@ -186,6 +187,77 @@ describe('queryRange', () => {
 
     await expect(queryRange('pm2_cpu', PROCESS_SCOPE, RANGE)).rejects.toMatchObject({
       code: 'PROMETHEUS_NOT_CONFIGURED',
+    })
+  })
+})
+
+describe('hasServerSeries', () => {
+  beforeEach(() => {
+    vi.stubEnv('VITE_PROMETHEUS_URL', 'http://prom.test/')
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
+  })
+
+  test('queries the series endpoint with the app selector', async () => {
+    const calls = stubFetch(() =>
+      jsonResponse({
+        status: 'success',
+        data: [{ __name__: 'pm2_status', app: 'MYPC' }],
+      }),
+    )
+
+    await expect(hasServerSeries('MYPC')).resolves.toBe(true)
+
+    expect(calls).toHaveLength(1)
+    const url = new URL(calls[0]!.url)
+    expect(url.origin).toBe('http://prom.test')
+    expect(url.pathname).toBe('/api/v1/series')
+    expect(url.searchParams.get('match[]')).toBe('{app="MYPC"}')
+    expect(url.searchParams.get('start')).toBeTruthy()
+    expect(url.searchParams.get('end')).toBeTruthy()
+  })
+
+  test('returns false for an empty series list', async () => {
+    stubFetch(() =>
+      jsonResponse({
+        status: 'success',
+        data: [],
+      }),
+    )
+
+    await expect(hasServerSeries('MYPC')).resolves.toBe(false)
+  })
+
+  test('maps an error envelope to PROMETHEUS_QUERY_ERROR', async () => {
+    stubFetch(() =>
+      jsonResponse(
+        {
+          status: 'error',
+          errorType: 'bad_data',
+          error: 'invalid query',
+        },
+        400,
+      ),
+    )
+
+    await expect(hasServerSeries('MYPC')).rejects.toMatchObject({
+      code: 'PROMETHEUS_QUERY_ERROR',
+      status: 400,
+      message: 'bad_data: invalid query',
+    })
+  })
+
+  test('maps network failures to PROMETHEUS_UNREACHABLE', async () => {
+    stubFetch(() => {
+      throw new Error('fetch failed')
+    })
+
+    await expect(hasServerSeries('MYPC')).rejects.toMatchObject({
+      code: 'PROMETHEUS_UNREACHABLE',
+      status: 0,
     })
   })
 })
