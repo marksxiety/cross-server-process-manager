@@ -19,6 +19,8 @@ import type {
   ResolvedMetricsRange,
 } from '@/types/prometheus'
 
+const RANGE_DEBOUNCE_MS = 200
+
 type UseMetricsRangeOptions = {
   scope: MetricsScope | null
   range: MetricsRange
@@ -76,6 +78,7 @@ export function useMetricsRange({
   const [refreshToken, setRefreshToken] = useState(0)
   const dataRef = useRef<MetricsData>({})
   const scopeRef = useRef<string | null>(null)
+  const rangeKeyRef = useRef<string | null>(null)
 
   useEffect(() => {
     dataRef.current = data
@@ -86,6 +89,15 @@ export function useMetricsRange({
   const absoluteEnd = range.kind === 'absolute' ? range.end : null
 
   useEffect(() => {
+    const rangeKey =
+      relativeDuration !== null
+        ? `relative:${relativeDuration}`
+        : `absolute:${absoluteStart}:${absoluteEnd}`
+    const previousRangeKey = rangeKeyRef.current
+    rangeKeyRef.current = rangeKey
+    const rangeChanged =
+      previousRangeKey !== null && previousRangeKey !== rangeKey
+
     if (!enabled || scope === null) return
 
     const controller = new AbortController()
@@ -171,10 +183,19 @@ export function useMetricsRange({
       }
     }
 
-    void load()
+    let debounceTimer: number | undefined
+
+    if (rangeChanged && !scopeChanged) {
+      debounceTimer = window.setTimeout(() => {
+        void load()
+      }, RANGE_DEBOUNCE_MS)
+    } else {
+      void load()
+    }
 
     return () => {
       active = false
+      if (debounceTimer !== undefined) window.clearTimeout(debounceTimer)
       controller.abort()
     }
   }, [
