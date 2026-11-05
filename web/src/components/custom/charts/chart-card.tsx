@@ -37,7 +37,7 @@ export type ChartCardProps = ChartCardBaseProps & {
   children: ReactNode
 }
 
-function ChartBodyLoading({
+export function ChartBodyLoading({
   label,
   chartClassName,
 }: {
@@ -58,7 +58,7 @@ function ChartBodyLoading({
   )
 }
 
-function ChartBodyError({
+export function ChartBodyError({
   error,
   onRetry,
   chartClassName,
