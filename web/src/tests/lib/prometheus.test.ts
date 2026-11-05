@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import {
+  buildHostSelector,
   buildSelector,
   buildSelectorForScope,
   buildServerSelector,
@@ -11,6 +12,7 @@ import {
   formatMetricAxisValue,
   formatMetricValue,
   formatSeriesLabel,
+  isHostMetric,
   lastPoint,
   lastValue,
   latestPoints,
@@ -99,6 +101,44 @@ describe('buildSelectorForScope', () => {
     expect(
       buildSelectorForScope('pm2_cpu', { kind: 'server', server: 'MYPC' }),
     ).toBe('pm2_cpu{app="MYPC"}')
+  })
+})
+
+describe('host selectors', () => {
+  test('identifies host metrics', () => {
+    expect(isHostMetric('host_cpu_usage_percent')).toBe(true)
+    expect(isHostMetric('host_memory_usage_percent')).toBe(true)
+    expect(isHostMetric('pm2_cpu')).toBe(false)
+  })
+
+  test('builds a host selector with only the app label', () => {
+    expect(
+      buildHostSelector('host_cpu_usage_percent', { server: 'MYPC' }),
+    ).toBe('host_cpu_usage_percent{app="MYPC"}')
+    expect(
+      buildHostSelector('host_memory_usage_percent', { server: '' }),
+    ).toBe('host_memory_usage_percent')
+  })
+
+  test('routes host metrics through the server selector', () => {
+    expect(
+      buildSelectorForScope('host_cpu_usage_percent', {
+        kind: 'server',
+        server: 'MYPC',
+        namespace: 'XPM',
+      }),
+    ).toBe('host_cpu_usage_percent{app="MYPC"}')
+  })
+
+  test('rejects host metrics with a process scope', () => {
+    expect(() =>
+      buildSelectorForScope('host_cpu_usage_percent', {
+        kind: 'process',
+        name: 'xpm-server',
+        namespace: 'XPM',
+        server: 'MYPC',
+      }),
+    ).toThrow(/server scope/)
   })
 })
 
