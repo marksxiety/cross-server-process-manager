@@ -36,5 +36,8 @@ export function isMetricsInitialLoad({
     );
     if (allSettled) return false;
 
-    return !Object.values(data).some((series) => (series?.length ?? 0) > 0);
+    const hasProcessData = PROCESS_METRICS.some(
+        (metric) => (data[metric]?.length ?? 0) > 0,
+    );
+    return !hasProcessData;
 }
