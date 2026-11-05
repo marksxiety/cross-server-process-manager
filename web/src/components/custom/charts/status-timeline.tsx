@@ -52,6 +52,8 @@ type CoordinateSystem = {
   height: number
 }
 
+const STATUS_BAR_GAP_PX = 2
+
 function categoryHeight(
   api: CustomSeriesRenderItemAPI,
   factor: number,
@@ -72,10 +74,17 @@ function renderStatusSegment(
   const endPoint = api.coord([end, laneIndex])
   const coord = params.coordSys as unknown as CoordinateSystem
   const laneHeight = categoryHeight(api, 0.7)
-  const x = Math.max(coord.x, startPoint[0] ?? coord.x)
-  const right = Math.min(coord.x + coord.width, endPoint[0] ?? x)
+  const rawX = Math.max(coord.x, startPoint[0] ?? coord.x)
+  const rawRight = Math.min(coord.x + coord.width, endPoint[0] ?? rawX)
 
-  if (right <= coord.x || x >= coord.x + coord.width) return null
+  if (rawRight <= coord.x || rawX >= coord.x + coord.width) return null
+
+  const span = rawRight - rawX
+  if (span <= 0) return null
+
+  const inset = Math.min(STATUS_BAR_GAP_PX / 2, span / 4)
+  const x = rawX + inset
+  const right = rawRight - inset
 
   return {
     type: 'rect',
