@@ -4,7 +4,7 @@ import {
 } from "@/api/services/prometheus.service";
 import type { ApiError } from "@/types/api";
 import type { LoadStatus } from "@/types/dashboard";
-import type { ProcessMetricName } from "@/types/prometheus";
+import type { MetricName } from "@/types/prometheus";
 
 export function metricDescription(
     status: LoadStatus,
@@ -16,8 +16,8 @@ export function metricDescription(
 }
 
 export function metricError(
-    errors: Partial<Record<ProcessMetricName, PrometheusError>>,
-    metric: ProcessMetricName,
+    errors: Partial<Record<MetricName, PrometheusError>>,
+    metric: MetricName,
 ): ApiError | null {
     const error = errors[metric];
     return error ? toPrometheusApiError(error) : null;
