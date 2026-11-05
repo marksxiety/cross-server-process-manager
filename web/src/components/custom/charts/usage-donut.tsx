@@ -27,6 +27,7 @@ export type UsageDonutProps = {
   other: number
   ariaLabel: string
   thresholds?: UsageThresholds
+  showLegend?: boolean
   className?: string
 }
 
@@ -111,6 +112,7 @@ function buildOption(
   pm2: number,
   other: number,
   { warn, critical }: UsageThresholds,
+  showLegend: boolean,
 ): EChartsCoreOption {
   const total = Math.min(100, pm2 + other)
   const free = Math.max(0, 100 - pm2 - other)
@@ -168,17 +170,19 @@ function buildOption(
       textStyle: { color: theme.text, fontSize: 11 },
       valueFormatter: (value: unknown) => formatUsagePercent(Number(value)),
     },
-    legend: {
-      bottom: 0,
-      left: 'center',
-      icon: 'roundRect',
-      itemWidth: 10,
-      itemHeight: 10,
-      data: Object.keys(legendValues),
-      textStyle: { fontSize: 11, color: theme.mutedText },
-      formatter: (name: string) =>
-        `${name} ${formatUsagePercent(legendValues[name] ?? 0)}`,
-    },
+    legend: showLegend
+      ? {
+          bottom: 0,
+          left: 'center',
+          icon: 'roundRect',
+          itemWidth: 10,
+          itemHeight: 10,
+          data: Object.keys(legendValues),
+          textStyle: { fontSize: 11, color: theme.mutedText },
+          formatter: (name: string) =>
+            `${name} ${formatUsagePercent(legendValues[name] ?? 0)}`,
+        }
+      : undefined,
     series: [
       {
         // Threshold ring: a gauge with no pointer, used only for its axis line.
@@ -270,13 +274,14 @@ export function UsageDonut({
   other,
   ariaLabel,
   thresholds = DEFAULT_USAGE_THRESHOLDS,
+  showLegend = true,
   className,
 }: UsageDonutProps) {
   const { warn, critical } = thresholds
 
   const option = useMemo(
-    () => buildOption(theme, pm2, other, { warn, critical }),
-    [theme, pm2, other, warn, critical],
+    () => buildOption(theme, pm2, other, { warn, critical }, showLegend),
+    [theme, pm2, other, warn, critical, showLegend],
   )
 
   const total = Math.min(100, pm2 + other)
