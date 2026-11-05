@@ -79,7 +79,7 @@ describe('isMetricsInitialLoad', () => {
     ).toBe(false)
   })
 
-  test('is false once series have arrived', () => {
+  test('is false once process series have arrived', () => {
     expect(
       isMetricsInitialLoad({
         enabled: true,
@@ -88,5 +88,18 @@ describe('isMetricsInitialLoad', () => {
         data: { pm2_cpu: [series('api-01')] } as MetricsData,
       }),
     ).toBe(false)
+  })
+
+  test('stays true when only host series have arrived', () => {
+    expect(
+      isMetricsInitialLoad({
+        enabled: true,
+        status: statusMap('loading'),
+        errors: {},
+        data: {
+          host_cpu_usage_percent: [series('host')],
+        } as MetricsData,
+      }),
+    ).toBe(true)
   })
 })
