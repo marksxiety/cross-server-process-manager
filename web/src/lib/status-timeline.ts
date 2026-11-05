@@ -39,22 +39,8 @@ function inferStepMs(points: PrometheusPoint[]): number | null {
 function appendSegment(
     segments: StatusTimelineSegment[],
     segment: StatusTimelineSegment,
-    restartSet: Set<number>,
 ): void {
     if (segment.end <= segment.start) return;
-
-    const previous = segments[segments.length - 1];
-
-    if (
-        previous !== undefined &&
-        previous.laneIndex === segment.laneIndex &&
-        previous.kind === segment.kind &&
-        previous.end === segment.start &&
-        !restartSet.has(segment.start)
-    ) {
-        previous.end = segment.end;
-        return;
-    }
 
     segments.push(segment);
 }
@@ -158,7 +144,6 @@ export function buildStatusTimeline(
         ]
             .filter((timestamp) => timestamp >= start && timestamp <= end)
             .sort((a, b) => a - b);
-        const restartSet = new Set(laneRestarts);
 
         restarts.push(
             ...laneRestarts.map((timestamp) => ({
@@ -179,7 +164,6 @@ export function buildStatusTimeline(
                     start: Math.max(start, from),
                     end: Math.min(end, to),
                 },
-                restartSet,
             );
         };
 
@@ -225,7 +209,6 @@ export function buildStatusTimeline(
                         start: cursor,
                         end: timestamp,
                     },
-                    restartSet,
                 );
                 cursor = timestamp;
             }
@@ -240,7 +223,6 @@ export function buildStatusTimeline(
                     start: cursor,
                     end: clampedEnd,
                 },
-                restartSet,
             );
         };
 
