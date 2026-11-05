@@ -1,6 +1,8 @@
 import { formatBytes, formatUptime } from "@/lib/format";
 import { statusLabelFromCode } from "@/lib/status-catalog";
 import type {
+    HostMetricName,
+    MetricName,
     MetricsRange,
     MetricsScope,
     ProcessMetricName,
@@ -28,6 +30,15 @@ export const PROCESS_METRICS: ProcessMetricName[] = [
     "pm2_unstable_restarts_total",
     "pm2_status",
 ];
+
+export const HOST_METRICS: HostMetricName[] = [
+    "host_cpu_usage_percent",
+    "host_cpu_cores",
+    "host_memory_usage_percent",
+    "host_memory_total_bytes",
+];
+
+export const ALL_METRICS: MetricName[] = [...PROCESS_METRICS, ...HOST_METRICS];
 
 export interface MetricsRangePreset {
     value: string;
@@ -130,10 +141,31 @@ export function buildServerSelector(
     return labels.length > 0 ? `${metric}{${labels.join(",")}}` : metric;
 }
 
+export function isHostMetric(metric: MetricName): metric is HostMetricName {
+    return HOST_METRICS.includes(metric as HostMetricName);
+}
+
+export function buildHostSelector(
+    metric: HostMetricName,
+    target: { server: string },
+): string {
+    return target.server
+        ? `${metric}{${PROMETHEUS_SERVER_LABEL}="${escapeLabelValue(target.server)}"}`
+        : metric;
+}
+
 export function buildSelectorForScope(
-    metric: ProcessMetricName,
+    metric: MetricName,
     scope: MetricsScope,
 ): string {
+    if (isHostMetric(metric)) {
+        if (scope.kind !== "server") {
+            throw new Error(`Host metric ${metric} requires a server scope`);
+        }
+
+        return buildHostSelector(metric, scope);
+    }
+
     if (scope.kind === "process") {
         return buildSelector(metric, scope);
     }
