@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import {
     buildStatusTimeline,
+    hasStatusTimelineData,
     type BuildStatusTimelineOptions,
 } from '../../lib/status-timeline'
 import { formatSeriesLabel, seriesIdentity } from '../../lib/prometheus'
@@ -9,7 +10,10 @@ import { STATUS_ORDER } from '../../lib/status-catalog'
 import type {
     PrometheusSeries,
     ResolvedMetricsRange,
+    StatusTimelineData,
+    StatusTimelineKind,
     StatusTimelineProcess,
+    StatusTimelineSegment,
 } from '../../types/prometheus'
 
 const STEP_MS = 15_000
@@ -258,6 +262,58 @@ describe('buildStatusTimeline', () => {
             end: 0,
             stepMs: null,
         })
+    })
+})
+
+function timelineWith(
+    segments: StatusTimelineSegment[],
+): StatusTimelineData {
+    return {
+        lanes: [],
+        segments,
+        restarts: [],
+        start: 0,
+        end: 1,
+        stepMs: null,
+    }
+}
+
+function segment(kind: StatusTimelineKind): StatusTimelineSegment {
+    return {
+        laneId: 'lane',
+        laneIndex: 0,
+        kind,
+        code: kind === 'no_data' ? null : 9,
+        start: 0,
+        end: 1,
+    }
+}
+
+describe('hasStatusTimelineData', () => {
+    test('is false when there are no segments', () => {
+        expect(hasStatusTimelineData(timelineWith([]))).toBe(false)
+    })
+
+    test('is false when every segment is no_data', () => {
+        expect(
+            hasStatusTimelineData(
+                timelineWith([segment('no_data'), segment('no_data')]),
+            ),
+        ).toBe(false)
+    })
+
+    test('is true for a real status segment', () => {
+        expect(hasStatusTimelineData(timelineWith([segment('online')]))).toBe(
+            true,
+        )
+    })
+
+    test('is true when real status and no_data segments are mixed', () => {
+        expect(
+            hasStatusTimelineData(
+                timelineWith([segment('online'), segment('no_data')]),
+            ),
+        ).toBe(true)
     })
 })
 
