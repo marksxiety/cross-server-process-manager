@@ -17,6 +17,10 @@ import type {
 
 const NO_DATA_KIND: StatusTimelineKind = "no_data";
 
+export function hasStatusTimelineData(data: StatusTimelineData): boolean {
+    return data.segments.some((segment) => segment.kind !== NO_DATA_KIND);
+}
+
 export interface BuildStatusTimelineOptions {
     restarts?: RestartTimestamps;
     range?: ResolvedMetricsRange | null;
