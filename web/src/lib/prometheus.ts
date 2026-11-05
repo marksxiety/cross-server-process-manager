@@ -84,6 +84,12 @@ export const METRICS_RANGE_PRESETS: MetricsRangePreset[] = [
         shortLabel: "7d",
         durationMs: 7 * 24 * 60 * 60 * 1000,
     },
+    {
+        value: "15d",
+        label: "Last 15 days",
+        shortLabel: "15d",
+        durationMs: 15 * 24 * 60 * 60 * 1000,
+    },
 ];
 
 export const METRICS_REFRESH_OPTIONS: { value: string; label: string }[] = [
@@ -188,6 +194,14 @@ export function formatSeriesLabel(series: PrometheusSeries): string {
     const discriminator = series.metric.unique_id ?? series.metric.pm_id;
 
     return discriminator ? `${base} (${discriminator})` : base;
+}
+
+/** Legend-friendly process name without the namespace prefix. */
+export function formatSeriesName(series: PrometheusSeries): string {
+    const name = series.metric.name ?? "unknown";
+    const discriminator = series.metric.unique_id ?? series.metric.pm_id;
+
+    return discriminator ? `${name} (${discriminator})` : name;
 }
 
 export function computeStep(rangeMs: number): number {
