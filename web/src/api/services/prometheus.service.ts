@@ -3,8 +3,8 @@ import { isDemoMode } from "@/lib/demo-mode";
 import { buildSelectorForScope, parseMatrixResult } from "@/lib/prometheus";
 import type { ApiError } from "@/types/api";
 import type {
+    MetricName,
     MetricsScope,
-    ProcessMetricName,
     PrometheusSeries,
     ResolvedMetricsRange,
 } from "@/types/prometheus";
@@ -38,7 +38,7 @@ export function toPrometheusApiError(error: PrometheusError): ApiError {
 }
 
 export async function queryRange(
-    metric: ProcessMetricName,
+    metric: MetricName,
     scope: MetricsScope,
     range: ResolvedMetricsRange,
     signal?: AbortSignal,
