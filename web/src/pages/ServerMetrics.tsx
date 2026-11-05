@@ -5,7 +5,7 @@ import { isPrometheusConfigured } from '@/api/services/prometheus.service'
 import {
   LineChartCard,
   StatusTimelineCard,
-  UsageDonutCard,
+  UsageTrendCard,
 } from '@/components/custom/charts'
 import { ErrorAlert } from '@/components/custom/error-alert'
 import { MetricBasisSwitch } from '@/components/custom/metric-basis-switch'
@@ -43,6 +43,7 @@ import {
   processStyleFor,
 } from '@/lib/metric-chart'
 import {
+  combineStatus,
   metricDescription,
   metricError,
 } from '@/lib/metric-status'
@@ -57,6 +58,7 @@ import {
   formatMetricAxisValue,
   formatMetricValue,
   formatSeriesLabel,
+  lastValue,
   normalizeCpu,
   seriesIdentity,
   sumLastValues,
@@ -93,6 +95,8 @@ const formatMemoryValue = metricValueFormatter('pm2_memory')
 const formatMemoryAxis = metricAxisFormatter('pm2_memory')
 const formatUptimeValue = metricValueFormatter('pm2_uptime')
 const formatUptimeAxis = metricAxisFormatter('pm2_uptime')
+const HOST_PERCENT_AXIS_MAX = 100
+const formatHostPercentAxis = percentAxisFormatter(HOST_PERCENT_AXIS_MAX)
 const STATUS_SUMMARY_ORDER = STATUS_ORDER.map(
   (status) => STATUS_CATALOG[status].label,
 )
@@ -107,6 +111,14 @@ function statusSummary(counts: Record<string, number>): string | null {
 
 function processCountLabel(count: number): string {
   return `${count} ${count === 1 ? 'process' : 'processes'}`
+}
+
+function missingHostMetricsError(subject: 'CPU' | 'memory'): ApiError {
+  return {
+    code: `HOST_${subject.toUpperCase()}_METRICS_UNAVAILABLE`,
+    message: `Host ${subject} metrics are not in Prometheus. Update xpm-exporter and keep host_* metrics in the scrape.`,
+    status: 0,
+  }
 }
 
 export type ServerMetricsProps = {
@@ -137,8 +149,41 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
   const server = servers.find((entry) => entry.server === serverName)
   const serverEntry = server ? processesByServer[server.server] : undefined
   const overviewStatus = serverEntry?.status ?? 'idle'
-  const cpuCores = serverEntry?.overview?.cpu.cores ?? null
-  const totalMemoryBytes = serverEntry?.overview?.memory.totalBytes ?? null
+
+  const hostCpuSeries = metrics.data.host_cpu_usage_percent ?? []
+  const hostCpuCoresSeries = metrics.data.host_cpu_cores ?? []
+  const hostMemorySeries = metrics.data.host_memory_usage_percent ?? []
+  const hostMemoryTotalSeries = metrics.data.host_memory_total_bytes ?? []
+  const hostCpuStatus = metrics.status.host_cpu_usage_percent
+  const hostCpuCoresStatus = metrics.status.host_cpu_cores
+  const hostMemoryStatus = metrics.status.host_memory_usage_percent
+  const hostMemoryTotalStatus = metrics.status.host_memory_total_bytes
+  const hostCpuMetricsStatus = combineStatus(
+    hostCpuStatus,
+    hostCpuCoresStatus,
+  )
+  const hostMemoryMetricsStatus = combineStatus(
+    hostMemoryStatus,
+    hostMemoryTotalStatus,
+  )
+  const hostCpuMissing =
+    hostCpuStatus === 'success' && hostCpuSeries.length === 0
+  const hostCpuCoresMissing =
+    hostCpuCoresStatus === 'success' && hostCpuCoresSeries.length === 0
+  const hostMemoryMissing =
+    hostMemoryStatus === 'success' && hostMemorySeries.length === 0
+  const hostMemoryTotalMissing =
+    hostMemoryTotalStatus === 'success' && hostMemoryTotalSeries.length === 0
+  const hostCpuPercent = lastValue(hostCpuSeries)
+  const hostMemoryPercent = lastValue(hostMemorySeries)
+  const hostCpuCores = lastValue(hostCpuCoresSeries)
+  const hostMemoryTotalBytes = lastValue(hostMemoryTotalSeries)
+  const hostMemoryUsedBytes =
+    hostMemoryPercent === null || hostMemoryTotalBytes === null
+      ? null
+      : (hostMemoryPercent / 100) * hostMemoryTotalBytes
+  const cpuCores = hostCpuCores
+  const totalMemoryBytes = hostMemoryTotalBytes
   const hostRamLabel =
     totalMemoryBytes === null ? '—' : formatBytes(totalMemoryBytes)
 
@@ -170,8 +215,8 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
   const namespaces = useMemo(() => {
     const values = new Set<string>()
 
-    for (const seriesList of Object.values(metrics.data)) {
-      for (const series of seriesList ?? []) {
+    for (const metric of PROCESS_METRICS) {
+      for (const series of metrics.data[metric] ?? []) {
         values.add(series.metric.namespace ?? 'default')
       }
     }
@@ -195,8 +240,8 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
   const uptimeSeries = filterMetric(metrics.data.pm2_uptime)
 
   const processIdentities = new Map<string, string>()
-  for (const seriesList of Object.values(metrics.data)) {
-    for (const series of filterSeries(seriesList ?? [], {
+  for (const metric of PROCESS_METRICS) {
+    for (const series of filterSeries(metrics.data[metric] ?? [], {
       namespace: activeNamespace === 'all' ? undefined : activeNamespace,
       query,
     })) {
@@ -208,7 +253,11 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
   }
 
   const styleMap = useMemo(
-    () => buildProcessStyleMap(Object.values(metrics.data), theme.palette),
+    () =>
+      buildProcessStyleMap(
+        PROCESS_METRICS.map((metric) => metrics.data[metric]),
+        theme.palette,
+      ),
     [metrics.data, theme.palette],
   )
   const fallbackStyle = { color: theme.palette[0] ?? '#155dfc' }
@@ -249,40 +298,45 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
     timelineProcesses,
   )
 
-  const overview = serverEntry?.overview ?? null
   const cpuTotalRaw = sumLastValues(cpuSeries)
   const memoryTotalRaw = sumLastValues(memorySeries)
   const statusCounts = countByStatus(statusSeries)
   const cpuShares = cpuUsageShares(
     cpuTotalRaw,
-    overview?.cpu.usagePercent ?? null,
-    overview?.cpu.cores ?? null,
+    hostCpuPercent,
+    hostCpuCores,
   )
   const memoryShares = memoryUsageShares(
     memoryTotalRaw,
-    overview?.memory.usedBytes ?? null,
-    overview?.memory.totalBytes ?? null,
+    hostMemoryUsedBytes,
+    hostMemoryTotalBytes,
   )
   const cpuUsageStatus = resolveUsageStatus(
-    overviewStatus,
+    hostCpuMetricsStatus,
     metrics.status.pm2_cpu,
     cpuShares,
   )
   const memoryUsageStatus = resolveUsageStatus(
-    overviewStatus,
+    hostMemoryMetricsStatus,
     metrics.status.pm2_memory,
     memoryShares,
   )
-  // The donuts need both the Prometheus metric and the agent overview, so a
-  // failure in either one is reported on the card.
-  const overviewError = serverEntry?.requestError ?? null
   const cpuUsageError =
-    metricError(metrics.errors, 'pm2_cpu') ?? overviewError
+    metricError(metrics.errors, 'pm2_cpu') ??
+    metricError(metrics.errors, 'host_cpu_usage_percent') ??
+    metricError(metrics.errors, 'host_cpu_cores') ??
+    (hostCpuMissing || hostCpuCoresMissing
+      ? missingHostMetricsError('CPU')
+      : null)
   const memoryUsageError =
-    metricError(metrics.errors, 'pm2_memory') ?? overviewError
+    metricError(metrics.errors, 'pm2_memory') ??
+    metricError(metrics.errors, 'host_memory_usage_percent') ??
+    metricError(metrics.errors, 'host_memory_total_bytes') ??
+    (hostMemoryMissing || hostMemoryTotalMissing
+      ? missingHostMetricsError('memory')
+      : null)
   const retryUsage = () => {
     void metrics.refresh()
-    if (server) void refreshServer(server)
   }
 
   const metricsLoading = metrics.isRefreshing && visibleProcessCount === 0
@@ -306,9 +360,11 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
     })
 
   const cpuServerPending =
-    overviewStatus === 'loading' || overviewStatus === 'idle'
+    hostCpuCoresStatus === 'loading' || hostCpuCoresStatus === 'idle'
   const cpuServerReady =
-    overviewStatus === 'success' && cpuCores !== null && cpuCores > 0
+    hostCpuCoresStatus === 'success' &&
+    cpuCores !== null &&
+    cpuCores > 0
   const cpuBasisIsServer = cpuBasis === 'server'
   const cpuCardStatus: LoadStatus = cpuBasisIsServer
     ? cpuServerPending
@@ -322,7 +378,7 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
       ? {
           code: 'SERVER_CPU_UNAVAILABLE',
           message:
-            'Server CPU basis requires the agent CPU core count. Update the agent or switch to PROCESS.',
+            'Server CPU basis requires the host CPU core count from Prometheus. Update xpm-exporter or switch to PROCESS.',
           status: 0,
         }
       : metricError(metrics.errors, 'pm2_cpu')
@@ -363,9 +419,9 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
   const cpuAxisFormatter = percentAxisFormatter(cpuAxisMax)
 
   const memoryServerPending =
-    overviewStatus === 'loading' || overviewStatus === 'idle'
+    hostMemoryTotalStatus === 'loading' || hostMemoryTotalStatus === 'idle'
   const memoryServerReady =
-    overviewStatus === 'success' &&
+    hostMemoryTotalStatus === 'success' &&
     totalMemoryBytes !== null &&
     totalMemoryBytes > 0
   const memoryBasisIsServer = memoryBasis === 'server'
@@ -381,7 +437,7 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
       ? {
           code: 'SERVER_MEMORY_UNAVAILABLE',
           message:
-            'Host RAM total is unavailable. Switch to PROCESS to see memory in MB.',
+            'Host RAM total is unavailable from Prometheus. Update xpm-exporter or switch to PROCESS.',
           status: 0,
         }
       : metricError(metrics.errors, 'pm2_memory')
@@ -441,6 +497,31 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
     ? (memoryPercentMax ?? undefined)
     : undefined
 
+  const hostCpuError: ApiError | null =
+    metricError(metrics.errors, 'host_cpu_usage_percent') ??
+    (hostCpuMissing ? missingHostMetricsError('CPU') : null)
+  const hostMemoryError: ApiError | null =
+    metricError(metrics.errors, 'host_memory_usage_percent') ??
+    (hostMemoryMissing ? missingHostMetricsError('memory') : null)
+  const hostCpuChartSeries = toChartSeries(hostCpuSeries, {
+    color: theme.series.cpu,
+    filled: true,
+    label: () => 'Host total',
+  })
+  const hostMemoryChartSeries = toChartSeries(hostMemorySeries, {
+    color: theme.series.memory,
+    filled: true,
+    label: () => 'Host total',
+  })
+  const hostCpuValueFormatter = (value: number | string) =>
+    formatPercent(Number(value), 1)
+  const hostMemoryValueFormatter = (value: number | string) => {
+    const percent = Number(value)
+    if (totalMemoryBytes === null) return formatPercent(percent, 1)
+    return `${formatPercent(percent, 1)} (${formatBytes(
+      (percent / 100) * totalMemoryBytes,
+    )})`
+  }
   const namespaceItems = useMemo(
     () => [
       { value: 'all', label: 'All namespaces' },
@@ -617,23 +698,43 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
       ) : (
         <>
           <div className='mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2'>
-            <UsageDonutCard
+            <UsageTrendCard
               title='CPU'
+              description='Whole-host usage'
               theme={theme}
               pm2={cpuShares?.pm2 ?? null}
               other={cpuShares?.other ?? null}
-              status={cpuUsageStatus}
-              error={cpuUsageError}
+              usageStatus={cpuUsageStatus}
+              usageError={cpuUsageError}
+              trendSeries={hostCpuChartSeries}
+              trendStatus={hostCpuStatus}
+              trendError={hostCpuError}
+              trendValueFormatter={hostCpuValueFormatter}
+              trendYAxisFormatter={formatHostPercentAxis}
+              trendYAxisMax={HOST_PERCENT_AXIS_MAX}
+              timeRange={metrics.range}
+              onTimeRangeSelect={selectTimeRange}
+              onResetTimeRange={resetTimeRange}
               onRetry={retryUsage}
               className='h-full'
             />
-            <UsageDonutCard
+            <UsageTrendCard
               title='Memory'
+              description='Whole-host usage'
               theme={theme}
               pm2={memoryShares?.pm2 ?? null}
               other={memoryShares?.other ?? null}
-              status={memoryUsageStatus}
-              error={memoryUsageError}
+              usageStatus={memoryUsageStatus}
+              usageError={memoryUsageError}
+              trendSeries={hostMemoryChartSeries}
+              trendStatus={hostMemoryStatus}
+              trendError={hostMemoryError}
+              trendValueFormatter={hostMemoryValueFormatter}
+              trendYAxisFormatter={formatHostPercentAxis}
+              trendYAxisMax={HOST_PERCENT_AXIS_MAX}
+              timeRange={metrics.range}
+              onTimeRangeSelect={selectTimeRange}
+              onResetTimeRange={resetTimeRange}
               onRetry={retryUsage}
               className='h-full'
               action={
@@ -646,7 +747,7 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
 
           <div className='mt-4 grid grid-cols-1 gap-3 xl:grid-cols-2'>
             <LineChartCard
-              title='CPU'
+              title='CPU by process'
               description={cpuDescription}
               series={cpuChartSeries}
               timeRange={metrics.range}
@@ -670,7 +771,7 @@ export function ServerMetrics({ serverName, metrics }: ServerMetricsProps) {
             />
 
             <LineChartCard
-              title='Memory'
+              title='Memory by process'
               description={memoryDescription}
               series={memoryChartSeries}
               timeRange={metrics.range}
