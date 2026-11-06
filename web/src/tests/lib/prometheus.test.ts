@@ -8,10 +8,12 @@ import {
   countByStatus,
   escapeLabelValue,
   filterSeries,
+  findRangePreset,
   formatDurationSeconds,
   formatMetricAxisValue,
   formatMetricValue,
   formatSeriesLabel,
+  formatSeriesName,
   isHostMetric,
   lastPoint,
   lastValue,
@@ -170,6 +172,17 @@ describe('series labels and aggregates', () => {
     ).toBe('plain')
   })
 
+  test('uses only the process name for legend labels', () => {
+    expect(formatSeriesName(entries[0]!)).toBe('xpm-agent')
+    expect(
+      formatSeriesName({
+        metric: { name: 'api', namespace: 'XPM', unique_id: 'u1' },
+        points: [],
+      }),
+    ).toBe('api (u1)')
+    expect(formatSeriesName({ metric: {}, points: [] })).toBe('unknown')
+  })
+
   test('returns the latest point for each series', () => {
     expect(latestPoints(entries)).toEqual([
       { series: entries[0], point: { timestamp: 15 * SECOND, value: 2 } },
@@ -218,6 +231,17 @@ describe('computeStep', () => {
     expect(computeStep(DAY)).toBe(300)
     expect(computeStep(7 * DAY)).toBe(1800)
     expect(computeStep(15 * DAY)).toBe(3600)
+  })
+})
+
+describe('METRICS_RANGE_PRESETS', () => {
+  test('includes the 15-day range', () => {
+    expect(findRangePreset(15 * DAY)).toMatchObject({
+      value: '15d',
+      label: 'Last 15 days',
+      shortLabel: '15d',
+      durationMs: 15 * DAY,
+    })
   })
 })
 
