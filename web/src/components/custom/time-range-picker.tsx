@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Spinner } from '@/components/ui/spinner'
 import { formatUptime } from '@/lib/format'
 import { METRICS_RANGE_PRESETS } from '@/lib/prometheus'
 import { cn } from '@/lib/utils'
@@ -20,6 +21,7 @@ type TimeRangePickerProps = {
   value: MetricsRange
   onChange: (range: MetricsRange) => void
   disabled?: boolean
+  loading?: boolean
 }
 
 const QUICK_CUSTOM_DURATIONS = METRICS_RANGE_PRESETS.filter((entry) =>
@@ -55,6 +57,7 @@ export function TimeRangePicker({
   value,
   onChange,
   disabled = false,
+  loading = false,
 }: TimeRangePickerProps) {
   const [customOpen, setCustomOpen] = useState(false)
   const [from, setFrom] = useState('')
@@ -123,6 +126,7 @@ export function TimeRangePicker({
         role='group'
         aria-label='Time range'
         aria-disabled={disabled || undefined}
+        aria-busy={loading || undefined}
         className='flex min-w-0 flex-1 items-center gap-0.5 rounded-md bg-muted/60 p-0.5'
       >
         <div className='flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto'>
@@ -157,6 +161,10 @@ export function TimeRangePicker({
             )
           })}
         </div>
+
+        {loading && (
+          <Spinner className='size-3.5 shrink-0 text-muted-foreground' />
+        )}
 
         <Button
           type='button'
