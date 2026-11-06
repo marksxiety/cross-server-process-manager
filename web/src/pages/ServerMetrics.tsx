@@ -66,6 +66,7 @@ import {
   formatMetricAxisValue,
   formatMetricValue,
   formatSeriesLabel,
+  formatSeriesName,
   lastValue,
   normalizeCpu,
   seriesIdentity,
@@ -420,14 +421,14 @@ export function ServerMetrics({
       ? toChartSeries(cpuSeries, {
           ...chartStyle(cpuSeries),
           filled: true,
-          label: formatSeriesLabel,
+          label: formatSeriesName,
           valueMapper: (value) => normalizeCpu(value, cpuCores),
         })
       : []
     : toChartSeries(cpuSeries, {
         ...chartStyle(cpuSeries),
         filled: true,
-        label: formatSeriesLabel,
+        label: formatSeriesName,
       })
   const cpuDisplayTotal =
     cpuTotalRaw === null || (cpuBasisIsServer && !cpuServerReady)
@@ -488,7 +489,7 @@ export function ServerMetrics({
       ? toChartSeries(memorySeries, {
           ...chartStyle(memorySeries),
           filled: true,
-          label: formatSeriesLabel,
+          label: formatSeriesName,
           valueMapper: (value) =>
             memorySharePercent(value, totalMemoryBytes) ?? 0,
         })
@@ -496,7 +497,7 @@ export function ServerMetrics({
     : toChartSeries(memorySeries, {
         ...chartStyle(memorySeries),
         filled: true,
-        label: formatSeriesLabel,
+        label: formatSeriesName,
       })
   const memoryDescriptionValue =
     memorySeries.length === 0 || memoryTotalRaw === null
@@ -867,7 +868,7 @@ export function ServerMetrics({
               series={toChartSeries(uptimeSeries, {
                 ...chartStyle(uptimeSeries),
                 filled: true,
-                label: formatSeriesLabel,
+                label: formatSeriesName,
               })}
               timeRange={metrics.range}
               onTimeRangeSelect={selectTimeRange}
