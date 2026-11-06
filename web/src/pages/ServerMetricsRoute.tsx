@@ -62,6 +62,7 @@ export function ServerMetricsRoute() {
         isRefreshing={
           metrics.isRefreshing || availability.status === 'loading'
         }
+        isRangeLoading={metrics.isRefreshing}
         onRefresh={refreshMetrics}
       />
 
