@@ -6,6 +6,7 @@ import {
   GridComponent,
   LegendComponent,
   TitleComponent,
+  ToolboxComponent,
   TooltipComponent,
 } from 'echarts/components'
 import * as echarts from 'echarts/core'
@@ -24,6 +25,7 @@ echarts.use([
   LineChart,
   PieChart,
   GridComponent,
+  ToolboxComponent,
   TooltipComponent,
   LegendComponent,
   TitleComponent,
@@ -171,7 +173,7 @@ export function EChart({
     if (!chart) return
 
     const nextOption = selection?.enabled
-      ? { ...option, brush: TIME_SERIES_BRUSH }
+      ? { ...option, brush: TIME_SERIES_BRUSH, toolbox: { show: false } }
       : option
 
     chart.setOption(
