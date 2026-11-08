@@ -66,6 +66,7 @@ function categoryHeight(
 function renderStatusSegment(
   params: CustomSeriesRenderItemParams,
   api: CustomSeriesRenderItemAPI,
+  opacity = 1,
 ): CustomSeriesRenderItemReturn {
   const laneIndex = Number(api.value(0))
   const start = Number(api.value(1))
@@ -95,7 +96,10 @@ function renderStatusSegment(
       height: laneHeight,
       r: 1,
     },
-    style: api.style(),
+    style: {
+      fill: api.visual('color'),
+      opacity,
+    },
   }
 }
 
@@ -211,7 +215,10 @@ function buildStatusTimelineOption({
         start: segment.start,
         end: segment.end,
       })),
-      renderItem: renderStatusSegment,
+      renderItem: (
+        params: CustomSeriesRenderItemParams,
+        api: CustomSeriesRenderItemAPI,
+      ) => renderStatusSegment(params, api, 0.25),
       z: 1,
     })
   }
