@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router'
 import { Activity, Info, Search, ServerOff } from 'lucide-react'
 import {
   isPrometheusConfigured,
@@ -11,6 +10,7 @@ import {
   UsageTrendCard,
 } from '@/components/custom/charts'
 import { ErrorAlert } from '@/components/custom/error-alert'
+import { LinkButton } from '@/components/custom/link-button'
 import { MetricBasisSwitch } from '@/components/custom/metric-basis-switch'
 import {
   Alert,
@@ -19,7 +19,6 @@ import {
 } from '@/components/ui/alert'
 import { PageLoader } from '@/components/custom/page-loader'
 import { ProcessesSection } from '@/components/custom/processes-section'
-import { Button } from '@/components/ui/button'
 import {
   Empty,
   EmptyContent,
@@ -655,7 +654,7 @@ export function ServerMetrics({
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
-          <Button render={<Link to='/' />}>Back to dashboard</Button>
+          <LinkButton to='/'>Back to dashboard</LinkButton>
         </EmptyContent>
       </Empty>
     )
