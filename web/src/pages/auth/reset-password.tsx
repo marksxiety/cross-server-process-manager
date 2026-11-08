@@ -5,6 +5,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router'
 import { authService } from '@/api/services/auth.service'
 import { AuthLayout } from '@/components/auth/auth-layout'
 import { ErrorAlert } from '@/components/custom/error-alert'
+import { LinkButton } from '@/components/custom/link-button'
 import { Button } from '@/components/ui/button'
 import {
   Field,
@@ -68,9 +69,9 @@ export function ResetPassword() {
           <p className='text-sm text-muted-foreground'>
             Request a new reset link from the sign-in page.
           </p>
-          <Button className='w-full' render={<Link to='/forgot-password' />}>
+          <LinkButton className='w-full' to='/forgot-password'>
             Request a new link
-          </Button>
+          </LinkButton>
         </div>
       </AuthLayout>
     )
