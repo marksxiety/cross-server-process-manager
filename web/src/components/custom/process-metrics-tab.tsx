@@ -49,7 +49,7 @@ import {
   PROCESS_METRICS,
   formatMetricAxisValue,
   formatMetricValue,
-  formatSeriesLabel,
+  formatSeriesName,
   lastValue,
   normalizeCpu,
   normalizeMetricsRefreshMs,
@@ -139,7 +139,7 @@ export function ProcessMetricsTab({
   const memorySeries = metrics.data.pm2_memory
   const statusSeries = metrics.data.pm2_status
   const timelineProcesses = (statusSeries ?? []).map((series) => ({
-    label: formatSeriesLabel(series),
+    label: formatSeriesName(series),
     identity: seriesIdentity(series.metric),
   }))
   const timelineData = useStatusTimeline(
@@ -186,12 +186,14 @@ export function ProcessMetricsTab({
       ? toChartSeries(cpuSeries, {
           color: colorFor,
           filled: true,
+          label: formatSeriesName,
           valueMapper: (value) => normalizeCpu(value, cpuCores),
         })
       : []
     : toChartSeries(cpuSeries, {
         color: colorFor,
         filled: true,
+        label: formatSeriesName,
       })
   const cpuDisplayLast =
     cpuLast === null || (cpuBasisIsServer && !cpuServerReady)
@@ -246,6 +248,7 @@ export function ProcessMetricsTab({
       ? toChartSeries(memorySeries, {
           color: colorFor,
           filled: true,
+          label: formatSeriesName,
           valueMapper: (value) =>
             memorySharePercent(value, totalMemoryBytes) ?? 0,
         })
@@ -253,6 +256,7 @@ export function ProcessMetricsTab({
     : toChartSeries(memorySeries, {
         color: colorFor,
         filled: true,
+        label: formatSeriesName,
       })
   const memoryDescriptionValue =
     memorySeries?.length === 0 || memoryLast === null
@@ -474,6 +478,7 @@ export function ProcessMetricsTab({
                 series={toChartSeries(uptimeSeries, {
                   color: colorFor,
                   filled: true,
+                  label: formatSeriesName,
                 })}
                 timeRange={metrics.range}
                 onTimeRangeSelect={selectTimeRange}
