@@ -42,12 +42,10 @@ import { useMetricsZoom } from '@/hooks/use-metrics-zoom'
 import { useStatusTimeline } from '@/hooks/use-status-timeline'
 import { formatBytes, formatPercent, memorySharePercent } from '@/lib/format'
 import {
-  buildProcessStyleMap,
   maxNumericValue,
   niceCpuProcessMax,
   nicePercentMax,
   percentAxisFormatter,
-  processStyleFor,
 } from '@/lib/metric-chart'
 import {
   combineStatus,
@@ -145,7 +143,7 @@ export function ServerMetrics({
   const memoryBasis = useMetricsStore((state) => state.memoryBasis)
   const setMemoryBasis = useMetricsStore((state) => state.setMemoryBasis)
   const theme = useChartTheme()
-  const toChartSeries = useMetricChartSeries(metrics)
+  const toChartSeries = useMetricChartSeries(metrics, theme.palette)
   const { selectTimeRange, resetTimeRange } = useMetricsZoom()
   const configured = isPrometheusConfigured()
   const metricsEnabled = configured && serverName !== ''
@@ -268,27 +266,6 @@ export function ServerMetrics({
       }
     }
   }
-
-  const styleMap = useMemo(
-    () =>
-      buildProcessStyleMap(
-        PROCESS_METRICS.map((metric) => metrics.data[metric]),
-        theme.palette,
-      ),
-    [metrics.data, theme.palette],
-  )
-  const fallbackStyle = { color: theme.palette[0] ?? '#155dfc' }
-  const styleFor = (series: PrometheusSeries) =>
-    processStyleFor(series, styleMap, fallbackStyle)
-  const chartStyle = (seriesList: PrometheusSeries[]) => ({
-    color: (series: PrometheusSeries) => styleFor(series).color,
-    ...(seriesList.length > 1
-      ? {
-          dashPattern: (series: PrometheusSeries) =>
-            styleFor(series).dashPattern,
-        }
-      : {}),
-  })
 
   const visibleLabels = new Set<string>()
   for (const seriesList of [
@@ -417,14 +394,12 @@ export function ServerMetrics({
   const cpuChartSeries = cpuBasisIsServer
     ? cpuServerReady
       ? toChartSeries(cpuSeries, {
-          ...chartStyle(cpuSeries),
           filled: true,
           label: formatSeriesName,
           valueMapper: (value) => normalizeCpu(value, cpuCores),
         })
       : []
     : toChartSeries(cpuSeries, {
-        ...chartStyle(cpuSeries),
         filled: true,
         label: formatSeriesName,
       })
@@ -485,7 +460,6 @@ export function ServerMetrics({
   const memoryChartSeries = memoryBasisIsServer
     ? memoryServerReady
       ? toChartSeries(memorySeries, {
-          ...chartStyle(memorySeries),
           filled: true,
           label: formatSeriesName,
           valueMapper: (value) =>
@@ -493,7 +467,6 @@ export function ServerMetrics({
         })
       : []
     : toChartSeries(memorySeries, {
-        ...chartStyle(memorySeries),
         filled: true,
         label: formatSeriesName,
       })
@@ -545,12 +518,10 @@ export function ServerMetrics({
       ? missingHostMetricsError('memory')
       : null)
   const hostCpuChartSeries = toChartSeries(hostCpuSeries, {
-    color: theme.series.cpu,
     filled: true,
     label: () => 'Host total',
   })
   const hostMemoryChartSeries = toChartSeries(hostMemorySeries, {
-    color: theme.series.memory,
     filled: true,
     label: () => 'Host total',
   })
@@ -754,6 +725,7 @@ export function ServerMetrics({
               trendSeries={hostCpuChartSeries}
               trendStatus={hostCpuStatus}
               trendError={hostCpuError}
+              trendColor={theme.usage.trendCpu}
               trendValueFormatter={hostCpuValueFormatter}
               trendYAxisFormatter={formatHostPercentAxis}
               trendYAxisMax={HOST_PERCENT_AXIS_MAX}
@@ -774,6 +746,7 @@ export function ServerMetrics({
               trendSeries={hostMemoryChartSeries}
               trendStatus={hostMemoryStatus}
               trendError={hostMemoryError}
+              trendColor={theme.usage.trendMemory}
               trendValueFormatter={hostMemoryValueFormatter}
               trendYAxisFormatter={formatHostPercentAxis}
               trendYAxisMax={HOST_PERCENT_AXIS_MAX}
@@ -864,7 +837,6 @@ export function ServerMetrics({
                   : processCountLabel(uptimeSeries.length),
               )}
               series={toChartSeries(uptimeSeries, {
-                ...chartStyle(uptimeSeries),
                 filled: true,
                 label: formatSeriesName,
               })}
