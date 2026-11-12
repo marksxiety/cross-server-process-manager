@@ -264,8 +264,7 @@ function buildStatusTimelineOption({
       ? {
           type: 'scroll',
           bottom: 0,
-          left: 0,
-          right: 0,
+          left: 'center',
           itemWidth: 8,
           itemHeight: 8,
           icon: 'roundRect',
