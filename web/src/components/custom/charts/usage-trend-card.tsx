@@ -38,6 +38,7 @@ export type UsageTrendCardProps = Omit<
   trendSeries: MetricChartSeries[]
   trendStatus: LoadStatus
   trendError?: ApiError | null
+  trendColor?: string
   trendValueFormatter: (value: number | string) => string
   trendYAxisFormatter?: (value: number) => string
   trendYAxisMax?: number
@@ -151,6 +152,7 @@ export function UsageTrendCard({
   trendSeries,
   trendStatus,
   trendError,
+  trendColor,
   trendValueFormatter,
   trendYAxisFormatter,
   trendYAxisMax,
@@ -239,6 +241,7 @@ export function UsageTrendCard({
               <LazyLineChart
                 series={trendSeries}
                 theme={theme}
+                color={trendColor}
                 valueFormatter={trendValueFormatter}
                 yAxisFormatter={trendYAxisFormatter}
                 yAxisMax={trendYAxisMax}
