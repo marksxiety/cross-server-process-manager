@@ -11,7 +11,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Spinner } from '@/components/ui/spinner'
 import { formatUptime } from '@/lib/format'
 import { METRICS_RANGE_PRESETS } from '@/lib/prometheus'
 import { cn } from '@/lib/utils'
@@ -77,9 +76,10 @@ export function TimeRangePicker({
 
   const isCustom = value.kind === 'absolute'
   const customLabel = absoluteRangeLabel(value)
+  const isBusy = disabled || loading
 
   const openCustom = () => {
-    if (disabled) return
+    if (isBusy) return
 
     const currentNow = Date.now()
     const end = value.kind === 'absolute' ? value.end : currentNow
@@ -142,7 +142,7 @@ export function TimeRangePicker({
                 size='sm'
                 aria-pressed={isActive}
                 aria-label={entry.label}
-                disabled={disabled}
+                disabled={isBusy}
                 onClick={() =>
                   onChange({
                     kind: 'relative',
@@ -162,10 +162,6 @@ export function TimeRangePicker({
           })}
         </div>
 
-        {loading && (
-          <Spinner className='size-3.5 shrink-0 text-muted-foreground' />
-        )}
-
         <Button
           type='button'
           variant='ghost'
@@ -173,7 +169,7 @@ export function TimeRangePicker({
           aria-pressed={isCustom}
           aria-label={isCustom ? customLabel : 'Choose a custom time range'}
           title={customLabel}
-          disabled={disabled}
+          disabled={isBusy}
           onClick={openCustom}
           className={cn(
             'h-8 shrink-0 gap-1 px-2 text-[11px] font-medium lg:h-6',
