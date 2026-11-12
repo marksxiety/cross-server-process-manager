@@ -64,7 +64,6 @@ import {
   filterSeries,
   formatMetricAxisValue,
   formatMetricValue,
-  formatSeriesLabel,
   formatSeriesName,
   lastValue,
   normalizeCpu,
@@ -263,7 +262,7 @@ export function ServerMetrics({
       namespace: activeNamespace === 'all' ? undefined : activeNamespace,
       query,
     })) {
-      const label = formatSeriesLabel(series)
+      const label = formatSeriesName(series)
       if (!processIdentities.has(label)) {
         processIdentities.set(label, seriesIdentity(series.metric))
       }
@@ -298,11 +297,11 @@ export function ServerMetrics({
     statusSeries,
     uptimeSeries,
   ]) {
-    for (const series of seriesList) visibleLabels.add(formatSeriesLabel(series))
+    for (const series of seriesList) visibleLabels.add(formatSeriesName(series))
   }
   const visibleProcessCount = visibleLabels.size
 
-  const statusLabels = new Set(statusSeries.map(formatSeriesLabel))
+  const statusLabels = new Set(statusSeries.map(formatSeriesName))
   const timelineProcesses = [
     ...statusLabels,
     ...[...visibleLabels].filter((label) => !statusLabels.has(label)).sort(),
