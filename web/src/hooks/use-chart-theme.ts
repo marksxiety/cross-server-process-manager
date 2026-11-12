@@ -21,18 +21,12 @@ export interface ChartTheme {
   reducedMotion: boolean
   palette: string[]
   status: Record<EffectiveStatus, string>
-  series: {
-    cpu: string
-    memory: string
-    uptime: string
-    restarts: string
-    unstable: string
-    status: string
-  }
   usage: {
     pm2: string
     other: string
     free: string
+    trendCpu: string
+    trendMemory: string
   }
   threshold: Record<ThresholdState, ThresholdColors>
 }
@@ -51,18 +45,7 @@ const THRESHOLD_TRACK_VAR: Record<ThresholdState, string> = {
 
 const THRESHOLD_STATES: ThresholdState[] = ['ok', 'warn', 'critical']
 
-const PALETTE_SIZE = 8
-
-const FALLBACK_PALETTE = [
-  '#155dfc',
-  '#e17100',
-  '#00a63e',
-  '#c800de',
-  '#0092b8',
-  '#e7000b',
-  '#4f39f6',
-  '#e60076',
-]
+const MAX_CHART_PALETTE_COLORS = 50
 
 const FALLBACK_STATUS: Record<EffectiveStatus, string> = {
   errored: '#ef4444',
@@ -89,20 +72,14 @@ const FALLBACK_THEME: ChartTheme = {
   border: '#e5e5e5',
   tooltipBackground: '#ffffff',
   reducedMotion: false,
-  palette: FALLBACK_PALETTE,
+  palette: [],
   status: FALLBACK_STATUS,
-  series: {
-    cpu: '#3b82f6',
-    memory: '#8b5cf6',
-    uptime: '#06b6d4',
-    restarts: '#f59e0b',
-    unstable: '#ef4444',
-    status: '#22c55e',
-  },
   usage: {
     pm2: '#8b5cf6',
     other: '#a1a1aa',
     free: '#e4e4e0',
+    trendCpu: '#00d3f2',
+    trendMemory: '#ffb900',
   },
   threshold: FALLBACK_THRESHOLD,
 }
@@ -137,13 +114,15 @@ function readColor(
 }
 
 function readPalette(styles: CSSStyleDeclaration): string[] {
-  return Array.from({ length: PALETTE_SIZE }, (_, index) =>
-    readColor(
-      styles,
-      `--chart-series-${index + 1}`,
-      FALLBACK_PALETTE[index] ?? FALLBACK_PALETTE[0]!,
-    ),
-  )
+  const colors: string[] = []
+
+  for (let index = 1; index <= MAX_CHART_PALETTE_COLORS; index += 1) {
+    const value = styles.getPropertyValue(`--chart-series-${index}`).trim()
+    if (value === '') break
+    colors.push(normalizeColor(value, value))
+  }
+
+  return colors
 }
 
 function readStatusColors(styles: CSSStyleDeclaration): ChartTheme['status'] {
@@ -209,11 +188,20 @@ function readChartTheme(): ChartTheme {
     reducedMotion: prefersReducedMotion(),
     palette: readPalette(styles),
     status,
-    series: FALLBACK_THEME.series,
     usage: {
       pm2: FALLBACK_THEME.usage.pm2,
       other: FALLBACK_THEME.usage.other,
       free: readColor(styles, '--border', FALLBACK_THEME.usage.free),
+      trendCpu: readColor(
+        styles,
+        '--chart-usage-cpu',
+        FALLBACK_THEME.usage.trendCpu,
+      ),
+      trendMemory: readColor(
+        styles,
+        '--chart-usage-memory',
+        FALLBACK_THEME.usage.trendMemory,
+      ),
     },
     threshold: readThresholdColors(styles, status),
   }
