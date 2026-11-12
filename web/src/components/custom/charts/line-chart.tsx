@@ -12,6 +12,7 @@ import { EChart } from './echart'
 export type LineChartProps = {
   series: MetricChartSeries[]
   theme: ChartTheme
+  color?: string
   valueFormatter: (value: number | string) => string
   yAxisFormatter?: (value: number) => string
   yAxisMax?: number
@@ -28,6 +29,7 @@ type LineChartOptionInput = Omit<LineChartProps, 'ariaLabel' | 'className'>
 function buildLineOption({
   series,
   theme,
+  color,
   valueFormatter,
   yAxisFormatter,
   yAxisMax,
@@ -41,6 +43,7 @@ function buildLineOption({
     animationDuration: 300,
     animationDurationUpdate: 300,
     animationEasingUpdate: 'cubicOut',
+    ...(theme.palette.length > 0 ? { color: theme.palette } : {}),
     grid: TIME_SERIES_GRID,
     tooltip: {
       trigger: 'axis',
@@ -57,11 +60,9 @@ function buildLineOption({
       ? {
           type: 'scroll',
           bottom: 0,
-          left: 0,
-          right: 0,
+          left: 'center',
           itemWidth: 14,
           itemHeight: 8,
-          icon: 'line',
           textStyle: { color: theme.mutedText, fontSize: 10 },
         }
       : undefined,
@@ -88,26 +89,27 @@ function buildLineOption({
           },
           splitLine: splitLineStyle(theme),
         },
-    series: series.map((entry) => ({
-      id: entry.id,
-      name: entry.name,
-      type: 'line',
-      data: entry.points,
-      encode: { x: 0, y: 1 },
-      showSymbol: false,
-      connectNulls: false,
-      step: entry.stepped ? 'end' : false,
-      lineStyle: {
-        width: 1.5,
-        color: entry.color,
-        type: entry.dashPattern ?? (entry.dashed ? 'dashed' : 'solid'),
-      },
-      itemStyle: { color: entry.color },
-      areaStyle: entry.filled
-        ? { color: entry.color, opacity: 0.08 }
-        : undefined,
-      emphasis: { focus: 'series' },
-    })),
+    series: series.map((entry) => {
+      const seriesColor = color ?? entry.color
+
+      return {
+        id: entry.id,
+        name: entry.name,
+        type: 'line',
+        ...(seriesColor ? { color: seriesColor } : {}),
+        data: entry.points,
+        encode: { x: 0, y: 1 },
+        showSymbol: false,
+        connectNulls: false,
+        step: entry.stepped ? 'end' : false,
+        lineStyle: {
+          width: 1.5,
+          type: entry.dashPattern ?? 'solid',
+        },
+        areaStyle: entry.filled ? { opacity: 0.08 } : undefined,
+        emphasis: { focus: 'series' },
+      }
+    }),
   }
 }
 
@@ -181,6 +183,7 @@ function formatLineTooltip(
 export function LineChart({
   series,
   theme,
+  color,
   valueFormatter,
   yAxisFormatter,
   yAxisMax,
@@ -196,6 +199,7 @@ export function LineChart({
       buildLineOption({
         series,
         theme,
+        color,
         valueFormatter,
         yAxisFormatter,
         yAxisMax,
@@ -205,6 +209,7 @@ export function LineChart({
     [
       series,
       theme,
+      color,
       valueFormatter,
       yAxisFormatter,
       yAxisMax,
