@@ -1,11 +1,11 @@
 import { describe, expect, test } from 'vitest'
 import {
-    buildProcessStyleMap,
     maxNumericValue,
     niceCpuProcessMax,
     nicePercentMax,
+    paletteColorFor,
+    paletteDashFor,
     percentAxisFormatter,
-    processStyleFor,
     toMetricChartSeries,
 } from '../../lib/metric-chart'
 import { seriesIdentity } from '../../lib/prometheus'
@@ -34,7 +34,6 @@ function points(timestamps: number[], values: number[]): PrometheusSeries {
 describe('toMetricChartSeries', () => {
     test('uses the resolved label as a stable id', () => {
         const result = toMetricChartSeries([series('api', [1, 2])], {
-            color: '#3b82f6',
             label: () => 'XPM · api',
         })
 
@@ -42,10 +41,8 @@ describe('toMetricChartSeries', () => {
             {
                 id: 'XPM · api',
                 name: 'XPM · api',
-                color: '#3b82f6',
                 stepped: undefined,
                 filled: undefined,
-                dashed: undefined,
                 points: [
                     [0, 1],
                     [15_000, 2],
@@ -56,14 +53,12 @@ describe('toMetricChartSeries', () => {
 
     test('falls back to the metric name and maps values', () => {
         const result = toMetricChartSeries([series('worker', [10, 20])], {
-            color: () => '#f59e0b',
             valueMapper: (value) => value * 2,
         })
 
         expect(result[0]).toMatchObject({
             id: 'worker',
             name: 'worker',
-            color: '#f59e0b',
             points: [
                 [0, 20],
                 [15_000, 40],
@@ -72,10 +67,61 @@ describe('toMetricChartSeries', () => {
     })
 
     test('skips series without points', () => {
+        expect(toMetricChartSeries([series('empty', [])], {})).toEqual([])
+        expect(toMetricChartSeries(undefined, {})).toEqual([])
+    })
+
+    test('assigns stable palette colors by series label', () => {
+        const palette = ['#a', '#b', '#c']
+        const result = toMetricChartSeries(
+            [series('api', [1]), series('worker', [2])],
+            { palette },
+        )
+
+        expect(result[0]!.color).toBe(paletteColorFor('api', palette))
+        expect(result[1]!.color).toBe(paletteColorFor('worker', palette))
         expect(
-            toMetricChartSeries([series('empty', [])], { color: '#000' }),
-        ).toEqual([])
-        expect(toMetricChartSeries(undefined, { color: '#000' })).toEqual([])
+            toMetricChartSeries([series('api', [1])], { palette })[0]!.color,
+        ).toBe(paletteColorFor('api', palette))
+    })
+
+    test('adds dash patterns only when series outnumber palette colors', () => {
+        const palette = ['#a', '#b']
+        const small = toMetricChartSeries(
+            [series('api', [1]), series('worker', [2])],
+            { palette },
+        )
+        const large = toMetricChartSeries(
+            [
+                series('api', [1]),
+                series('worker', [2]),
+                series('cron', [3]),
+            ],
+            { palette },
+        )
+
+        expect(small.every((entry) => entry.dashPattern === undefined)).toBe(
+            true,
+        )
+        expect(large.map((entry) => entry.dashPattern)).toEqual(
+            large.map((entry) => paletteDashFor(entry.name)),
+        )
+    })
+})
+
+describe('palette helpers', () => {
+    test('returns undefined for an empty palette', () => {
+        expect(paletteColorFor('api', [])).toBeUndefined()
+    })
+
+    test('returns deterministic palette and dash values', () => {
+        const palette = ['#a', '#b', '#c']
+
+        expect(paletteColorFor('worker', palette)).toBe(
+            paletteColorFor('worker', palette),
+        )
+        expect(paletteDashFor('worker')).toEqual(paletteDashFor('worker'))
+        expect(palette).toContain(paletteColorFor('worker', palette))
     })
 })
 
@@ -84,7 +130,6 @@ describe('chart breaks', () => {
         const entry = points([0, 15_000, 60_000], [1, 2, 3])
 
         const result = toMetricChartSeries([entry], {
-            color: '#000',
             stepMs: 15_000,
         })
 
@@ -101,7 +146,6 @@ describe('chart breaks', () => {
         const restarts = new Map([[seriesIdentity(entry.metric), [15_000]]])
 
         const result = toMetricChartSeries([entry], {
-            color: '#000',
             restarts,
         })
 
@@ -117,7 +161,6 @@ describe('chart breaks', () => {
         const entry = points([0, 60_000], [2, 4])
 
         const result = toMetricChartSeries([entry], {
-            color: '#000',
             stepMs: 15_000,
             valueMapper: (value) => value * 10,
         })
@@ -133,13 +176,13 @@ describe('chart breaks', () => {
         const entry = points([0, 60_000], [1, 2])
 
         expect(
-            toMetricChartSeries([entry], { color: '#000' })[0]!.points,
+            toMetricChartSeries([entry], {})[0]!.points,
         ).toEqual([
             [0, 1],
             [60_000, 2],
         ])
         expect(
-            toMetricChartSeries([entry], { color: '#000', stepMs: 0 })[0]!
+            toMetricChartSeries([entry], { stepMs: 0 })[0]!
                 .points,
         ).toEqual([
             [0, 1],
@@ -148,68 +191,11 @@ describe('chart breaks', () => {
     })
 })
 
-describe('process style map', () => {
-    test('assigns palette colors by sorted process label', () => {
-        const api = series('api', [1])
-        const worker = series('worker', [1])
-        const palette = ['#a', '#b', '#c']
-
-        const styles = buildProcessStyleMap([[worker, api]], palette)
-
-        expect(styles.get('XPM · api')).toEqual({
-            color: '#a',
-            dashPattern: undefined,
-        })
-        expect(styles.get('XPM · worker')).toEqual({
-            color: '#b',
-            dashPattern: undefined,
-        })
-    })
-
-    test('keeps a process style stable while filtering', () => {
-        const api = series('api', [1])
-        const worker = series('worker', [1])
-        const palette = ['#a', '#b']
-
-        const styles = buildProcessStyleMap([[worker, api], [api]], palette)
-
-        expect(
-            processStyleFor(worker, styles, { color: '#fallback' }),
-        ).toEqual({ color: '#b', dashPattern: undefined })
-        expect(
-            processStyleFor(series('unknown', [1]), styles, {
-                color: '#fallback',
-            }),
-        ).toEqual({ color: '#fallback' })
-    })
-
-    test('advances the dash pattern after each palette cycle', () => {
-        const processes = Array.from({ length: 9 }, (_, index) =>
-            series(`p${index}`, [1]),
-        )
-        const palette = Array.from({ length: 8 }, (_, index) => `#${index + 1}`)
-
-        const styles = buildProcessStyleMap([processes], palette, [
-            undefined,
-            [6, 3],
-        ])
-
-        expect(styles.get('XPM · p0')).toEqual({
-            color: '#1',
-            dashPattern: undefined,
-        })
-        expect(styles.get('XPM · p8')).toEqual({
-            color: '#1',
-            dashPattern: [6, 3],
-        })
-    })
-})
-
 describe('chart axis helpers', () => {
     test('finds the maximum numeric value', () => {
         const chartSeries = toMetricChartSeries(
             [series('a', [1, 9]), series('b', [3, 4])],
-            { color: '#000' },
+            {},
         )
 
         expect(maxNumericValue(chartSeries)).toBe(9)
