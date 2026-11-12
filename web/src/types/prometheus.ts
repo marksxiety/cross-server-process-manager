@@ -58,12 +58,11 @@ export type MetricBasis = "server" | "process";
 export interface MetricChartSeries {
     id: string;
     name: string;
-    color: string;
+    color?: string;
+    dashPattern?: number[];
     points: Array<[number, number | string | null]>;
     stepped?: boolean;
     filled?: boolean;
-    dashed?: boolean;
-    dashPattern?: number[];
 }
 
 export type StatusTimelineKind = EffectiveStatus | "no_data";
