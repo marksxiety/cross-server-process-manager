@@ -108,7 +108,7 @@ function buildServer(
 const [prodApiUs, prodEdgeEu, stagingCore, prodWorkerUs, prodCacheEu] = FIXTURE_SERVERS;
 
 const AGENTS: Record<string, ServerFixture> = {
-    [`${prodApiUs.host}:${prodApiUs.port}`]: buildServer(prodApiUs, 34.2, 61, [
+    [`${prodApiUs.host}:${prodApiUs.port}`]: buildServer(prodApiUs, 70, 70, [
         {
             pmId: 0,
             name: "api-gateway",
@@ -183,7 +183,7 @@ const AGENTS: Record<string, ServerFixture> = {
             exitCode: 0,
         },
     ]),
-    [`${prodEdgeEu.host}:${prodEdgeEu.port}`]: buildServer(prodEdgeEu, 82.4, 74, [
+    [`${prodEdgeEu.host}:${prodEdgeEu.port}`]: buildServer(prodEdgeEu, 30, 30, [
         {
             pmId: 0,
             name: "edge-proxy",
@@ -247,7 +247,7 @@ const AGENTS: Record<string, ServerFixture> = {
             pid: 6118,
         },
     ]),
-    [`${stagingCore.host}:${stagingCore.port}`]: buildServer(stagingCore, 12.1, 46, [
+    [`${stagingCore.host}:${stagingCore.port}`]: buildServer(stagingCore, 10, 10, [
         {
             pmId: 0,
             name: "web-frontend",
@@ -305,7 +305,7 @@ const AGENTS: Record<string, ServerFixture> = {
             pid: 3327,
         },
     ]),
-    [`${prodWorkerUs.host}:${prodWorkerUs.port}`]: buildServer(prodWorkerUs, 58.3, 67, [
+    [`${prodWorkerUs.host}:${prodWorkerUs.port}`]: buildServer(prodWorkerUs, 55, 55, [
         {
             pmId: 0,
             name: "pdf-renderer",
@@ -360,7 +360,7 @@ const AGENTS: Record<string, ServerFixture> = {
             restarts: 3,
         },
     ]),
-    [`${prodCacheEu.host}:${prodCacheEu.port}`]: buildServer(prodCacheEu, 21.6, 52, [
+    [`${prodCacheEu.host}:${prodCacheEu.port}`]: buildServer(prodCacheEu, 90, 90, [
         {
             pmId: 0,
             name: "redis-primary",
