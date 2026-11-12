@@ -28,9 +28,9 @@ import { useProcessMetrics } from '@/hooks/use-process-metrics'
 import { useStatusTimeline } from '@/hooks/use-status-timeline'
 import { formatBytes, formatPercent, memorySharePercent } from '@/lib/format'
 import {
+  PERCENT_AXIS_MAX,
   maxNumericValue,
   niceCpuProcessMax,
-  nicePercentMax,
   percentAxisFormatter,
 } from '@/lib/metric-chart'
 import {
@@ -199,7 +199,7 @@ export function ProcessMetricsTab({
     cpuDescriptionValue,
   )
   const cpuAxisMax = cpuBasisIsServer
-    ? nicePercentMax(maxNumericValue(cpuChartSeries), 1)
+    ? PERCENT_AXIS_MAX
     : niceCpuProcessMax(maxNumericValue(cpuChartSeries))
   const cpuAxisFormatter = percentAxisFormatter(cpuAxisMax)
 
@@ -257,9 +257,6 @@ export function ProcessMetricsTab({
     memoryCardStatus,
     memoryDescriptionValue,
   )
-  const memoryPercentMax = memoryBasisIsServer
-    ? nicePercentMax(maxNumericValue(memoryChartSeries), 1)
-    : null
   const memoryValueFormatter = (value: number | string) => {
     if (!memoryBasisIsServer || totalMemoryBytes === null) {
       return formatMemoryValue(value)
@@ -271,11 +268,9 @@ export function ProcessMetricsTab({
     )})`
   }
   const memoryAxisFormatter = memoryBasisIsServer
-    ? percentAxisFormatter(memoryPercentMax ?? 100)
+    ? percentAxisFormatter(PERCENT_AXIS_MAX)
     : formatMemoryAxis
-  const memoryAxisMax = memoryBasisIsServer
-    ? (memoryPercentMax ?? undefined)
-    : undefined
+  const memoryAxisMax = memoryBasisIsServer ? PERCENT_AXIS_MAX : undefined
 
   const restartsStatus = combineStatus(
     metrics.status.pm2_restarts_total,
