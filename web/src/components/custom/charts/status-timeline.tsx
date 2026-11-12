@@ -52,6 +52,8 @@ type CoordinateSystem = {
   height: number
 }
 
+const STATUS_BAR_GAP_PX = 2
+
 function categoryHeight(
   api: CustomSeriesRenderItemAPI,
   factor: number,
@@ -64,6 +66,7 @@ function categoryHeight(
 function renderStatusSegment(
   params: CustomSeriesRenderItemParams,
   api: CustomSeriesRenderItemAPI,
+  opacity = 1,
 ): CustomSeriesRenderItemReturn {
   const laneIndex = Number(api.value(0))
   const start = Number(api.value(1))
@@ -72,10 +75,17 @@ function renderStatusSegment(
   const endPoint = api.coord([end, laneIndex])
   const coord = params.coordSys as unknown as CoordinateSystem
   const laneHeight = categoryHeight(api, 0.7)
-  const x = Math.max(coord.x, startPoint[0] ?? coord.x)
-  const right = Math.min(coord.x + coord.width, endPoint[0] ?? x)
+  const rawX = Math.max(coord.x, startPoint[0] ?? coord.x)
+  const rawRight = Math.min(coord.x + coord.width, endPoint[0] ?? rawX)
 
-  if (right <= coord.x || x >= coord.x + coord.width) return null
+  if (rawRight <= coord.x || rawX >= coord.x + coord.width) return null
+
+  const span = rawRight - rawX
+  if (span <= 0) return null
+
+  const inset = Math.min(STATUS_BAR_GAP_PX / 2, span / 4)
+  const x = rawX + inset
+  const right = rawRight - inset
 
   return {
     type: 'rect',
@@ -86,7 +96,10 @@ function renderStatusSegment(
       height: laneHeight,
       r: 1,
     },
-    style: api.style(),
+    style: {
+      fill: api.visual('color'),
+      opacity,
+    },
   }
 }
 
@@ -202,7 +215,10 @@ function buildStatusTimelineOption({
         start: segment.start,
         end: segment.end,
       })),
-      renderItem: renderStatusSegment,
+      renderItem: (
+        params: CustomSeriesRenderItemParams,
+        api: CustomSeriesRenderItemAPI,
+      ) => renderStatusSegment(params, api, 0.25),
       z: 1,
     })
   }
@@ -248,8 +264,7 @@ function buildStatusTimelineOption({
       ? {
           type: 'scroll',
           bottom: 0,
-          left: 0,
-          right: 0,
+          left: 'center',
           itemWidth: 8,
           itemHeight: 8,
           icon: 'roundRect',

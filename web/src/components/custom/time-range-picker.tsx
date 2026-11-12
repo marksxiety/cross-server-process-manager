@@ -20,6 +20,7 @@ type TimeRangePickerProps = {
   value: MetricsRange
   onChange: (range: MetricsRange) => void
   disabled?: boolean
+  loading?: boolean
 }
 
 const QUICK_CUSTOM_DURATIONS = METRICS_RANGE_PRESETS.filter((entry) =>
@@ -55,6 +56,7 @@ export function TimeRangePicker({
   value,
   onChange,
   disabled = false,
+  loading = false,
 }: TimeRangePickerProps) {
   const [customOpen, setCustomOpen] = useState(false)
   const [from, setFrom] = useState('')
@@ -74,9 +76,10 @@ export function TimeRangePicker({
 
   const isCustom = value.kind === 'absolute'
   const customLabel = absoluteRangeLabel(value)
+  const isBusy = disabled || loading
 
   const openCustom = () => {
-    if (disabled) return
+    if (isBusy) return
 
     const currentNow = Date.now()
     const end = value.kind === 'absolute' ? value.end : currentNow
@@ -123,6 +126,7 @@ export function TimeRangePicker({
         role='group'
         aria-label='Time range'
         aria-disabled={disabled || undefined}
+        aria-busy={loading || undefined}
         className='flex min-w-0 flex-1 items-center gap-0.5 rounded-md bg-muted/60 p-0.5'
       >
         <div className='flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto'>
@@ -138,7 +142,7 @@ export function TimeRangePicker({
                 size='sm'
                 aria-pressed={isActive}
                 aria-label={entry.label}
-                disabled={disabled}
+                disabled={isBusy}
                 onClick={() =>
                   onChange({
                     kind: 'relative',
@@ -165,7 +169,7 @@ export function TimeRangePicker({
           aria-pressed={isCustom}
           aria-label={isCustom ? customLabel : 'Choose a custom time range'}
           title={customLabel}
-          disabled={disabled}
+          disabled={isBusy}
           onClick={openCustom}
           className={cn(
             'h-8 shrink-0 gap-1 px-2 text-[11px] font-medium lg:h-6',

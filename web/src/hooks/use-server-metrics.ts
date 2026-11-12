@@ -3,6 +3,7 @@ import {
   useMetricsRange,
   type MetricsRangeResult,
 } from '@/hooks/use-metrics-range'
+import { ALL_METRICS } from '@/lib/prometheus'
 import type { MetricsRange, MetricsScope } from '@/types/prometheus'
 
 type UseServerMetricsOptions = {
@@ -28,5 +29,11 @@ export function useServerMetrics({
     [enabled, serverName],
   )
 
-  return useMetricsRange({ scope, range, refreshMs, enabled })
+  return useMetricsRange({
+    scope,
+    range,
+    refreshMs,
+    enabled,
+    metricNames: ALL_METRICS,
+  })
 }

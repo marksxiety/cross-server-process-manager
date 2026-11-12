@@ -1,4 +1,3 @@
-import { useMemo } from 'react'
 import { Activity } from 'lucide-react'
 import { isPrometheusConfigured } from '@/api/services/prometheus.service'
 import { MetricBasisSwitch } from '@/components/custom/metric-basis-switch'
@@ -29,12 +28,10 @@ import { useProcessMetrics } from '@/hooks/use-process-metrics'
 import { useStatusTimeline } from '@/hooks/use-status-timeline'
 import { formatBytes, formatPercent, memorySharePercent } from '@/lib/format'
 import {
-  buildProcessStyleMap,
+  PERCENT_AXIS_MAX,
   maxNumericValue,
   niceCpuProcessMax,
-  nicePercentMax,
   percentAxisFormatter,
-  processStyleFor,
 } from '@/lib/metric-chart'
 import {
   combineStatus,
@@ -49,7 +46,7 @@ import {
   PROCESS_METRICS,
   formatMetricAxisValue,
   formatMetricValue,
-  formatSeriesLabel,
+  formatSeriesName,
   lastValue,
   normalizeCpu,
   normalizeMetricsRefreshMs,
@@ -62,7 +59,6 @@ import type { LoadStatus } from '@/types/dashboard'
 import type {
   MetricsData,
   ProcessMetricName,
-  PrometheusSeries,
 } from '@/types/prometheus'
 import type { ProcessSummary } from '@/types/process'
 import type { RegisteredServer } from '@/types/server'
@@ -125,21 +121,14 @@ export function ProcessMetricsTab({
     refreshMs: activeRefreshMs,
     enabled: configured && active,
   })
-  const toChartSeries = useMetricChartSeries(metrics)
+  const toChartSeries = useMetricChartSeries(metrics, theme.palette)
   const { selectTimeRange, resetTimeRange } = useMetricsZoom()
-  const styleMap = useMemo(
-    () => buildProcessStyleMap(Object.values(metrics.data), theme.palette),
-    [metrics.data, theme.palette],
-  )
-  const fallbackStyle = { color: theme.palette[0] ?? '#155dfc' }
-  const colorFor = (series: PrometheusSeries) =>
-    processStyleFor(series, styleMap, fallbackStyle).color
 
   const cpuSeries = metrics.data.pm2_cpu
   const memorySeries = metrics.data.pm2_memory
   const statusSeries = metrics.data.pm2_status
   const timelineProcesses = (statusSeries ?? []).map((series) => ({
-    label: formatSeriesLabel(series),
+    label: formatSeriesName(series),
     identity: seriesIdentity(series.metric),
   }))
   const timelineData = useStatusTimeline(
@@ -184,14 +173,14 @@ export function ProcessMetricsTab({
   const cpuChartSeries = cpuBasisIsServer
     ? cpuServerReady
       ? toChartSeries(cpuSeries, {
-          color: colorFor,
           filled: true,
+          label: formatSeriesName,
           valueMapper: (value) => normalizeCpu(value, cpuCores),
         })
       : []
     : toChartSeries(cpuSeries, {
-        color: colorFor,
         filled: true,
+        label: formatSeriesName,
       })
   const cpuDisplayLast =
     cpuLast === null || (cpuBasisIsServer && !cpuServerReady)
@@ -210,7 +199,7 @@ export function ProcessMetricsTab({
     cpuDescriptionValue,
   )
   const cpuAxisMax = cpuBasisIsServer
-    ? nicePercentMax(maxNumericValue(cpuChartSeries), 1)
+    ? PERCENT_AXIS_MAX
     : niceCpuProcessMax(maxNumericValue(cpuChartSeries))
   const cpuAxisFormatter = percentAxisFormatter(cpuAxisMax)
 
@@ -244,15 +233,15 @@ export function ProcessMetricsTab({
   const memoryChartSeries = memoryBasisIsServer
     ? memoryServerReady
       ? toChartSeries(memorySeries, {
-          color: colorFor,
           filled: true,
+          label: formatSeriesName,
           valueMapper: (value) =>
             memorySharePercent(value, totalMemoryBytes) ?? 0,
         })
       : []
     : toChartSeries(memorySeries, {
-        color: colorFor,
         filled: true,
+        label: formatSeriesName,
       })
   const memoryDescriptionValue =
     memorySeries?.length === 0 || memoryLast === null
@@ -268,9 +257,6 @@ export function ProcessMetricsTab({
     memoryCardStatus,
     memoryDescriptionValue,
   )
-  const memoryPercentMax = memoryBasisIsServer
-    ? nicePercentMax(maxNumericValue(memoryChartSeries), 1)
-    : null
   const memoryValueFormatter = (value: number | string) => {
     if (!memoryBasisIsServer || totalMemoryBytes === null) {
       return formatMemoryValue(value)
@@ -282,11 +268,9 @@ export function ProcessMetricsTab({
     )})`
   }
   const memoryAxisFormatter = memoryBasisIsServer
-    ? percentAxisFormatter(memoryPercentMax ?? 100)
+    ? percentAxisFormatter(PERCENT_AXIS_MAX)
     : formatMemoryAxis
-  const memoryAxisMax = memoryBasisIsServer
-    ? (memoryPercentMax ?? undefined)
-    : undefined
+  const memoryAxisMax = memoryBasisIsServer ? PERCENT_AXIS_MAX : undefined
 
   const restartsStatus = combineStatus(
     metrics.status.pm2_restarts_total,
@@ -444,12 +428,10 @@ export function ProcessMetricsTab({
                 )}
                 series={[
                   ...toChartSeries(restartsSeries, {
-                    color: theme.series.restarts,
                     stepped: true,
                     label: () => 'Total',
                   }),
                   ...toChartSeries(unstableSeries, {
-                    color: theme.series.unstable,
                     stepped: true,
                     label: () => 'Unstable',
                   }),
@@ -472,8 +454,8 @@ export function ProcessMetricsTab({
                   uptimeLast === null ? null : formatUptimeValue(uptimeLast),
                 )}
                 series={toChartSeries(uptimeSeries, {
-                  color: colorFor,
                   filled: true,
+                  label: formatSeriesName,
                 })}
                 timeRange={metrics.range}
                 onTimeRangeSelect={selectTimeRange}

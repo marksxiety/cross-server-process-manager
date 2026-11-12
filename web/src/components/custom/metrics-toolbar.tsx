@@ -16,6 +16,7 @@ type MetricsToolbarProps = {
   range: MetricsRange
   refreshMs: number
   isRefreshing: boolean
+  isRangeLoading?: boolean
   onRangeChange: (range: MetricsRange) => void
   onRefreshMsChange: (refreshMs: number) => void
   onRefresh: () => void
@@ -27,6 +28,7 @@ export function MetricsToolbar({
   range,
   refreshMs,
   isRefreshing,
+  isRangeLoading,
   onRangeChange,
   onRefreshMsChange,
   onRefresh,
@@ -34,6 +36,7 @@ export function MetricsToolbar({
   disabled = false,
 }: MetricsToolbarProps) {
   const isStacked = layout === 'stacked'
+  const rangeLoading = isRangeLoading ?? isRefreshing
 
   return (
     <section
@@ -57,6 +60,7 @@ export function MetricsToolbar({
             value={range}
             onChange={onRangeChange}
             disabled={disabled}
+            loading={rangeLoading}
           />
         </div>
 

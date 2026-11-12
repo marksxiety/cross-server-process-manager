@@ -1,5 +1,6 @@
 import { lazy } from 'react'
 import type { ChartTheme } from '@/hooks/use-chart-theme'
+import { hasStatusTimelineData } from '@/lib/status-timeline'
 import type { LoadStatus } from '@/types/dashboard'
 import type { StatusTimelineData } from '@/types/prometheus'
 import { ChartCard } from './chart-card'
@@ -28,7 +29,7 @@ export function StatusTimelineCard({
   onResetTimeRange,
   ...cardProps
 }: StatusTimelineCardProps) {
-  const hasData = data.segments.length > 0
+  const hasData = hasStatusTimelineData(data)
 
   return (
     <ChartCard

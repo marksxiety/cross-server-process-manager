@@ -1,15 +1,19 @@
 import { describe, expect, test } from 'vitest'
 import {
     buildStatusTimeline,
+    hasStatusTimelineData,
     type BuildStatusTimelineOptions,
 } from '../../lib/status-timeline'
-import { formatSeriesLabel, seriesIdentity } from '../../lib/prometheus'
+import { formatSeriesName, seriesIdentity } from '../../lib/prometheus'
 import { STATUS_COLOR_VAR, STATUS_TEXT_COLOR_VAR } from '../../lib/status-chart'
 import { STATUS_ORDER } from '../../lib/status-catalog'
 import type {
     PrometheusSeries,
     ResolvedMetricsRange,
+    StatusTimelineData,
+    StatusTimelineKind,
     StatusTimelineProcess,
+    StatusTimelineSegment,
 } from '../../types/prometheus'
 
 const STEP_MS = 15_000
@@ -37,7 +41,7 @@ function series(name: string, values: number[], startMs = 0): PrometheusSeries {
 
 function asProcess(series: PrometheusSeries): StatusTimelineProcess {
     return {
-        label: formatSeriesLabel(series),
+        label: formatSeriesName(series),
         identity: seriesIdentity(series.metric),
     }
 }
@@ -58,7 +62,7 @@ function summary(seriesList: PrometheusSeries[]) {
 }
 
 describe('buildStatusTimeline', () => {
-    test('builds a lane per process and merges contiguous status samples', () => {
+    test('builds a lane per process and one segment per status sample', () => {
         const entry = series('api', [9, 9, 9, 9])
 
         const data = build([entry], [asProcess(entry)], {
@@ -68,7 +72,7 @@ describe('buildStatusTimeline', () => {
         expect(data.lanes).toEqual([
             {
                 id: seriesIdentity(entry.metric),
-                label: 'XPM · api',
+                label: 'api',
                 index: 0,
             },
         ])
@@ -79,6 +83,30 @@ describe('buildStatusTimeline', () => {
                 kind: 'online',
                 code: 9,
                 start: 0,
+                end: 15_000,
+            },
+            {
+                laneId: seriesIdentity(entry.metric),
+                laneIndex: 0,
+                kind: 'online',
+                code: 9,
+                start: 15_000,
+                end: 30_000,
+            },
+            {
+                laneId: seriesIdentity(entry.metric),
+                laneIndex: 0,
+                kind: 'online',
+                code: 9,
+                start: 30_000,
+                end: 45_000,
+            },
+            {
+                laneId: seriesIdentity(entry.metric),
+                laneIndex: 0,
+                kind: 'online',
+                code: 9,
+                start: 45_000,
                 end: 60_000,
             },
         ])
@@ -93,9 +121,11 @@ describe('buildStatusTimeline', () => {
         ])
 
         expect(summary([entry])).toEqual([
-            { kind: 'online', start: 0, end: 30_000 },
+            { kind: 'online', start: 0, end: 15_000 },
+            { kind: 'online', start: 15_000, end: 30_000 },
             { kind: 'no_data', start: 30_000, end: 60_000 },
-            { kind: 'online', start: 60_000, end: 90_000 },
+            { kind: 'online', start: 60_000, end: 75_000 },
+            { kind: 'online', start: 75_000, end: 90_000 },
         ])
     })
 
@@ -113,12 +143,13 @@ describe('buildStatusTimeline', () => {
             data.segments.map(({ kind, start, end }) => ({ kind, start, end })),
         ).toEqual([
             { kind: 'no_data', start: 0, end: 30_000 },
-            { kind: 'online', start: 30_000, end: 60_000 },
+            { kind: 'online', start: 30_000, end: 45_000 },
+            { kind: 'online', start: 45_000, end: 60_000 },
             { kind: 'no_data', start: 60_000, end: 120_000 },
         ])
     })
 
-    test('splits a status at a restart and reports the marker', () => {
+    test('reports a restart marker without merging status samples', () => {
         const entry = series('api', [9, 9, 9])
         const identity = seriesIdentity(entry.metric)
 
@@ -131,7 +162,8 @@ describe('buildStatusTimeline', () => {
             data.segments.map(({ kind, start, end }) => ({ kind, start, end })),
         ).toEqual([
             { kind: 'online', start: 0, end: 15_000 },
-            { kind: 'online', start: 15_000, end: 45_000 },
+            { kind: 'online', start: 15_000, end: 30_000 },
+            { kind: 'online', start: 30_000, end: 45_000 },
         ])
         expect(data.restarts).toEqual([
             {
@@ -162,14 +194,14 @@ describe('buildStatusTimeline', () => {
             [entry],
             [
                 asProcess(entry),
-                { label: 'XPM · worker', identity: 'worker-identity' },
+                { label: 'worker', identity: 'worker-identity' },
             ],
             { range: range(30_000) },
         )
 
         expect(data.lanes.map((lane) => lane.label)).toEqual([
-            'XPM · api',
-            'XPM · worker',
+            'api',
+            'worker',
         ])
         expect(data.segments).toEqual([
             {
@@ -178,6 +210,14 @@ describe('buildStatusTimeline', () => {
                 kind: 'online',
                 code: 9,
                 start: 0,
+                end: 15_000,
+            },
+            {
+                laneId: seriesIdentity(entry.metric),
+                laneIndex: 0,
+                kind: 'online',
+                code: 9,
+                start: 15_000,
                 end: 30_000,
             },
             {
@@ -207,7 +247,10 @@ describe('buildStatusTimeline', () => {
 
         expect(
             data.segments.map(({ kind, start, end }) => ({ kind, start, end })),
-        ).toEqual([{ kind: 'online', start: 30_000, end: 60_000 }])
+        ).toEqual([
+            { kind: 'online', start: 30_000, end: 45_000 },
+            { kind: 'online', start: 45_000, end: 60_000 },
+        ])
     })
 
     test('returns empty data when there are no lanes', () => {
@@ -219,6 +262,58 @@ describe('buildStatusTimeline', () => {
             end: 0,
             stepMs: null,
         })
+    })
+})
+
+function timelineWith(
+    segments: StatusTimelineSegment[],
+): StatusTimelineData {
+    return {
+        lanes: [],
+        segments,
+        restarts: [],
+        start: 0,
+        end: 1,
+        stepMs: null,
+    }
+}
+
+function segment(kind: StatusTimelineKind): StatusTimelineSegment {
+    return {
+        laneId: 'lane',
+        laneIndex: 0,
+        kind,
+        code: kind === 'no_data' ? null : 9,
+        start: 0,
+        end: 1,
+    }
+}
+
+describe('hasStatusTimelineData', () => {
+    test('is false when there are no segments', () => {
+        expect(hasStatusTimelineData(timelineWith([]))).toBe(false)
+    })
+
+    test('is false when every segment is no_data', () => {
+        expect(
+            hasStatusTimelineData(
+                timelineWith([segment('no_data'), segment('no_data')]),
+            ),
+        ).toBe(false)
+    })
+
+    test('is true for a real status segment', () => {
+        expect(hasStatusTimelineData(timelineWith([segment('online')]))).toBe(
+            true,
+        )
+    })
+
+    test('is true when real status and no_data segments are mixed', () => {
+        expect(
+            hasStatusTimelineData(
+                timelineWith([segment('online'), segment('no_data')]),
+            ),
+        ).toBe(true)
     })
 })
 

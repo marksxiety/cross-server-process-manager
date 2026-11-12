@@ -1,6 +1,8 @@
 import { formatBytes, formatUptime } from "@/lib/format";
 import { statusLabelFromCode } from "@/lib/status-catalog";
 import type {
+    HostMetricName,
+    MetricName,
     MetricsRange,
     MetricsScope,
     ProcessMetricName,
@@ -28,6 +30,15 @@ export const PROCESS_METRICS: ProcessMetricName[] = [
     "pm2_unstable_restarts_total",
     "pm2_status",
 ];
+
+export const HOST_METRICS: HostMetricName[] = [
+    "host_cpu_usage_percent",
+    "host_cpu_cores",
+    "host_memory_usage_percent",
+    "host_memory_total_bytes",
+];
+
+export const ALL_METRICS: MetricName[] = [...PROCESS_METRICS, ...HOST_METRICS];
 
 export interface MetricsRangePreset {
     value: string;
@@ -72,6 +83,12 @@ export const METRICS_RANGE_PRESETS: MetricsRangePreset[] = [
         label: "Last 7 days",
         shortLabel: "7d",
         durationMs: 7 * 24 * 60 * 60 * 1000,
+    },
+    {
+        value: "15d",
+        label: "Last 15 days",
+        shortLabel: "15d",
+        durationMs: 15 * 24 * 60 * 60 * 1000,
     },
 ];
 
@@ -130,10 +147,31 @@ export function buildServerSelector(
     return labels.length > 0 ? `${metric}{${labels.join(",")}}` : metric;
 }
 
+export function isHostMetric(metric: MetricName): metric is HostMetricName {
+    return HOST_METRICS.includes(metric as HostMetricName);
+}
+
+export function buildHostSelector(
+    metric: HostMetricName,
+    target: { server: string },
+): string {
+    return target.server
+        ? `${metric}{${PROMETHEUS_SERVER_LABEL}="${escapeLabelValue(target.server)}"}`
+        : metric;
+}
+
 export function buildSelectorForScope(
-    metric: ProcessMetricName,
+    metric: MetricName,
     scope: MetricsScope,
 ): string {
+    if (isHostMetric(metric)) {
+        if (scope.kind !== "server") {
+            throw new Error(`Host metric ${metric} requires a server scope`);
+        }
+
+        return buildHostSelector(metric, scope);
+    }
+
     if (scope.kind === "process") {
         return buildSelector(metric, scope);
     }
@@ -156,6 +194,14 @@ export function formatSeriesLabel(series: PrometheusSeries): string {
     const discriminator = series.metric.unique_id ?? series.metric.pm_id;
 
     return discriminator ? `${base} (${discriminator})` : base;
+}
+
+/** Legend-friendly process name without the namespace prefix. */
+export function formatSeriesName(series: PrometheusSeries): string {
+    const name = series.metric.name ?? "unknown";
+    const discriminator = series.metric.unique_id ?? series.metric.pm_id;
+
+    return discriminator ? `${name} (${discriminator})` : name;
 }
 
 export function computeStep(rangeMs: number): number {

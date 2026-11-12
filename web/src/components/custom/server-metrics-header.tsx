@@ -9,6 +9,7 @@ export type ServerMetricsHeaderProps = {
   host: string | null
   port: number | null
   isRefreshing: boolean
+  isRangeLoading?: boolean
   onRefresh: () => void
   disabled?: boolean
 }
@@ -18,6 +19,7 @@ export function ServerMetricsHeader({
   host,
   port,
   isRefreshing,
+  isRangeLoading,
   onRefresh,
   disabled = false,
 }: ServerMetricsHeaderProps) {
@@ -54,6 +56,7 @@ export function ServerMetricsHeader({
             range={range}
             refreshMs={activeRefreshMs}
             isRefreshing={isRefreshing}
+            isRangeLoading={isRangeLoading}
             onRangeChange={setRange}
             onRefreshMsChange={setRefreshMs}
             onRefresh={onRefresh}

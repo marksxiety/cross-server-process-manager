@@ -9,6 +9,14 @@ export type ProcessMetricName =
     | "pm2_unstable_restarts_total"
     | "pm2_status";
 
+export type HostMetricName =
+    | "host_cpu_usage_percent"
+    | "host_cpu_cores"
+    | "host_memory_usage_percent"
+    | "host_memory_total_bytes";
+
+export type MetricName = ProcessMetricName | HostMetricName;
+
 export interface PrometheusTarget {
     name: string;
     namespace: string;
@@ -43,19 +51,18 @@ export type MetricsRange =
     | { kind: "relative"; durationMs: number }
     | { kind: "absolute"; start: number; end: number };
 
-export type MetricsData = Partial<Record<ProcessMetricName, PrometheusSeries[]>>;
+export type MetricsData = Partial<Record<MetricName, PrometheusSeries[]>>;
 
 export type MetricBasis = "server" | "process";
 
 export interface MetricChartSeries {
     id: string;
     name: string;
-    color: string;
+    color?: string;
+    dashPattern?: number[];
     points: Array<[number, number | string | null]>;
     stepped?: boolean;
     filled?: boolean;
-    dashed?: boolean;
-    dashPattern?: number[];
 }
 
 export type StatusTimelineKind = EffectiveStatus | "no_data";

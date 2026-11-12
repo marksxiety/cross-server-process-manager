@@ -4,6 +4,7 @@ import { isPrometheusConfigured } from '@/api/services/prometheus.service'
 import { PageLoader } from '@/components/custom/page-loader'
 import { ServerMetricsHeader } from '@/components/custom/server-metrics-header'
 import { useServerMetrics } from '@/hooks/use-server-metrics'
+import { useServerSeriesAvailability } from '@/hooks/use-server-series-availability'
 import { metricsLoadingDescription } from '@/lib/metrics-loading'
 import { normalizeMetricsRefreshMs } from '@/lib/prometheus'
 import { useDashboardStore } from '@/stores/dashboard.store'
@@ -35,6 +36,17 @@ export function ServerMetricsRoute() {
     enabled: metricsEnabled,
   })
 
+  const availability = useServerSeriesAvailability({
+    serverName,
+    enabled: metricsEnabled,
+    refreshKey: metrics.lastUpdated,
+  })
+
+  const refreshMetrics = () => {
+    metrics.refresh()
+    availability.refresh()
+  }
+
   useEffect(() => {
     void load()
   }, [load])
@@ -47,8 +59,11 @@ export function ServerMetricsRoute() {
         serverName={serverName}
         host={server?.host ?? null}
         port={server?.port ?? null}
-        isRefreshing={metrics.isRefreshing}
-        onRefresh={metrics.refresh}
+        isRefreshing={
+          metrics.isRefreshing || availability.status === 'loading'
+        }
+        isRangeLoading={metrics.isRefreshing}
+        onRefresh={refreshMetrics}
       />
 
       <Suspense
@@ -60,7 +75,11 @@ export function ServerMetricsRoute() {
           />
         }
       >
-        <LazyServerMetrics serverName={serverName} metrics={metrics} />
+        <LazyServerMetrics
+          serverName={serverName}
+          metrics={metrics}
+          availability={availability}
+        />
       </Suspense>
     </div>
   )

@@ -28,6 +28,8 @@ function AppLayout() {
   const { setOpenMobile } = useSidebar()
   const { pathname } = useLocation()
   const isDashboard = pathname === '/'
+  const isServerMetrics =
+    pathname.startsWith('/server/') && pathname.endsWith('/metrics')
   const showFullscreenToggle = isDashboard
 
   const handleToggleFullscreen = () => {
@@ -79,7 +81,10 @@ function AppLayout() {
             <div
               className={cn(
                 'flex min-h-full w-full min-w-0 flex-col px-4 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6',
-                !isDashboard && 'mx-auto max-w-7xl',
+                !isDashboard &&
+                  (isServerMetrics
+                    ? 'mx-auto max-w-[90rem]'
+                    : 'mx-auto max-w-7xl'),
               )}
             >
               <div className="min-w-0 flex-1">

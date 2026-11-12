@@ -5,6 +5,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router'
 import { authService } from '@/api/services/auth.service'
 import { AuthLayout } from '@/components/auth/auth-layout'
 import { ErrorAlert } from '@/components/custom/error-alert'
+import { LinkButton } from '@/components/custom/link-button'
 import { Button } from '@/components/ui/button'
 import {
   Field,
@@ -65,9 +66,9 @@ export function VerifyEmail() {
           <p className='text-sm text-muted-foreground'>
             Start the registration again to receive a new link.
           </p>
-          <Button className='w-full' render={<Link to='/register' />}>
+          <LinkButton className='w-full' to='/register'>
             Register again
-          </Button>
+          </LinkButton>
         </div>
       </AuthLayout>
     )

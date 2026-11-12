@@ -1,6 +1,5 @@
-import { Link } from 'react-router'
 import { AuthLayout } from '@/components/auth/auth-layout'
-import { Button } from '@/components/ui/button'
+import { LinkButton } from '@/components/custom/link-button'
 
 export function Forbidden() {
   return (
@@ -8,9 +7,9 @@ export function Forbidden() {
       title='403'
       description="You don't have access to this page"
     >
-      <Button className='w-full' render={<Link to='/' />}>
+      <LinkButton to='/' className='w-full'>
         Back to dashboard
-      </Button>
+      </LinkButton>
     </AuthLayout>
   )
 }

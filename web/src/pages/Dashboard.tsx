@@ -12,6 +12,7 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty'
 import { ErrorAlert } from '@/components/custom/error-alert'
+import { LinkButton } from '@/components/custom/link-button'
 import { PageLoader } from '@/components/custom/page-loader'
 import { ProcessesSection } from '@/components/custom/processes-section'
 import { ServerHeader } from '@/components/custom/server-header'
@@ -144,7 +145,7 @@ export function Dashboard() {
           </EmptyHeader>
           <EmptyContent>
             {access.canVisit('servers') && access.canDo('server.create') ? (
-              <Button render={<Link to='/server' />}>Register a server</Button>
+              <LinkButton to='/server'>Register a server</LinkButton>
             ) : (
               <p className='text-xs text-muted-foreground'>
                 You don&apos;t have permission to register a server.

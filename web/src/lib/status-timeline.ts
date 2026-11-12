@@ -1,6 +1,6 @@
 import { GAP_STEP_FACTOR } from "@/lib/metric-chart";
 import type { RestartTimestamps } from "@/lib/metric-restart";
-import { formatSeriesLabel, seriesIdentity } from "@/lib/prometheus";
+import { formatSeriesName, seriesIdentity } from "@/lib/prometheus";
 import { statusFromCode } from "@/lib/status-catalog";
 import type { EffectiveStatus } from "@/types/process";
 import type {
@@ -16,6 +16,10 @@ import type {
 } from "@/types/prometheus";
 
 const NO_DATA_KIND: StatusTimelineKind = "no_data";
+
+export function hasStatusTimelineData(data: StatusTimelineData): boolean {
+    return data.segments.some((segment) => segment.kind !== NO_DATA_KIND);
+}
 
 export interface BuildStatusTimelineOptions {
     restarts?: RestartTimestamps;
@@ -39,22 +43,8 @@ function inferStepMs(points: PrometheusPoint[]): number | null {
 function appendSegment(
     segments: StatusTimelineSegment[],
     segment: StatusTimelineSegment,
-    restartSet: Set<number>,
 ): void {
     if (segment.end <= segment.start) return;
-
-    const previous = segments[segments.length - 1];
-
-    if (
-        previous !== undefined &&
-        previous.laneIndex === segment.laneIndex &&
-        previous.kind === segment.kind &&
-        previous.end === segment.start &&
-        !restartSet.has(segment.start)
-    ) {
-        previous.end = segment.end;
-        return;
-    }
 
     segments.push(segment);
 }
@@ -80,7 +70,7 @@ export function buildStatusTimeline(
 
     for (const series of statusSeries) {
         if (series.points.length === 0) continue;
-        statusByLabel.set(formatSeriesLabel(series), series);
+        statusByLabel.set(formatSeriesName(series), series);
     }
 
     const orderedProcesses = uniqueProcesses(
@@ -158,7 +148,6 @@ export function buildStatusTimeline(
         ]
             .filter((timestamp) => timestamp >= start && timestamp <= end)
             .sort((a, b) => a - b);
-        const restartSet = new Set(laneRestarts);
 
         restarts.push(
             ...laneRestarts.map((timestamp) => ({
@@ -179,7 +168,6 @@ export function buildStatusTimeline(
                     start: Math.max(start, from),
                     end: Math.min(end, to),
                 },
-                restartSet,
             );
         };
 
@@ -225,7 +213,6 @@ export function buildStatusTimeline(
                         start: cursor,
                         end: timestamp,
                     },
-                    restartSet,
                 );
                 cursor = timestamp;
             }
@@ -240,7 +227,6 @@ export function buildStatusTimeline(
                     start: cursor,
                     end: clampedEnd,
                 },
-                restartSet,
             );
         };
 

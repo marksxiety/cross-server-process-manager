@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import { ChevronDown, Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -52,12 +52,14 @@ function typeTag(spec: ProcessFieldSpec): string {
 // ---------------------------------------------------------------------------
 
 function TagInput({
+  id,
   spec,
   value,
   disabled,
   invalid,
   onChange,
 }: {
+  id: string
   spec: ProcessFieldSpec
   value: unknown
   disabled: boolean
@@ -104,6 +106,7 @@ function TagInput({
     <div className={cn(disabled && 'opacity-60')}>
       <div className='flex gap-2'>
         <Input
+          id={id}
           className='font-mono text-xs'
           value={draft}
           disabled={disabled}
@@ -211,10 +214,12 @@ function rowsToObject(rows: EnvRow[]): Record<string, string> {
 }
 
 function KeyValueEditor({
+  labelledBy,
   value,
   disabled,
   onChange,
 }: {
+  labelledBy?: string
   value: unknown
   disabled: boolean
   onChange: (value: Record<string, string>) => void
@@ -239,7 +244,11 @@ function KeyValueEditor({
   }
 
   return (
-    <div className={cn('space-y-2', disabled && 'opacity-60')}>
+    <div
+      role='group'
+      aria-labelledby={labelledBy}
+      className={cn('space-y-2', disabled && 'opacity-60')}
+    >
       {rows.map((row, index) => (
         <div key={index} className='flex flex-col gap-2 sm:flex-row'>
           <Input
@@ -288,12 +297,16 @@ function KeyValueEditor({
 }
 
 function FieldControl({
+  id,
+  labelledBy,
   spec,
   value,
   disabled,
   invalid,
   onChange,
 }: {
+  id: string
+  labelledBy?: string
   spec: ProcessFieldSpec
   value: unknown
   disabled: boolean
@@ -305,6 +318,7 @@ function FieldControl({
     const checked = value === undefined ? resting : value === true || value === 'true'
     return (
       <Switch
+        id={id}
         checked={checked}
         disabled={disabled}
         aria-invalid={invalid || undefined}
@@ -319,7 +333,12 @@ function FieldControl({
         value={typeof value === 'string' ? value : ''}
         onValueChange={(next) => onChange(next ?? '')}
       >
-        <SelectTrigger className='w-full' disabled={disabled} aria-invalid={invalid || undefined}>
+        <SelectTrigger
+          id={id}
+          className='w-full'
+          disabled={disabled}
+          aria-invalid={invalid || undefined}
+        >
           <SelectValue placeholder='Select a value' />
         </SelectTrigger>
         <SelectContent>
@@ -334,11 +353,12 @@ function FieldControl({
   }
 
   if (spec.combobox && spec.options) {
-    const listId = `list-${spec.key}`
+    const listId = `${id}-list`
     const uppercase = spec.format === 'uppercase'
     return (
       <>
         <Input
+          id={id}
           className={cn('font-mono text-xs', uppercase && 'uppercase')}
           list={listId}
           disabled={disabled}
@@ -363,18 +383,33 @@ function FieldControl({
 
   if (spec.type === 'array') {
     return (
-      <TagInput spec={spec} value={value} disabled={disabled} invalid={invalid} onChange={onChange} />
+      <TagInput
+        id={id}
+        spec={spec}
+        value={value}
+        disabled={disabled}
+        invalid={invalid}
+        onChange={onChange}
+      />
     )
   }
 
   if (spec.type === 'object') {
-    return <KeyValueEditor value={value} disabled={disabled} onChange={onChange} />
+    return (
+      <KeyValueEditor
+        labelledBy={labelledBy}
+        value={value}
+        disabled={disabled}
+        onChange={onChange}
+      />
+    )
   }
 
   const isNumeric = spec.type === 'number' || spec.type === 'duration'
   const uppercase = spec.format === 'uppercase'
   return (
     <Input
+      id={id}
       className={cn('font-mono text-xs', uppercase && 'uppercase')}
       type='text'
       inputMode={isNumeric ? 'numeric' : undefined}
@@ -405,6 +440,9 @@ function ProcessField({
   values: TemplateValues
   onChange: (value: unknown) => void
 }) {
+  const fieldId = useId()
+  const labelId = `${fieldId}-label`
+  const isGrouped = spec.type === 'object'
   const disabled = !isFieldEnabled(spec, values)
   const showHint = spec.hint !== undefined && (spec.enabledWhen === undefined || disabled)
   const invalid = !!error
@@ -415,7 +453,11 @@ function ProcessField({
   return (
     <Field data-disabled={disabled}>
       <div className='flex items-center justify-between gap-2'>
-        <FieldLabel htmlFor={spec.key} className='text-muted-foreground'>
+        <FieldLabel
+          id={labelId}
+          htmlFor={isGrouped ? undefined : fieldId}
+          className='text-muted-foreground'
+        >
           {spec.label}
           {spec.required && <span className='text-destructive'>*</span>}
         </FieldLabel>
@@ -429,6 +471,8 @@ function ProcessField({
         <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4'>
           <div className='min-w-0 flex-1'>
             <FieldControl
+              id={fieldId}
+              labelledBy={labelId}
               spec={spec}
               value={value}
               disabled={disabled}
@@ -449,6 +493,8 @@ function ProcessField({
         </div>
       ) : (
         <FieldControl
+          id={fieldId}
+          labelledBy={labelId}
           spec={spec}
           value={value}
           disabled={disabled}

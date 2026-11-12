@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router'
+import { useNavigate, useSearchParams } from 'react-router'
 import {
   ArrowLeft,
   ArrowRight,
@@ -19,6 +19,7 @@ import {
   AlertTitle,
 } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { LinkButton } from '@/components/custom/link-button'
 import {
   Card,
   CardContent,
@@ -437,7 +438,7 @@ export function Process() {
           </EmptyHeader>
           <EmptyContent>
             {canRegisterServer ? (
-              <Button render={<Link to='/server' />}>Register a server</Button>
+              <LinkButton to='/server'>Register a server</LinkButton>
             ) : (
               <p className='text-xs text-muted-foreground'>
                 You don&apos;t have permission to register a server.

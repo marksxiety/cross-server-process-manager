@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import {
+  buildHostSelector,
   buildSelector,
   buildSelectorForScope,
   buildServerSelector,
@@ -7,10 +8,13 @@ import {
   countByStatus,
   escapeLabelValue,
   filterSeries,
+  findRangePreset,
   formatDurationSeconds,
   formatMetricAxisValue,
   formatMetricValue,
   formatSeriesLabel,
+  formatSeriesName,
+  isHostMetric,
   lastPoint,
   lastValue,
   latestPoints,
@@ -102,6 +106,44 @@ describe('buildSelectorForScope', () => {
   })
 })
 
+describe('host selectors', () => {
+  test('identifies host metrics', () => {
+    expect(isHostMetric('host_cpu_usage_percent')).toBe(true)
+    expect(isHostMetric('host_memory_usage_percent')).toBe(true)
+    expect(isHostMetric('pm2_cpu')).toBe(false)
+  })
+
+  test('builds a host selector with only the app label', () => {
+    expect(
+      buildHostSelector('host_cpu_usage_percent', { server: 'MYPC' }),
+    ).toBe('host_cpu_usage_percent{app="MYPC"}')
+    expect(
+      buildHostSelector('host_memory_usage_percent', { server: '' }),
+    ).toBe('host_memory_usage_percent')
+  })
+
+  test('routes host metrics through the server selector', () => {
+    expect(
+      buildSelectorForScope('host_cpu_usage_percent', {
+        kind: 'server',
+        server: 'MYPC',
+        namespace: 'XPM',
+      }),
+    ).toBe('host_cpu_usage_percent{app="MYPC"}')
+  })
+
+  test('rejects host metrics with a process scope', () => {
+    expect(() =>
+      buildSelectorForScope('host_cpu_usage_percent', {
+        kind: 'process',
+        name: 'xpm-server',
+        namespace: 'XPM',
+        server: 'MYPC',
+      }),
+    ).toThrow(/server scope/)
+  })
+})
+
 describe('seriesIdentity', () => {
   test('keys a series by its labels without the metric name', () => {
     expect(
@@ -128,6 +170,17 @@ describe('series labels and aggregates', () => {
     expect(
       formatSeriesLabel({ metric: { name: 'plain' }, points: [] }),
     ).toBe('plain')
+  })
+
+  test('uses only the process name for legend labels', () => {
+    expect(formatSeriesName(entries[0]!)).toBe('xpm-agent')
+    expect(
+      formatSeriesName({
+        metric: { name: 'api', namespace: 'XPM', unique_id: 'u1' },
+        points: [],
+      }),
+    ).toBe('api (u1)')
+    expect(formatSeriesName({ metric: {}, points: [] })).toBe('unknown')
   })
 
   test('returns the latest point for each series', () => {
@@ -178,6 +231,17 @@ describe('computeStep', () => {
     expect(computeStep(DAY)).toBe(300)
     expect(computeStep(7 * DAY)).toBe(1800)
     expect(computeStep(15 * DAY)).toBe(3600)
+  })
+})
+
+describe('METRICS_RANGE_PRESETS', () => {
+  test('includes the 15-day range', () => {
+    expect(findRangePreset(15 * DAY)).toMatchObject({
+      value: '15d',
+      label: 'Last 15 days',
+      shortLabel: '15d',
+      durationMs: 15 * DAY,
+    })
   })
 })
 
