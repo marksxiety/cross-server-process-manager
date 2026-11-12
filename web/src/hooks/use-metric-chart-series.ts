@@ -17,6 +17,7 @@ export type MetricChartSeriesBuilder = (
 
 export function useMetricChartSeries(
   metrics: MetricsRangeResult,
+  palette: string[],
 ): MetricChartSeriesBuilder {
   const uptime = metrics.data.pm2_uptime
   const startTime = metrics.data.pm2_start_time_seconds
@@ -32,7 +33,7 @@ export function useMetricChartSeries(
 
   return useCallback(
     (seriesList, options) =>
-      toMetricChartSeries(seriesList, { ...options, restarts, stepMs }),
-    [restarts, stepMs],
+      toMetricChartSeries(seriesList, { ...options, palette, restarts, stepMs }),
+    [palette, restarts, stepMs],
   )
 }
