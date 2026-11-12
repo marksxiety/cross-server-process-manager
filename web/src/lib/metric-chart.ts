@@ -67,6 +67,8 @@ export function maxNumericValue(series: MetricChartSeries[]): number {
 
 const NICE_PERCENT_MAXIMA = [1, 2, 2.5, 5, 10, 20, 25, 50, 75, 100];
 
+export const PERCENT_AXIS_MAX = 100;
+
 export function nicePercentMax(max: number, minimum = 1): number {
     const target = Math.max(minimum, Number.isFinite(max) ? max * 1.1 : minimum);
     return NICE_PERCENT_MAXIMA.find((value) => value >= target) ?? 100;
