@@ -1,6 +1,6 @@
 import { GAP_STEP_FACTOR } from "@/lib/metric-chart";
 import type { RestartTimestamps } from "@/lib/metric-restart";
-import { formatSeriesLabel, seriesIdentity } from "@/lib/prometheus";
+import { formatSeriesName, seriesIdentity } from "@/lib/prometheus";
 import { statusFromCode } from "@/lib/status-catalog";
 import type { EffectiveStatus } from "@/types/process";
 import type {
@@ -70,7 +70,7 @@ export function buildStatusTimeline(
 
     for (const series of statusSeries) {
         if (series.points.length === 0) continue;
-        statusByLabel.set(formatSeriesLabel(series), series);
+        statusByLabel.set(formatSeriesName(series), series);
     }
 
     const orderedProcesses = uniqueProcesses(
