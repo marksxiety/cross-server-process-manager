@@ -4,7 +4,7 @@ import {
     hasStatusTimelineData,
     type BuildStatusTimelineOptions,
 } from '../../lib/status-timeline'
-import { formatSeriesLabel, seriesIdentity } from '../../lib/prometheus'
+import { formatSeriesName, seriesIdentity } from '../../lib/prometheus'
 import { STATUS_COLOR_VAR, STATUS_TEXT_COLOR_VAR } from '../../lib/status-chart'
 import { STATUS_ORDER } from '../../lib/status-catalog'
 import type {
@@ -41,7 +41,7 @@ function series(name: string, values: number[], startMs = 0): PrometheusSeries {
 
 function asProcess(series: PrometheusSeries): StatusTimelineProcess {
     return {
-        label: formatSeriesLabel(series),
+        label: formatSeriesName(series),
         identity: seriesIdentity(series.metric),
     }
 }
@@ -72,7 +72,7 @@ describe('buildStatusTimeline', () => {
         expect(data.lanes).toEqual([
             {
                 id: seriesIdentity(entry.metric),
-                label: 'XPM · api',
+                label: 'api',
                 index: 0,
             },
         ])
@@ -194,14 +194,14 @@ describe('buildStatusTimeline', () => {
             [entry],
             [
                 asProcess(entry),
-                { label: 'XPM · worker', identity: 'worker-identity' },
+                { label: 'worker', identity: 'worker-identity' },
             ],
             { range: range(30_000) },
         )
 
         expect(data.lanes.map((lane) => lane.label)).toEqual([
-            'XPM · api',
-            'XPM · worker',
+            'api',
+            'worker',
         ])
         expect(data.segments).toEqual([
             {
