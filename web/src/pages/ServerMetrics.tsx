@@ -42,9 +42,9 @@ import { useMetricsZoom } from '@/hooks/use-metrics-zoom'
 import { useStatusTimeline } from '@/hooks/use-status-timeline'
 import { formatBytes, formatPercent, memorySharePercent } from '@/lib/format'
 import {
+  PERCENT_AXIS_MAX,
   maxNumericValue,
   niceCpuProcessMax,
-  nicePercentMax,
   percentAxisFormatter,
 } from '@/lib/metric-chart'
 import {
@@ -101,7 +101,7 @@ const formatMemoryValue = metricValueFormatter('pm2_memory')
 const formatMemoryAxis = metricAxisFormatter('pm2_memory')
 const formatUptimeValue = metricValueFormatter('pm2_uptime')
 const formatUptimeAxis = metricAxisFormatter('pm2_uptime')
-const HOST_PERCENT_AXIS_MAX = 100
+const HOST_PERCENT_AXIS_MAX = PERCENT_AXIS_MAX
 const formatHostPercentAxis = percentAxisFormatter(HOST_PERCENT_AXIS_MAX)
 const STATUS_SUMMARY_ORDER = STATUS_ORDER.map(
   (status) => STATUS_CATALOG[status].label,
@@ -421,7 +421,7 @@ export function ServerMetrics({
     cpuDescriptionValue,
   )
   const cpuAxisMax = cpuBasisIsServer
-    ? nicePercentMax(maxNumericValue(cpuChartSeries), 1)
+    ? PERCENT_AXIS_MAX
     : niceCpuProcessMax(maxNumericValue(cpuChartSeries))
   const cpuAxisFormatter = percentAxisFormatter(cpuAxisMax)
 
@@ -487,9 +487,6 @@ export function ServerMetrics({
     memoryCardStatus,
     memoryDescriptionValue,
   )
-  const memoryPercentMax = memoryBasisIsServer
-    ? nicePercentMax(maxNumericValue(memoryChartSeries), 1)
-    : null
   const memoryValueFormatter = (value: number | string) => {
     if (!memoryBasisIsServer || totalMemoryBytes === null) {
       return formatMemoryValue(value)
@@ -501,11 +498,9 @@ export function ServerMetrics({
     )})`
   }
   const memoryAxisFormatter = memoryBasisIsServer
-    ? percentAxisFormatter(memoryPercentMax ?? 100)
+    ? percentAxisFormatter(PERCENT_AXIS_MAX)
     : formatMemoryAxis
-  const memoryAxisMax = memoryBasisIsServer
-    ? (memoryPercentMax ?? undefined)
-    : undefined
+  const memoryAxisMax = memoryBasisIsServer ? PERCENT_AXIS_MAX : undefined
 
   const hostCpuError: ApiError | null =
     metricError(metrics.errors, 'host_cpu_usage_percent') ??
