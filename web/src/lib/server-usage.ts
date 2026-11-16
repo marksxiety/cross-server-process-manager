@@ -3,6 +3,12 @@ import type { LoadStatus } from '@/types/dashboard'
 export interface UsageShares {
   pm2: number
   other: number
+  /**
+   * True when the PM2 estimate is larger than the host reading. The split then
+   * cannot be reconciled; callers should surface the discrepancy instead of
+   * presenting the PM2 value as the host total.
+   */
+  exceedsHost: boolean
 }
 
 export type UsageStatus = 'loading' | 'ready' | 'empty' | 'error'
@@ -21,12 +27,14 @@ export function cpuUsageShares(
   if (cores === null || !Number.isFinite(cores) || cores <= 0) return null
 
   const pm2 = clampPercent(pm2CpuPercent / cores)
-  const other = Math.min(
-    clampPercent((hostCpuPercent ?? 0) - pm2),
-    Math.max(0, 100 - pm2),
-  )
+  const host = clampPercent(hostCpuPercent ?? 0)
+  const exceedsHost =
+    hostCpuPercent !== null && Number.isFinite(hostCpuPercent) && pm2 > host
+  const other = exceedsHost
+    ? 0
+    : Math.min(clampPercent(host - pm2), Math.max(0, 100 - pm2))
 
-  return { pm2, other }
+  return { pm2, other, exceedsHost }
 }
 
 export function serverCpuShare(
@@ -56,14 +64,20 @@ export function memoryUsageShares(
   const used =
     hostUsedBytes !== null && Number.isFinite(hostUsedBytes)
       ? hostUsedBytes
-      : 0
+      : null
   const pm2 = clampPercent((pm2Bytes / hostTotalBytes) * 100)
-  const other = Math.min(
-    clampPercent(((used - pm2Bytes) / hostTotalBytes) * 100),
-    Math.max(0, 100 - pm2),
-  )
+  const hostUsedPercent =
+    used === null ? null : clampPercent((used / hostTotalBytes) * 100)
+  const exceedsHost = hostUsedPercent !== null && pm2 > hostUsedPercent
+  const other =
+    hostUsedPercent === null || exceedsHost
+      ? 0
+      : Math.min(
+          clampPercent(hostUsedPercent - pm2),
+          Math.max(0, 100 - pm2),
+        )
 
-  return { pm2, other }
+  return { pm2, other, exceedsHost }
 }
 
 export function resolveUsageStatus(
