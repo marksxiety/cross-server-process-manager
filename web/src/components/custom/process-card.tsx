@@ -106,6 +106,7 @@ export function ProcessCard({
             label='CPU'
             value={cpuShare}
             tone={inactive ? 'neutral' : percentTone(cpuShare)}
+            title='Share of total server CPU capacity (PM2 per-core CPU ÷ logical cores)'
           />
         ) : (
           <StatText label='CPU' value='—' />
@@ -115,6 +116,7 @@ export function ProcessCard({
             label='Mem'
             value={memoryShare}
             tone={inactive ? 'neutral' : percentTone(memoryShare)}
+            title='Process RSS as a share of total host RAM (RSS sums can double-count shared pages)'
           />
         ) : (
           <StatText label='Mem' value={formatBytes(process.memory)} />
