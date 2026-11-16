@@ -9,13 +9,21 @@ type StatBarProps = {
   tone: Tone
   /** Renders the muted "disabled" treatment (e.g. an inactive process). */
   disabled?: boolean
+  /** Native tooltip explaining where the number came from. */
+  title?: string
 }
 
-export function StatBar({ label, value, tone, disabled = false }: StatBarProps) {
+export function StatBar({
+  label,
+  value,
+  tone,
+  disabled = false,
+  title,
+}: StatBarProps) {
   const effectiveTone = disabled ? 'neutral' : tone
 
   return (
-    <div className='w-full min-w-0'>
+    <div className='w-full min-w-0' title={title}>
       <div className='mb-0.5 flex justify-between text-xs uppercase tracking-wide text-muted-foreground'>
         <span>{label}</span>
         <span className={cn('font-semibold', toneTextClasses[effectiveTone])}>
