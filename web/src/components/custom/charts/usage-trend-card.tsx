@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import type { ChartTheme } from '@/hooks/use-chart-theme'
 import { combineStatus } from '@/lib/metric-status'
 import { formatUsagePercent, type UsageStatus } from '@/lib/server-usage'
+import { toneTextClasses } from '@/lib/status-tone'
 import { cn } from '@/lib/utils'
 import type { ApiError } from '@/types/api'
 import type { LoadStatus } from '@/types/dashboard'
@@ -35,6 +36,8 @@ export type UsageTrendCardProps = Omit<
   other: number | null
   usageStatus: UsageStatus
   usageError?: ApiError | null
+  /** Shown when the PM2 estimate cannot be reconciled with the host reading. */
+  usageWarning?: string | null
   trendSeries: MetricChartSeries[]
   trendStatus: LoadStatus
   trendError?: ApiError | null
@@ -149,6 +152,7 @@ export function UsageTrendCard({
   other,
   usageStatus,
   usageError,
+  usageWarning,
   trendSeries,
   trendStatus,
   trendError,
@@ -255,6 +259,16 @@ export function UsageTrendCard({
           </ChartSlot>
         </div>
       </div>
+      {usageWarning && (
+        <p
+          className={cn(
+            'pt-2 text-[11px] leading-snug',
+            toneTextClasses.warning,
+          )}
+        >
+          {usageWarning}
+        </p>
+      )}
     </ChartCard>
   )
 }
