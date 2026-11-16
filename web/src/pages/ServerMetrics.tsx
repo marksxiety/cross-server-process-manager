@@ -74,6 +74,7 @@ import {
 } from '@/lib/status-catalog'
 import {
   cpuUsageShares,
+  formatUsagePercent,
   memoryUsageShares,
   resolveUsageStatus,
 } from '@/lib/server-usage'
@@ -277,6 +278,14 @@ export function ServerMetrics({
     for (const series of seriesList) visibleLabels.add(formatSeriesName(series))
   }
   const visibleProcessCount = visibleLabels.size
+  const xpmProcessCount = new Set(
+    [...cpuSeries, ...memorySeries, ...statusSeries, ...uptimeSeries]
+      .filter(
+        (series) =>
+          (series.metric.namespace ?? 'default').toLowerCase() === 'xpm',
+      )
+      .map(formatSeriesName),
+  ).size
 
   const statusLabels = new Set(statusSeries.map(formatSeriesName))
   const timelineProcesses = [
@@ -305,6 +314,22 @@ export function ServerMetrics({
     hostMemoryUsedBytes,
     hostMemoryTotalBytes,
   )
+  const cpuUsageWarning =
+    cpuShares?.exceedsHost && hostCpuPercent !== null
+      ? `PM2 CPU estimate (${formatUsagePercent(
+          cpuShares.pm2,
+        )}) exceeds the host reading (${formatUsagePercent(
+          hostCpuPercent,
+        )}). The split is not reconcilable; check scrape timing and core count.`
+      : null
+  const memoryUsageWarning =
+    memoryShares?.exceedsHost && hostMemoryPercent !== null
+      ? `PM2 RSS estimate (${formatUsagePercent(
+          memoryShares.pm2,
+        )}) exceeds host-used memory (${formatUsagePercent(
+          hostMemoryPercent,
+        )}). Process footprints can double-count shared pages.`
+      : null
   const cpuUsageStatus = resolveUsageStatus(
     hostCpuMetricsStatus,
     metrics.status.pm2_cpu,
@@ -415,7 +440,7 @@ export function ServerMetrics({
       : `${processCountLabel(cpuSeries.length)} · ${formatPercent(
           cpuDisplayTotal,
           1,
-        )} ${cpuBasisIsServer ? 'of server CPU' : 'CPU (PM2)'}`
+        )} ${cpuBasisIsServer ? 'of server CPU capacity' : 'CPU (PM2)'}`
   const cpuDescription = metricDescription(
     cpuCardStatus,
     cpuDescriptionValue,
@@ -479,7 +504,7 @@ export function ServerMetrics({
           : `${processCountLabel(memorySeries.length)} · ${formatPercent(
               memoryServerPercent,
               1,
-            )} of host RAM (${formatBytes(memoryTotalRaw)})`
+            )} of host RAM · ${formatBytes(memoryTotalRaw)} RSS`
         : `${processCountLabel(memorySeries.length)} · ${formatBytes(
             memoryTotalRaw,
           )}`
@@ -495,7 +520,7 @@ export function ServerMetrics({
     const percent = Number(value)
     return `${formatPercent(percent, 1)} (${formatBytes(
       (percent / 100) * totalMemoryBytes,
-    )})`
+    )} RSS)`
   }
   const memoryAxisFormatter = memoryBasisIsServer
     ? percentAxisFormatter(PERCENT_AXIS_MAX)
@@ -645,8 +670,21 @@ export function ServerMetrics({
       {registryError && <ErrorAlert error={registryError} className='mb-3' />}
 
       <div className='mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3'>
-        <p className='shrink-0 text-xs font-medium text-muted-foreground'>
-          {metricsLoading ? 'Loading…' : processCountLabel(visibleProcessCount)}
+        <p
+          className='shrink-0 text-xs font-medium text-muted-foreground'
+          title={
+            xpmProcessCount > 0
+              ? 'Includes XPM-managed processes; use the namespace filter to exclude them.'
+              : undefined
+          }
+        >
+          {metricsLoading
+            ? 'Loading…'
+            : `${processCountLabel(visibleProcessCount)}${
+                xpmProcessCount > 0
+                  ? ` · ${xpmProcessCount} XPM included`
+                  : ''
+              }`}
         </p>
         <Separator className='hidden flex-1 sm:block' />
         <div className='flex flex-col gap-2 sm:flex-row sm:items-center'>
@@ -717,6 +755,7 @@ export function ServerMetrics({
               other={cpuShares?.other ?? null}
               usageStatus={cpuUsageStatus}
               usageError={cpuUsageError}
+              usageWarning={cpuUsageWarning}
               trendSeries={hostCpuChartSeries}
               trendStatus={hostCpuStatus}
               trendError={hostCpuError}
@@ -738,6 +777,7 @@ export function ServerMetrics({
               other={memoryShares?.other ?? null}
               usageStatus={memoryUsageStatus}
               usageError={memoryUsageError}
+              usageWarning={memoryUsageWarning}
               trendSeries={hostMemoryChartSeries}
               trendStatus={hostMemoryStatus}
               trendError={hostMemoryError}
