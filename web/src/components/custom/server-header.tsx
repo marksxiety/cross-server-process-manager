@@ -18,9 +18,29 @@ type ServerHeaderProps = {
   entry: ServerProcesses | undefined
 }
 
+function formatWindow(windowMs: number | null | undefined): string | null {
+  if (typeof windowMs !== 'number' || !Number.isFinite(windowMs) || windowMs <= 0) {
+    return null
+  }
+  if (windowMs < 1_000) return `${Math.round(windowMs)} ms`
+  const seconds = windowMs / 1_000
+  return `${seconds % 1 === 0 ? seconds.toFixed(0) : seconds.toFixed(1)} s`
+}
+
 export function ServerHeader({ server, entry }: ServerHeaderProps) {
   const tone = serverTone(entry)
   const overview = entry?.status === 'success' ? entry.overview : null
+  const sampledAt =
+    overview?.sampledAt != null
+      ? new Date(overview.sampledAt).toLocaleTimeString()
+      : null
+  const cpuWindow = formatWindow(overview?.cpu.windowMs)
+  const snapshotNote = [
+    sampledAt ? `sampled at ${sampledAt}` : null,
+    cpuWindow ? `CPU over ${cpuWindow}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
 
   return (
     <div className='flex h-full flex-col justify-between gap-3 px-(--card-spacing)'>
@@ -47,11 +67,17 @@ export function ServerHeader({ server, entry }: ServerHeaderProps) {
             label='CPU'
             value={overview.cpu.usagePercent}
             tone={percentTone(overview.cpu.usagePercent)}
+            title={`Whole-host CPU${
+              snapshotNote ? ` — agent snapshot ${snapshotNote}` : ''
+            }`}
           />
           <StatBar
             label='Mem'
             value={overview.memory.percentUsed}
             tone={percentTone(overview.memory.percentUsed)}
+            title={`Whole-host memory${
+              sampledAt ? ` — agent snapshot sampled at ${sampledAt}` : ''
+            }`}
           />
         </div>
       ) : entry?.status === 'error' ? (
