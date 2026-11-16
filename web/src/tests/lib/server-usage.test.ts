@@ -22,15 +22,27 @@ describe('formatUsagePercent', () => {
 
 describe('cpuUsageShares', () => {
   test('normalizes PM2 CPU by the host core count', () => {
-    expect(cpuUsageShares(200, 60, 8)).toEqual({ pm2: 25, other: 35 })
+    expect(cpuUsageShares(200, 60, 8)).toEqual({
+      pm2: 25,
+      other: 35,
+      exceedsHost: false,
+    })
   })
 
-  test('does not let other go below zero', () => {
-    expect(cpuUsageShares(200, 10, 8)).toEqual({ pm2: 25, other: 0 })
+  test('flags a PM2 estimate that is larger than the host reading', () => {
+    expect(cpuUsageShares(200, 10, 8)).toEqual({
+      pm2: 25,
+      other: 0,
+      exceedsHost: true,
+    })
   })
 
   test('falls back to other zero when host CPU is unavailable', () => {
-    expect(cpuUsageShares(80, null, 8)).toEqual({ pm2: 10, other: 0 })
+    expect(cpuUsageShares(80, null, 8)).toEqual({
+      pm2: 10,
+      other: 0,
+      exceedsHost: false,
+    })
   })
 
   test('returns null without PM2 data or valid cores', () => {
@@ -40,7 +52,11 @@ describe('cpuUsageShares', () => {
   })
 
   test('caps PM2 at 100 percent of the server', () => {
-    expect(cpuUsageShares(1600, 60, 8)).toEqual({ pm2: 100, other: 0 })
+    expect(cpuUsageShares(1600, 60, 8)).toEqual({
+      pm2: 100,
+      other: 0,
+      exceedsHost: true,
+    })
   })
 })
 
@@ -66,13 +82,15 @@ describe('memoryUsageShares', () => {
     expect(memoryUsageShares(100, 500, 1000)).toEqual({
       pm2: 10,
       other: 40,
+      exceedsHost: false,
     })
   })
 
-  test('does not let other go below zero when PM2 overshoots host used', () => {
+  test('flags a PM2 estimate that overshoots host used memory', () => {
     expect(memoryUsageShares(600, 500, 1000)).toEqual({
       pm2: 60,
       other: 0,
+      exceedsHost: true,
     })
   })
 
@@ -80,6 +98,7 @@ describe('memoryUsageShares', () => {
     expect(memoryUsageShares(100, null, 1000)).toEqual({
       pm2: 10,
       other: 0,
+      exceedsHost: false,
     })
   })
 
@@ -87,6 +106,7 @@ describe('memoryUsageShares', () => {
     expect(memoryUsageShares(1200, 900, 1000)).toEqual({
       pm2: 100,
       other: 0,
+      exceedsHost: true,
     })
   })
 
@@ -98,7 +118,7 @@ describe('memoryUsageShares', () => {
 })
 
 describe('resolveUsageStatus', () => {
-  const shares = { pm2: 10, other: 20 }
+  const shares = { pm2: 10, other: 20, exceedsHost: false }
 
   test('reports loading while either source is pending', () => {
     expect(resolveUsageStatus('loading', 'success', shares)).toBe('loading')
