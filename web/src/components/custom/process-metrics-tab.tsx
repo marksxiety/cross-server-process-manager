@@ -25,6 +25,7 @@ import { useChartTheme } from '@/hooks/use-chart-theme'
 import { useMetricChartSeries } from '@/hooks/use-metric-chart-series'
 import { useMetricsZoom } from '@/hooks/use-metrics-zoom'
 import { useProcessMetrics } from '@/hooks/use-process-metrics'
+import { useServerHostMetrics } from '@/hooks/use-server-host-metrics'
 import { useStatusTimeline } from '@/hooks/use-status-timeline'
 import { formatBytes, formatPercent, memorySharePercent } from '@/lib/format'
 import {
@@ -121,6 +122,16 @@ export function ProcessMetricsTab({
     refreshMs: activeRefreshMs,
     enabled: configured && active,
   })
+  const hostMetrics = useServerHostMetrics({
+    serverName: server.server,
+    range,
+    refreshMs: activeRefreshMs,
+    enabled: configured && active,
+  })
+  const hostCpuCores = lastValue(hostMetrics.data.host_cpu_cores)
+  const hostMemoryTotalBytes = lastValue(hostMetrics.data.host_memory_total_bytes)
+  const effectiveCpuCores = hostCpuCores ?? cpuCores
+  const effectiveTotalMemoryBytes = hostMemoryTotalBytes ?? totalMemoryBytes
   const toChartSeries = useMetricChartSeries(metrics, theme.palette)
   const { selectTimeRange, resetTimeRange } = useMetricsZoom()
 
@@ -150,10 +161,16 @@ export function ProcessMetricsTab({
   const startedAt = lastValue(startTimeSeries)
 
   const cpuBasisIsServer = cpuBasis === 'server'
-  const cpuServerPending =
-    overviewStatus === 'loading' || overviewStatus === 'idle'
+  const hostCoresStatus = hostMetrics.status.host_cpu_cores
+  const hostCoresPending =
+    hostCoresStatus === 'loading' || hostCoresStatus === 'idle'
   const cpuServerReady =
-    overviewStatus === 'success' && cpuCores !== null && cpuCores > 0
+    effectiveCpuCores !== null && effectiveCpuCores > 0
+  const cpuServerPending =
+    !cpuServerReady &&
+    (hostCoresPending ||
+      overviewStatus === 'loading' ||
+      overviewStatus === 'idle')
   const cpuCardStatus: LoadStatus = cpuBasisIsServer
     ? cpuServerPending
       ? 'loading'
@@ -161,21 +178,24 @@ export function ProcessMetricsTab({
         ? metrics.status.pm2_cpu
         : 'error'
     : metrics.status.pm2_cpu
+  const hostCoresError = metricError(hostMetrics.errors, 'host_cpu_cores')
   const cpuCardError: ApiError | null =
-    cpuBasisIsServer && !cpuServerPending && !cpuServerReady
+    metricError(metrics.errors, 'pm2_cpu') ??
+    (cpuServerReady ? null : hostCoresError) ??
+    (cpuBasisIsServer && !cpuServerPending && !cpuServerReady
       ? {
           code: 'SERVER_CPU_UNAVAILABLE',
           message:
-            'Server CPU basis requires the agent CPU core count. Update the agent or switch to PROCESS.',
+            'Server CPU basis requires the host CPU core count from Prometheus or the agent overview. Switch to PROCESS or check the host metrics.',
           status: 0,
         }
-      : metricError(metrics.errors, 'pm2_cpu')
+      : null)
   const cpuChartSeries = cpuBasisIsServer
     ? cpuServerReady
       ? toChartSeries(cpuSeries, {
           filled: true,
           label: formatSeriesName,
-          valueMapper: (value) => normalizeCpu(value, cpuCores),
+          valueMapper: (value) => normalizeCpu(value, effectiveCpuCores),
         })
       : []
     : toChartSeries(cpuSeries, {
@@ -186,13 +206,13 @@ export function ProcessMetricsTab({
     cpuLast === null || (cpuBasisIsServer && !cpuServerReady)
       ? null
       : cpuBasisIsServer
-        ? normalizeCpu(cpuLast, cpuCores)
+        ? normalizeCpu(cpuLast, effectiveCpuCores)
         : cpuLast
   const cpuDescriptionValue =
     cpuSeries?.length === 0 || cpuDisplayLast === null
       ? null
       : `${formatPercent(cpuDisplayLast, 1)} ${
-          cpuBasisIsServer ? 'of server CPU' : 'CPU (PM2)'
+          cpuBasisIsServer ? 'of server CPU capacity' : 'CPU (PM2)'
         }`
   const cpuDescription = metricDescription(
     cpuCardStatus,
@@ -204,12 +224,18 @@ export function ProcessMetricsTab({
   const cpuAxisFormatter = percentAxisFormatter(cpuAxisMax)
 
   const memoryBasisIsServer = memoryBasis === 'server'
-  const memoryServerPending =
-    overviewStatus === 'loading' || overviewStatus === 'idle'
+  const hostMemoryTotalStatus = hostMetrics.status.host_memory_total_bytes
+  const hostMemoryTotalPending =
+    hostMemoryTotalStatus === 'loading' ||
+    hostMemoryTotalStatus === 'idle'
   const memoryServerReady =
-    overviewStatus === 'success' &&
-    totalMemoryBytes !== null &&
-    totalMemoryBytes > 0
+    effectiveTotalMemoryBytes !== null &&
+    effectiveTotalMemoryBytes > 0
+  const memoryServerPending =
+    !memoryServerReady &&
+    (hostMemoryTotalPending ||
+      overviewStatus === 'loading' ||
+      overviewStatus === 'idle')
   const memoryCardStatus: LoadStatus = memoryBasisIsServer
     ? memoryServerPending
       ? 'loading'
@@ -217,18 +243,24 @@ export function ProcessMetricsTab({
         ? metrics.status.pm2_memory
         : 'error'
     : metrics.status.pm2_memory
+  const hostMemoryTotalError = metricError(
+    hostMetrics.errors,
+    'host_memory_total_bytes',
+  )
   const memoryCardError: ApiError | null =
-    memoryBasisIsServer && !memoryServerPending && !memoryServerReady
+    metricError(metrics.errors, 'pm2_memory') ??
+    (memoryServerReady ? null : hostMemoryTotalError) ??
+    (memoryBasisIsServer && !memoryServerPending && !memoryServerReady
       ? {
           code: 'SERVER_MEMORY_UNAVAILABLE',
           message:
-            'Host RAM total is unavailable. Switch to PROCESS to see memory in MB.',
+            'Host RAM total is unavailable from Prometheus or the agent overview. Switch to PROCESS to see memory in MB.',
           status: 0,
         }
-      : metricError(metrics.errors, 'pm2_memory')
+      : null)
   const memoryLastPercent =
     memoryServerReady && memoryLast !== null
-      ? memorySharePercent(memoryLast, totalMemoryBytes)
+      ? memorySharePercent(memoryLast, effectiveTotalMemoryBytes)
       : null
   const memoryChartSeries = memoryBasisIsServer
     ? memoryServerReady
@@ -236,7 +268,7 @@ export function ProcessMetricsTab({
           filled: true,
           label: formatSeriesName,
           valueMapper: (value) =>
-            memorySharePercent(value, totalMemoryBytes) ?? 0,
+            memorySharePercent(value, effectiveTotalMemoryBytes) ?? 0,
         })
       : []
     : toChartSeries(memorySeries, {
@@ -251,21 +283,21 @@ export function ProcessMetricsTab({
           ? null
           : `${formatPercent(memoryLastPercent, 1)} of host RAM · ${formatBytes(
               memoryLast,
-            )}`
+            )} RSS`
         : formatBytes(memoryLast)
   const memoryDescription = metricDescription(
     memoryCardStatus,
     memoryDescriptionValue,
   )
   const memoryValueFormatter = (value: number | string) => {
-    if (!memoryBasisIsServer || totalMemoryBytes === null) {
+    if (!memoryBasisIsServer || effectiveTotalMemoryBytes === null) {
       return formatMemoryValue(value)
     }
 
     const percent = Number(value)
     return `${formatPercent(percent, 1)} (${formatBytes(
-      (percent / 100) * totalMemoryBytes,
-    )})`
+      (percent / 100) * effectiveTotalMemoryBytes,
+    )} RSS)`
   }
   const memoryAxisFormatter = memoryBasisIsServer
     ? percentAxisFormatter(PERCENT_AXIS_MAX)
