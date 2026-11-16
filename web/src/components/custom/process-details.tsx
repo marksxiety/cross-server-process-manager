@@ -496,14 +496,14 @@ function OverviewTab({
           <StatTile
             label='CPU'
             value={cpuShare === null ? '—' : formatPercent(cpuShare)}
-            sub={cpuShare === null ? undefined : 'of server'}
+            sub={cpuShare === null ? undefined : 'of server capacity'}
             progress={cpuShare}
             disabled={inactive}
           />
           <StatTile
             label='Memory'
             value={memoryShare === null ? formatBytes(summary.memory) : formatPercent(memoryShare)}
-            sub={memoryShare === null ? undefined : formatBytes(summary.memory)}
+            sub={memoryShare === null ? undefined : `${formatBytes(summary.memory)} RSS`}
             progress={memoryShare}
             disabled={inactive}
           />
