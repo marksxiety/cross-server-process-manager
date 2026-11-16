@@ -40,6 +40,16 @@ export const HOST_METRICS: HostMetricName[] = [
 
 export const ALL_METRICS: MetricName[] = [...PROCESS_METRICS, ...HOST_METRICS];
 
+/**
+ * Host totals needed to turn PM2 process values into a "server" basis.
+ * Kept separate from ALL_METRICS so per-process views don't re-query the
+ * host usage gauges they never render.
+ */
+export const HOST_DENOMINATOR_METRICS: HostMetricName[] = [
+    "host_cpu_cores",
+    "host_memory_total_bytes",
+];
+
 export interface MetricsRangePreset {
     value: string;
     label: string;
