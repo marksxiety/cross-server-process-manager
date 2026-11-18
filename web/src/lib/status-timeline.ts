@@ -106,8 +106,9 @@ export function buildStatusTimeline(
         allPoints.push(...series.points);
     }
 
-    const inferredStep = inferStepMs(allPoints);
-    const stepMs = options.range ? options.range.step * 1000 : inferredStep;
+    const stepMs = options.range
+        ? options.range.step * 1000
+        : inferStepMs(allPoints);
 
     let dataStart = Number.POSITIVE_INFINITY;
     let dataEnd = Number.NEGATIVE_INFINITY;
