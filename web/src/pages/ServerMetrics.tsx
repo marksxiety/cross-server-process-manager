@@ -56,6 +56,7 @@ import {
   isMetricsInitialLoad,
   metricsLoadingDescription,
 } from '@/lib/metrics-loading'
+import { isXpmNamespace } from '@/lib/process-filter'
 import {
   PROCESS_METRICS,
   countByStatus,
@@ -151,6 +152,9 @@ export function ServerMetrics({
 
   const servers = useDashboardStore((state) => state.servers)
   const serversStatus = useDashboardStore((state) => state.serversStatus)
+  const hideXpmProcesses = useDashboardStore(
+    (state) => state.hideXpmProcesses,
+  )
   const registryError = useDashboardStore((state) => state.requestError)
   const processesByServer = useDashboardStore((state) => state.processesByServer)
   const refreshServer = useDashboardStore((state) => state.refreshServer)
@@ -233,21 +237,27 @@ export function ServerMetrics({
 
     for (const metric of PROCESS_METRICS) {
       for (const series of metrics.data[metric] ?? []) {
-        values.add(series.metric.namespace ?? 'default')
+        const value = series.metric.namespace ?? 'default'
+        if (hideXpmProcesses && isXpmNamespace(value)) continue
+        values.add(value)
       }
     }
 
     return [...values].sort()
-  }, [metrics.data])
+  }, [hideXpmProcesses, metrics.data])
 
   const activeNamespace =
     namespace !== 'all' && namespaces.includes(namespace) ? namespace : 'all'
   const query = searchQuery.trim().toLowerCase()
-
+  const scopeFilter = {
+    namespace: activeNamespace === 'all' ? undefined : activeNamespace,
+    query,
+  }
+  // Per-process views follow the namespace, search, and XPM visibility filters.
   const filterMetric = (seriesList: PrometheusSeries[] | undefined) =>
     filterSeries(seriesList ?? [], {
-      namespace: activeNamespace === 'all' ? undefined : activeNamespace,
-      query,
+      ...scopeFilter,
+      excludeXpm: hideXpmProcesses,
     })
 
   const cpuSeries = filterMetric(metrics.data.pm2_cpu)
@@ -257,10 +267,7 @@ export function ServerMetrics({
 
   const processIdentities = new Map<string, string>()
   for (const metric of PROCESS_METRICS) {
-    for (const series of filterSeries(metrics.data[metric] ?? [], {
-      namespace: activeNamespace === 'all' ? undefined : activeNamespace,
-      query,
-    })) {
+    for (const series of filterMetric(metrics.data[metric])) {
       const label = formatSeriesName(series)
       if (!processIdentities.has(label)) {
         processIdentities.set(label, seriesIdentity(series.metric))
@@ -278,14 +285,21 @@ export function ServerMetrics({
     for (const series of seriesList) visibleLabels.add(formatSeriesName(series))
   }
   const visibleProcessCount = visibleLabels.size
+  // Counted before the visibility toggle so the header can report what is hidden.
   const xpmProcessCount = new Set(
-    [...cpuSeries, ...memorySeries, ...statusSeries, ...uptimeSeries]
-      .filter(
-        (series) =>
-          (series.metric.namespace ?? 'default').toLowerCase() === 'xpm',
-      )
+    [
+      metrics.data.pm2_cpu,
+      metrics.data.pm2_memory,
+      metrics.data.pm2_status,
+      metrics.data.pm2_uptime,
+    ]
+      .flatMap((seriesList) => filterSeries(seriesList ?? [], scopeFilter))
+      .filter((series) => isXpmNamespace(series.metric.namespace))
       .map(formatSeriesName),
   ).size
+  const xpmHint = hideXpmProcesses
+    ? 'XPM-managed processes are hidden; use the eye toggle above the process list to show them.'
+    : 'Includes XPM-managed processes; hide them with the eye toggle above the process list.'
 
   const statusLabels = new Set(statusSeries.map(formatSeriesName))
   const timelineProcesses = [
@@ -301,16 +315,20 @@ export function ServerMetrics({
     timelineProcesses,
   )
 
-  const cpuTotalRaw = sumLastValues(cpuSeries)
-  const memoryTotalRaw = sumLastValues(memorySeries)
+  const cpuProcessTotalRaw = sumLastValues(cpuSeries)
+  const memoryProcessTotalRaw = sumLastValues(memorySeries)
   const statusCounts = countByStatus(statusSeries)
+  // The usage donuts are a whole-server overview, so they always count every
+  // PM2 series regardless of the namespace, search, or XPM visibility filters.
+  const cpuUsageTotalRaw = sumLastValues(metrics.data.pm2_cpu ?? [])
+  const memoryUsageTotalRaw = sumLastValues(metrics.data.pm2_memory ?? [])
   const cpuShares = cpuUsageShares(
-    cpuTotalRaw,
+    cpuUsageTotalRaw,
     hostCpuPercent,
     hostCpuCores,
   )
   const memoryShares = memoryUsageShares(
-    memoryTotalRaw,
+    memoryUsageTotalRaw,
     hostMemoryUsedBytes,
     hostMemoryTotalBytes,
   )
@@ -429,11 +447,11 @@ export function ServerMetrics({
         label: formatSeriesName,
       })
   const cpuDisplayTotal =
-    cpuTotalRaw === null || (cpuBasisIsServer && !cpuServerReady)
+    cpuProcessTotalRaw === null || (cpuBasisIsServer && !cpuServerReady)
       ? null
       : cpuBasisIsServer
-        ? normalizeCpu(cpuTotalRaw, cpuCores)
-        : cpuTotalRaw
+        ? normalizeCpu(cpuProcessTotalRaw, cpuCores)
+        : cpuProcessTotalRaw
   const cpuDescriptionValue =
     cpuSeries.length === 0 || cpuDisplayTotal === null
       ? null
@@ -479,8 +497,8 @@ export function ServerMetrics({
         }
       : metricError(metrics.errors, 'pm2_memory')
   const memoryServerPercent =
-    memoryServerReady && memoryTotalRaw !== null
-      ? memorySharePercent(memoryTotalRaw, totalMemoryBytes)
+    memoryServerReady && memoryProcessTotalRaw !== null
+      ? memorySharePercent(memoryProcessTotalRaw, totalMemoryBytes)
       : null
   const memoryChartSeries = memoryBasisIsServer
     ? memoryServerReady
@@ -496,7 +514,7 @@ export function ServerMetrics({
         label: formatSeriesName,
       })
   const memoryDescriptionValue =
-    memorySeries.length === 0 || memoryTotalRaw === null
+    memorySeries.length === 0 || memoryProcessTotalRaw === null
       ? null
       : memoryBasisIsServer
         ? memoryServerPercent === null
@@ -504,9 +522,9 @@ export function ServerMetrics({
           : `${processCountLabel(memorySeries.length)} · ${formatPercent(
               memoryServerPercent,
               1,
-            )} of host RAM · ${formatBytes(memoryTotalRaw)} RSS`
+            )} of host RAM · ${formatBytes(memoryProcessTotalRaw)} RSS`
         : `${processCountLabel(memorySeries.length)} · ${formatBytes(
-            memoryTotalRaw,
+            memoryProcessTotalRaw,
           )}`
   const memoryDescription = metricDescription(
     memoryCardStatus,
@@ -672,17 +690,15 @@ export function ServerMetrics({
       <div className='mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3'>
         <p
           className='shrink-0 text-xs font-medium text-muted-foreground'
-          title={
-            xpmProcessCount > 0
-              ? 'Includes XPM-managed processes; use the namespace filter to exclude them.'
-              : undefined
-          }
+          title={xpmProcessCount > 0 ? xpmHint : undefined}
         >
           {metricsLoading
             ? 'Loading…'
             : `${processCountLabel(visibleProcessCount)}${
                 xpmProcessCount > 0
-                  ? ` · ${xpmProcessCount} XPM included`
+                  ? ` · ${xpmProcessCount} XPM ${
+                      hideXpmProcesses ? 'hidden' : 'included'
+                    }`
                   : ''
               }`}
         </p>
