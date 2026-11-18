@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import {
   filterProcessItemsByQuery,
+  isXpmNamespace,
   isXpmProcess,
   partitionXpmProcesses,
 } from '../../lib/process-filter'
@@ -39,6 +40,18 @@ function makeItem(process: ProcessSummary): ProcessListItem {
   }
   return { server, process }
 }
+
+describe('isXpmNamespace', () => {
+  test('matches the XPM namespace case-insensitively and ignoring whitespace', () => {
+    expect(isXpmNamespace('XPM')).toBe(true)
+    expect(isXpmNamespace(' xpm ')).toBe(true)
+  })
+
+  test('does not match another namespace or a missing one', () => {
+    expect(isXpmNamespace('default')).toBe(false)
+    expect(isXpmNamespace(undefined)).toBe(false)
+  })
+})
 
 describe('isXpmProcess', () => {
   test('matches the XPM namespace', () => {
