@@ -1,4 +1,5 @@
 import { formatBytes, formatUptime } from "@/lib/format";
+import { isXpmNamespace } from "@/lib/process-filter";
 import { statusLabelFromCode } from "@/lib/status-catalog";
 import type {
     HostMetricName,
@@ -335,13 +336,14 @@ export function countByStatus(series: PrometheusSeries[]): Record<string, number
 
 export function filterSeries(
     series: PrometheusSeries[],
-    filter: { namespace?: string; query?: string },
+    filter: { namespace?: string; query?: string; excludeXpm?: boolean },
 ): PrometheusSeries[] {
     const query = filter.query?.trim().toLowerCase() ?? "";
 
     return series.filter((entry) => {
         const namespace = entry.metric.namespace ?? "default";
 
+        if (filter.excludeXpm && isXpmNamespace(namespace)) return false;
         if (filter.namespace && namespace !== filter.namespace) return false;
         if (query === "") return true;
 
