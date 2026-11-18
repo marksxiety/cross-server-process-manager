@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Activity, Info, Search, ServerOff } from 'lucide-react'
 import {
   isPrometheusConfigured,
@@ -249,66 +249,119 @@ export function ServerMetrics({
   const activeNamespace =
     namespace !== 'all' && namespaces.includes(namespace) ? namespace : 'all'
   const query = searchQuery.trim().toLowerCase()
-  const scopeFilter = {
-    namespace: activeNamespace === 'all' ? undefined : activeNamespace,
-    query,
-  }
+  const scopeFilter = useMemo(
+    () => ({
+      namespace: activeNamespace === 'all' ? undefined : activeNamespace,
+      query,
+    }),
+    [activeNamespace, query],
+  )
   // Per-process views follow the namespace, search, and XPM visibility filters.
-  const filterMetric = (seriesList: PrometheusSeries[] | undefined) =>
-    filterSeries(seriesList ?? [], {
-      ...scopeFilter,
-      excludeXpm: hideXpmProcesses,
-    })
+  const filterMetric = useCallback(
+    (seriesList: PrometheusSeries[] | undefined) =>
+      filterSeries(seriesList ?? [], {
+        ...scopeFilter,
+        excludeXpm: hideXpmProcesses,
+      }),
+    [hideXpmProcesses, scopeFilter],
+  )
 
-  const cpuSeries = filterMetric(metrics.data.pm2_cpu)
-  const memorySeries = filterMetric(metrics.data.pm2_memory)
-  const statusSeries = filterMetric(metrics.data.pm2_status)
-  const uptimeSeries = filterMetric(metrics.data.pm2_uptime)
+  // Key on each metric slice rather than `metrics.data`: the range hook replaces
+  // one metric at a time, so unrelated responses must not invalidate these.
+  const cpuSeries = useMemo(
+    () => filterMetric(metrics.data.pm2_cpu),
+    [filterMetric, metrics.data.pm2_cpu],
+  )
+  const memorySeries = useMemo(
+    () => filterMetric(metrics.data.pm2_memory),
+    [filterMetric, metrics.data.pm2_memory],
+  )
+  const statusSeries = useMemo(
+    () => filterMetric(metrics.data.pm2_status),
+    [filterMetric, metrics.data.pm2_status],
+  )
+  const uptimeSeries = useMemo(
+    () => filterMetric(metrics.data.pm2_uptime),
+    [filterMetric, metrics.data.pm2_uptime],
+  )
 
-  const processIdentities = new Map<string, string>()
-  for (const metric of PROCESS_METRICS) {
-    for (const series of filterMetric(metrics.data[metric])) {
+  // Every label the timeline looks up comes from these four metric slices.
+  const processIdentities = useMemo(() => {
+    const identities = new Map<string, string>()
+
+    for (const series of [
+      ...cpuSeries,
+      ...memorySeries,
+      ...statusSeries,
+      ...uptimeSeries,
+    ]) {
       const label = formatSeriesName(series)
-      if (!processIdentities.has(label)) {
-        processIdentities.set(label, seriesIdentity(series.metric))
+      if (!identities.has(label)) {
+        identities.set(label, seriesIdentity(series.metric))
       }
     }
-  }
 
-  const visibleLabels = new Set<string>()
-  for (const seriesList of [
-    cpuSeries,
-    memorySeries,
-    statusSeries,
-    uptimeSeries,
-  ]) {
-    for (const series of seriesList) visibleLabels.add(formatSeriesName(series))
-  }
-  const visibleProcessCount = visibleLabels.size
+    return identities
+  }, [cpuSeries, memorySeries, statusSeries, uptimeSeries])
+
+  const { visibleLabels, visibleProcessCount } = useMemo(() => {
+    const labels = new Set<string>()
+
+    for (const seriesList of [
+      cpuSeries,
+      memorySeries,
+      statusSeries,
+      uptimeSeries,
+    ]) {
+      for (const series of seriesList) labels.add(formatSeriesName(series))
+    }
+
+    return { visibleLabels: labels, visibleProcessCount: labels.size }
+  }, [cpuSeries, memorySeries, statusSeries, uptimeSeries])
+
   // Counted before the visibility toggle so the header can report what is hidden.
-  const xpmProcessCount = new Set(
+  const xpmProcessCount = useMemo(
+    () =>
+      new Set(
+        [
+          metrics.data.pm2_cpu,
+          metrics.data.pm2_memory,
+          metrics.data.pm2_status,
+          metrics.data.pm2_uptime,
+        ]
+          .flatMap((seriesList) => filterSeries(seriesList ?? [], scopeFilter))
+          .filter((series) => isXpmNamespace(series.metric.namespace))
+          .map(formatSeriesName),
+      ).size,
     [
       metrics.data.pm2_cpu,
       metrics.data.pm2_memory,
       metrics.data.pm2_status,
       metrics.data.pm2_uptime,
-    ]
-      .flatMap((seriesList) => filterSeries(seriesList ?? [], scopeFilter))
-      .filter((series) => isXpmNamespace(series.metric.namespace))
-      .map(formatSeriesName),
-  ).size
+      scopeFilter,
+    ],
+  )
   const xpmHint = hideXpmProcesses
     ? 'XPM-managed processes are hidden; use the eye toggle above the process list to show them.'
     : 'Includes XPM-managed processes; hide them with the eye toggle above the process list.'
 
-  const statusLabels = new Set(statusSeries.map(formatSeriesName))
-  const timelineProcesses = [
-    ...statusLabels,
-    ...[...visibleLabels].filter((label) => !statusLabels.has(label)).sort(),
-  ].map((label) => ({
-    label,
-    identity: processIdentities.get(label) ?? label,
-  }))
+  const statusLabels = useMemo(
+    () => new Set(statusSeries.map(formatSeriesName)),
+    [statusSeries],
+  )
+  const timelineProcesses = useMemo(
+    () =>
+      [
+        ...statusLabels,
+        ...[...visibleLabels]
+          .filter((label) => !statusLabels.has(label))
+          .sort(),
+      ].map((label) => ({
+        label,
+        identity: processIdentities.get(label) ?? label,
+      })),
+    [processIdentities, statusLabels, visibleLabels],
+  )
   const timelineData = useStatusTimeline(
     metrics,
     statusSeries,
@@ -555,14 +608,30 @@ export function ServerMetrics({
     (showMissingHostErrors && hostMemoryMissing
       ? missingHostMetricsError('memory')
       : null)
-  const hostCpuChartSeries = toChartSeries(hostCpuSeries, {
-    filled: true,
-    label: () => 'Host total',
-  })
-  const hostMemoryChartSeries = toChartSeries(hostMemorySeries, {
-    filled: true,
-    label: () => 'Host total',
-  })
+  const hostCpuChartSeries = useMemo(
+    () =>
+      toChartSeries(metrics.data.host_cpu_usage_percent, {
+        filled: true,
+        label: () => 'Host total',
+      }),
+    [metrics.data.host_cpu_usage_percent, toChartSeries],
+  )
+  const hostMemoryChartSeries = useMemo(
+    () =>
+      toChartSeries(metrics.data.host_memory_usage_percent, {
+        filled: true,
+        label: () => 'Host total',
+      }),
+    [metrics.data.host_memory_usage_percent, toChartSeries],
+  )
+  const uptimeChartSeries = useMemo(
+    () =>
+      toChartSeries(uptimeSeries, {
+        filled: true,
+        label: formatSeriesName,
+      }),
+    [toChartSeries, uptimeSeries],
+  )
   const hostCpuValueFormatter = (value: number | string) =>
     formatPercent(Number(value), 1)
   const hostMemoryValueFormatter = (value: number | string) => {
@@ -887,10 +956,7 @@ export function ServerMetrics({
                   ? null
                   : processCountLabel(uptimeSeries.length),
               )}
-              series={toChartSeries(uptimeSeries, {
-                filled: true,
-                label: formatSeriesName,
-              })}
+              series={uptimeChartSeries}
               timeRange={metrics.range}
               onTimeRangeSelect={selectTimeRange}
               onResetTimeRange={resetTimeRange}
