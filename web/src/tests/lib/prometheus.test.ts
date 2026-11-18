@@ -217,6 +217,21 @@ describe('series labels and aggregates', () => {
     expect(filterSeries(entries, { query: 'production' })).toEqual([entries[2]])
     expect(filterSeries(entries, {})).toEqual(entries)
   })
+
+  test('excludes XPM series when requested', () => {
+    expect(filterSeries(entries, { excludeXpm: true })).toEqual([entries[2]])
+    expect(filterSeries(entries, { excludeXpm: false })).toEqual(entries)
+    expect(
+      filterSeries([series('agent', ' xpm ', [1])], { excludeXpm: true }),
+    ).toEqual([])
+  })
+
+  test('combines the XPM exclusion with namespace and query filters', () => {
+    expect(
+      filterSeries(entries, { namespace: 'XPM', excludeXpm: true }),
+    ).toEqual([])
+    expect(filterSeries(entries, { query: 'xpm', excludeXpm: true })).toEqual([])
+  })
 })
 
 describe('computeStep', () => {
