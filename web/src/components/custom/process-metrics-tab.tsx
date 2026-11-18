@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { Activity } from 'lucide-react'
 import { isPrometheusConfigured } from '@/api/services/prometheus.service'
 import { MetricBasisSwitch } from '@/components/custom/metric-basis-switch'
@@ -138,19 +139,45 @@ export function ProcessMetricsTab({
   const cpuSeries = metrics.data.pm2_cpu
   const memorySeries = metrics.data.pm2_memory
   const statusSeries = metrics.data.pm2_status
-  const timelineProcesses = (statusSeries ?? []).map((series) => ({
-    label: formatSeriesName(series),
-    identity: seriesIdentity(series.metric),
-  }))
+  const statusSeriesList = useMemo(() => statusSeries ?? [], [statusSeries])
+  const timelineProcesses = useMemo(
+    () =>
+      statusSeriesList.map((series) => ({
+        label: formatSeriesName(series),
+        identity: seriesIdentity(series.metric),
+      })),
+    [statusSeriesList],
+  )
   const timelineData = useStatusTimeline(
     metrics,
-    statusSeries ?? [],
+    statusSeriesList,
     timelineProcesses,
   )
   const restartsSeries = metrics.data.pm2_restarts_total
   const unstableSeries = metrics.data.pm2_unstable_restarts_total
   const uptimeSeries = metrics.data.pm2_uptime
   const startTimeSeries = metrics.data.pm2_start_time_seconds
+  const restartsChartSeries = useMemo(
+    () => [
+      ...toChartSeries(restartsSeries, {
+        stepped: true,
+        label: () => 'Total',
+      }),
+      ...toChartSeries(unstableSeries, {
+        stepped: true,
+        label: () => 'Unstable',
+      }),
+    ],
+    [restartsSeries, toChartSeries, unstableSeries],
+  )
+  const uptimeChartSeries = useMemo(
+    () =>
+      toChartSeries(uptimeSeries, {
+        filled: true,
+        label: formatSeriesName,
+      }),
+    [toChartSeries, uptimeSeries],
+  )
 
   const cpuLast = lastValue(cpuSeries)
   const memoryLast = lastValue(memorySeries)
@@ -190,18 +217,28 @@ export function ProcessMetricsTab({
           status: 0,
         }
       : null)
-  const cpuChartSeries = cpuBasisIsServer
-    ? cpuServerReady
-      ? toChartSeries(cpuSeries, {
-          filled: true,
-          label: formatSeriesName,
-          valueMapper: (value) => normalizeCpu(value, effectiveCpuCores),
-        })
-      : []
-    : toChartSeries(cpuSeries, {
-        filled: true,
-        label: formatSeriesName,
-      })
+  const cpuChartSeries = useMemo(
+    () =>
+      cpuBasisIsServer
+        ? cpuServerReady
+          ? toChartSeries(cpuSeries, {
+              filled: true,
+              label: formatSeriesName,
+              valueMapper: (value) => normalizeCpu(value, effectiveCpuCores),
+            })
+          : []
+        : toChartSeries(cpuSeries, {
+            filled: true,
+            label: formatSeriesName,
+          }),
+    [
+      cpuBasisIsServer,
+      cpuSeries,
+      cpuServerReady,
+      effectiveCpuCores,
+      toChartSeries,
+    ],
+  )
   const cpuDisplayLast =
     cpuLast === null || (cpuBasisIsServer && !cpuServerReady)
       ? null
@@ -458,16 +495,7 @@ export function ProcessMetricsTab({
                     ? null
                     : `${restartsLast ?? 0} total · ${unstableLast ?? 0} unstable`,
                 )}
-                series={[
-                  ...toChartSeries(restartsSeries, {
-                    stepped: true,
-                    label: () => 'Total',
-                  }),
-                  ...toChartSeries(unstableSeries, {
-                    stepped: true,
-                    label: () => 'Unstable',
-                  }),
-                ]}
+                series={restartsChartSeries}
                 timeRange={metrics.range}
                 onTimeRangeSelect={selectTimeRange}
                 onResetTimeRange={resetTimeRange}
@@ -485,10 +513,7 @@ export function ProcessMetricsTab({
                   metrics.status.pm2_uptime,
                   uptimeLast === null ? null : formatUptimeValue(uptimeLast),
                 )}
-                series={toChartSeries(uptimeSeries, {
-                  filled: true,
-                  label: formatSeriesName,
-                })}
+                series={uptimeChartSeries}
                 timeRange={metrics.range}
                 onTimeRangeSelect={selectTimeRange}
                 onResetTimeRange={resetTimeRange}
