@@ -6,11 +6,16 @@ export const XPM_NAMESPACE = 'XPM'
 
 const XPM_NAMESPACE_LOWER = XPM_NAMESPACE.toLowerCase()
 
+/** True when a PM2 namespace belongs to the XPM-owned namespace. */
+export function isXpmNamespace(namespace: string | undefined): boolean {
+  return (namespace ?? '').trim().toLowerCase() === XPM_NAMESPACE_LOWER
+}
+
 /** True when the process belongs to the XPM-owned namespace. */
 export function isXpmProcess(
   process: Pick<ProcessSummary, 'namespace'>,
 ): boolean {
-  return process.namespace.trim().toLowerCase() === XPM_NAMESPACE_LOWER
+  return isXpmNamespace(process.namespace)
 }
 
 export interface PartitionedProcessItems {
