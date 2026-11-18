@@ -253,6 +253,21 @@ describe('buildStatusTimeline', () => {
         ])
     })
 
+    test('uses the requested range step instead of the sample spacing', () => {
+        const entry = seriesAt('api', [
+            [0, 9],
+            [10_000, 9],
+            [70_000, 9],
+        ])
+
+        const data = build([entry], [asProcess(entry)], {
+            range: { start: 0, end: 90_000, step: 20 },
+        })
+
+        expect(data.stepMs).toBe(20_000)
+        expect(data.segments.at(-1)).toMatchObject({ end: 90_000 })
+    })
+
     test('returns empty data when there are no lanes', () => {
         expect(build([], [], { range: range(60_000) })).toEqual({
             lanes: [],
