@@ -72,16 +72,34 @@ export const METRICS_RANGE_PRESETS: MetricsRangePreset[] = [
         durationMs: 15 * 60 * 1000,
     },
     {
+        value: "30m",
+        label: "Last 30 minutes",
+        shortLabel: "30m",
+        durationMs: 30 * 60 * 1000,
+    },
+    {
         value: "1h",
         label: "Last 1 hour",
         shortLabel: "1h",
         durationMs: 60 * 60 * 1000,
     },
     {
+        value: "3h",
+        label: "Last 3 hours",
+        shortLabel: "3h",
+        durationMs: 3 * 60 * 60 * 1000,
+    },
+    {
         value: "6h",
         label: "Last 6 hours",
         shortLabel: "6h",
         durationMs: 6 * 60 * 60 * 1000,
+    },
+    {
+        value: "12h",
+        label: "Last 12 hours",
+        shortLabel: "12h",
+        durationMs: 12 * 60 * 60 * 1000,
     },
     {
         value: "24h",
@@ -100,6 +118,12 @@ export const METRICS_RANGE_PRESETS: MetricsRangePreset[] = [
         label: "Last 15 days",
         shortLabel: "15d",
         durationMs: 15 * 24 * 60 * 60 * 1000,
+    },
+    {
+        value: "30d",
+        label: "Last 30 days",
+        shortLabel: "30d",
+        durationMs: 30 * 24 * 60 * 60 * 1000,
     },
 ];
 
