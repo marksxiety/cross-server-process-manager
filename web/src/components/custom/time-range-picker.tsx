@@ -8,6 +8,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { formatUptime } from '@/lib/format'
 import { METRICS_RANGE_PRESETS } from '@/lib/prometheus'
 import {
@@ -17,11 +18,13 @@ import {
   validateCustomRange,
 } from '@/lib/time-range'
 import { cn } from '@/lib/utils'
+import type { RecentAbsoluteRange } from '@/stores/metrics.store'
 import type { MetricsRange } from '@/types/prometheus'
 
 type TimeRangePickerProps = {
   value: MetricsRange
   onChange: (range: MetricsRange) => void
+  recentAbsoluteRanges?: RecentAbsoluteRange[]
   disabled?: boolean
   loading?: boolean
 }
@@ -29,6 +32,7 @@ type TimeRangePickerProps = {
 export function TimeRangePicker({
   value,
   onChange,
+  recentAbsoluteRanges = [],
   disabled = false,
   loading = false,
 }: TimeRangePickerProps) {
@@ -244,43 +248,98 @@ export function TimeRangePicker({
                 Apply
               </Button>
             </div>
+
+            {recentAbsoluteRanges.length > 0 && (
+              <div className='border-t pt-3'>
+                <p className='px-2 pb-2 text-[11px] text-muted-foreground'>
+                  Recent
+                </p>
+                <ScrollArea className='max-h-40 **:data-[slot=scroll-area-viewport]:max-h-40'>
+                  <div className='pr-2'>
+                    {recentAbsoluteRanges.map((entry) => {
+                      const rangeLabel = formatRangeLabel({
+                        kind: 'absolute',
+                        start: entry.start,
+                        end: entry.end,
+                      })
+                      const isActive =
+                        value.kind === 'absolute' &&
+                        value.start === entry.start &&
+                        value.end === entry.end
+
+                      return (
+                        <DropdownMenuItem
+                          key={`${entry.start}:${entry.end}`}
+                          title={rangeLabel}
+                          aria-label={`${rangeLabel}${isActive ? ' (selected)' : ''}`}
+                          className={cn(
+                            'justify-between',
+                            isActive && 'bg-accent text-accent-foreground',
+                          )}
+                          onClick={() => {
+                            onChange({
+                              kind: 'absolute',
+                              start: entry.start,
+                              end: entry.end,
+                            })
+                            setOpen(false)
+                          }}
+                        >
+                          <span className='min-w-0 truncate'>{rangeLabel}</span>
+                          {isActive && (
+                            <Check
+                              className='ml-auto size-3.5 shrink-0'
+                              strokeWidth={2}
+                            />
+                          )}
+                        </DropdownMenuItem>
+                      )
+                    })}
+                  </div>
+                </ScrollArea>
+              </div>
+            )}
           </div>
 
           <div className='p-2'>
-            <p className='px-2 pt-1 pb-2 text-[11px] text-muted-foreground'>
-              Relative
-            </p>
-            {METRICS_RANGE_PRESETS.map((entry) => {
-              const isActive =
-                value.kind === 'relative' &&
-                value.durationMs === entry.durationMs
+            <ScrollArea className='h-56 sm:h-72'>
+              <div className='pr-2'>
+                <p className='px-2 pt-1 pb-2 text-[11px] text-muted-foreground'>
+                  Relative
+                </p>
+                {METRICS_RANGE_PRESETS.map((entry) => {
+                  const isActive =
+                    value.kind === 'relative' &&
+                    value.durationMs === entry.durationMs
 
-              return (
-                <DropdownMenuItem
-                  key={entry.value}
-                  aria-label={`${entry.label}${isActive ? ' (selected)' : ''}`}
-                  className={cn(
-                    'justify-between',
-                    isActive && 'bg-accent text-accent-foreground',
-                  )}
-                  onClick={() => {
-                    onChange({
-                      kind: 'relative',
-                      durationMs: entry.durationMs,
-                    })
-                    setOpen(false)
-                  }}
-                >
-                  <span className='min-w-0 truncate'>{entry.label}</span>
-                  {isActive && (
-                    <Check
-                      className='ml-auto size-3.5 shrink-0'
-                      strokeWidth={2}
-                    />
-                  )}
-                </DropdownMenuItem>
-              )
-            })}
+                  return (
+                    <DropdownMenuItem
+                      key={entry.value}
+                      aria-label={`${entry.label}${isActive ? ' (selected)' : ''}`}
+                      className={cn(
+                        'justify-between',
+                        isActive && 'bg-accent text-accent-foreground',
+                      )}
+                      onClick={() => {
+                        onChange({
+                          kind: 'relative',
+                          durationMs: entry.durationMs,
+                        })
+                        setOpen(false)
+                      }}
+                    >
+                      <span className='min-w-0 truncate'>{entry.label}</span>
+                      {isActive && (
+                        <Check
+                          className='ml-auto size-3.5 shrink-0'
+                          strokeWidth={2}
+                        />
+                      )}
+                    </DropdownMenuItem>
+                  )
+                })}
+              </div>
+            </ScrollArea>
           </div>
         </div>
       </DropdownMenuContent>
