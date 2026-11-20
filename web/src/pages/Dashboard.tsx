@@ -17,6 +17,7 @@ import { PageLoader } from '@/components/custom/page-loader'
 import { ProcessesSection } from '@/components/custom/processes-section'
 import { ServerHeader } from '@/components/custom/server-header'
 import { TimeRangeControl } from '@/components/custom/time-range-control'
+import { ZoomOutButton } from '@/components/custom/zoom-out-button'
 import { useAccess } from '@/hooks/use-access'
 import { DASHBOARD_AUTO_REFRESH_MS } from '@/lib/swr'
 import { cn } from '@/lib/utils'
@@ -107,27 +108,35 @@ export function Dashboard() {
           Servers Overview
         </h1>
 
-        <div className='flex w-full items-center gap-2 sm:w-auto'>
-          <div className='min-w-0 flex-1 sm:flex-none'>
+        <div className='flex w-full flex-col gap-2 sm:w-auto sm:items-end'>
+          <div className='w-full min-w-0 sm:w-auto'>
             <TimeRangeControl
               value={metricsRange}
               onChange={setMetricsRange}
               loading={isRefreshing}
             />
           </div>
-          <Button
-            variant='ghost'
-            size='icon'
-            onClick={() => void reload()}
-            disabled={serversStatus === 'loading' || isRefreshing}
-            aria-label='Refresh servers and processes'
-            title='Refresh servers and processes'
-          >
-            <RefreshCw
-              strokeWidth={2}
-              className={cn(isRefreshing && 'animate-spin')}
+          <div className='flex items-center justify-end gap-2'>
+            <Button
+              variant='ghost'
+              size='icon'
+              onClick={() => void reload()}
+              disabled={serversStatus === 'loading' || isRefreshing}
+              aria-label='Refresh servers and processes'
+              title='Refresh servers and processes'
+              className='size-9 lg:size-6'
+            >
+              <RefreshCw
+                strokeWidth={2}
+                className={cn(isRefreshing && 'animate-spin')}
+              />
+            </Button>
+            <ZoomOutButton
+              value={metricsRange}
+              onChange={setMetricsRange}
+              loading={isRefreshing}
             />
-          </Button>
+          </div>
         </div>
       </div>
 
