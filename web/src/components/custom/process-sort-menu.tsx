@@ -10,20 +10,8 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { PROCESS_SORT_OPTIONS } from '@/lib/sort-processes'
 import type { ProcessSortKey } from '@/lib/sort-processes'
-
-// Status is always rendered first and, when checked, always ranks first
-// (see sortProcesses); every option stays checkable/uncheckable.
-const SORT_OPTIONS: { value: ProcessSortKey; label: string }[] = [
-  { value: 'status', label: 'Status' },
-  { value: 'name', label: 'Name' },
-  { value: 'restarts', label: 'Restart Count' },
-  { value: 'memory', label: 'Memory' },
-  { value: 'cpu', label: 'CPU' },
-  { value: 'uptime', label: 'Uptime' },
-  { value: 'host', label: 'Host (Server Name)' },
-  { value: 'namespace', label: 'Namespace' },
-]
 
 export type ProcessSortMenuProps = {
   sortOrder: readonly ProcessSortKey[]
@@ -53,7 +41,7 @@ export function ProcessSortMenu({ sortOrder, onToggle }: ProcessSortMenuProps) {
       <DropdownMenuContent align='end' className='w-48'>
         <DropdownMenuGroup>
           <DropdownMenuLabel>Sort order</DropdownMenuLabel>
-          {SORT_OPTIONS.map((option) => {
+          {PROCESS_SORT_OPTIONS.map((option) => {
             const index = sortOrder.indexOf(option.value)
             return (
               <DropdownMenuCheckboxItem
