@@ -526,9 +526,16 @@ export function ProcessMetricsTab({
               />
 
               <Card size='sm'>
-                <CardHeader className='pb-1'>
-                  <CardTitle>Started at</CardTitle>
-                  <CardDescription>
+                <CardHeader className='flex flex-row items-center justify-between gap-3'>
+                  <CardTitle>Registered At:</CardTitle>
+                  <CardDescription
+                    className='min-w-0 truncate text-right'
+                    title={
+                      startedAt === null
+                        ? undefined
+                        : new Date(startedAt * 1000).toLocaleString()
+                    }
+                  >
                     {metricDescription(
                       metrics.status.pm2_start_time_seconds,
                       startedAt === null
