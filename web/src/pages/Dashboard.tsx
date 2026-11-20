@@ -16,7 +16,7 @@ import { LinkButton } from '@/components/custom/link-button'
 import { PageLoader } from '@/components/custom/page-loader'
 import { ProcessesSection } from '@/components/custom/processes-section'
 import { ServerHeader } from '@/components/custom/server-header'
-import { TimeRangePicker } from '@/components/custom/time-range-picker'
+import { TimeRangeControl } from '@/components/custom/time-range-control'
 import { useAccess } from '@/hooks/use-access'
 import { DASHBOARD_AUTO_REFRESH_MS } from '@/lib/swr'
 import { cn } from '@/lib/utils'
@@ -109,7 +109,7 @@ export function Dashboard() {
 
         <div className='flex w-full items-center gap-2 sm:w-auto'>
           <div className='min-w-0 flex-1 sm:flex-none'>
-            <TimeRangePicker
+            <TimeRangeControl
               value={metricsRange}
               onChange={setMetricsRange}
               loading={isRefreshing}
