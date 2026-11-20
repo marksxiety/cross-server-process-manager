@@ -2,6 +2,7 @@ import { ZoomOut } from 'lucide-react'
 import { TimeRangePicker } from '@/components/custom/time-range-picker'
 import { Button } from '@/components/ui/button'
 import { zoomOutMetricsRange } from '@/lib/time-range'
+import { useMetricsStore } from '@/stores/metrics.store'
 import type { MetricsRange } from '@/types/prometheus'
 
 type TimeRangeControlProps = {
@@ -18,6 +19,9 @@ export function TimeRangeControl({
   loading = false,
 }: TimeRangeControlProps) {
   const isBusy = disabled || loading
+  const recentAbsoluteRanges = useMetricsStore(
+    (state) => state.recentAbsoluteRanges,
+  )
 
   return (
     <div className='flex min-w-0 items-center gap-1.5'>
@@ -25,6 +29,7 @@ export function TimeRangeControl({
         <TimeRangePicker
           value={value}
           onChange={onChange}
+          recentAbsoluteRanges={recentAbsoluteRanges}
           disabled={disabled}
           loading={loading}
         />
