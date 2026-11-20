@@ -258,6 +258,13 @@ describe('METRICS_RANGE_PRESETS', () => {
       durationMs: 15 * DAY,
     })
   })
+
+  test('offers the common short and long ranges', () => {
+    expect(findRangePreset(30 * MINUTE)).toMatchObject({ value: '30m' })
+    expect(findRangePreset(3 * HOUR)).toMatchObject({ value: '3h' })
+    expect(findRangePreset(12 * HOUR)).toMatchObject({ value: '12h' })
+    expect(findRangePreset(30 * DAY)).toMatchObject({ value: '30d' })
+  })
 })
 
 describe('resolveMetricsRange', () => {
