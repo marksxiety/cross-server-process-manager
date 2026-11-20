@@ -1,5 +1,6 @@
 import { RefreshCw, Timer } from 'lucide-react'
 import { TimeRangeControl } from '@/components/custom/time-range-control'
+import { ZoomOutButton } from '@/components/custom/zoom-out-button'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -46,10 +47,10 @@ export function MetricsToolbar({
       <div
         className={cn(
           'flex gap-2',
-          isStacked ? 'flex-col' : 'flex-wrap items-center',
+          isStacked ? 'flex-col' : 'flex-col lg:flex-row lg:items-center',
         )}
       >
-        {/* Time range picker */}
+        {/* Row one on small screens: time range picker */}
         <div
           className={cn(
             'min-w-0',
@@ -64,7 +65,7 @@ export function MetricsToolbar({
           />
         </div>
 
-        {/* Refresh controls */}
+        {/* Row two on small screens: interval, zoom out, refresh */}
         <div
           className={cn(
             'flex items-center gap-1.5',
@@ -98,6 +99,13 @@ export function MetricsToolbar({
             </SelectContent>
           </Select>
 
+          <ZoomOutButton
+            value={range}
+            onChange={onRangeChange}
+            disabled={disabled}
+            loading={rangeLoading}
+          />
+
           <Button
             type='button'
             variant='outline'
@@ -105,7 +113,7 @@ export function MetricsToolbar({
             disabled={isRefreshing || disabled}
             aria-label='Refresh metrics'
             onClick={onRefresh}
-            className='h-8 shrink-0 gap-1.5 px-2 text-[11px] lg:h-6'
+            className='h-9 shrink-0 gap-1.5 px-2 text-[11px] lg:h-6'
           >
             <RefreshCw
               strokeWidth={2}
