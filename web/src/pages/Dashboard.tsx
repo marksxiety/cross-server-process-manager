@@ -204,6 +204,7 @@ export function Dashboard() {
             isError={processesStatus === 'error'}
             empty={processEmptyState}
             loadingDescription='Fetching processes from the registered servers…'
+            controlVariant='dialog'
           />
         </>
       )}
