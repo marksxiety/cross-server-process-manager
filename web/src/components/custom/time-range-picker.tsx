@@ -112,7 +112,7 @@ export function TimeRangePicker({
             aria-busy={loading || undefined}
             disabled={isBusy}
             className={cn(
-              'flex h-8 w-full min-w-0 cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-muted/40 px-2 text-left text-[11px] font-medium transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 sm:w-auto lg:h-6',
+              'flex h-9 w-full min-w-0 cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-muted/40 px-3 py-2 text-left text-[11px] font-medium transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 lg:h-6 lg:px-2 lg:py-1.5',
               open && 'bg-accent text-accent-foreground',
             )}
           />
