@@ -1,5 +1,5 @@
 import { RefreshCw, Timer } from 'lucide-react'
-import { TimeRangePicker } from '@/components/custom/time-range-picker'
+import { TimeRangeControl } from '@/components/custom/time-range-control'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -56,7 +56,7 @@ export function MetricsToolbar({
             isStacked ? 'w-full' : 'w-full lg:w-auto lg:flex-auto',
           )}
         >
-          <TimeRangePicker
+          <TimeRangeControl
             value={range}
             onChange={onRangeChange}
             disabled={disabled}
