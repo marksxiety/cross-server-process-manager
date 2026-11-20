@@ -5,6 +5,11 @@ import { processService } from "@/api/services/process.service";
 import { queueAudit, type AuditAction } from "@/api/services/audit.service";
 import { isDemoMode } from "@/lib/demo-mode";
 import { PROCESS_STATE_CONFLICT_CODE, toApiError, toUnreachableError } from "@/lib/error-code";
+import {
+    DEFAULT_PROCESS_FILTERS,
+    sanitizeProcessFilters,
+} from "@/lib/process-filter";
+import type { ProcessFilters } from "@/lib/process-filter";
 import { canRunProcessCommand } from "@/lib/process-runtime";
 import { withRetry } from "@/lib/retry";
 import { sanitizeSortOrder } from "@/lib/sort-processes";
@@ -31,6 +36,7 @@ interface DashboardState {
     requestError: ApiError | null;
     processesByServer: Record<string, ServerProcesses>;
     sortOrder: ProcessSortKey[];
+    processFilters: ProcessFilters;
     hideXpmProcesses: boolean;
     isRefreshing: boolean;
     isStarting: boolean;
@@ -43,6 +49,7 @@ interface DashboardState {
     refreshServer: (server: RegisteredServer) => Promise<void>;
     reload: () => Promise<void>;
     setSortOrder: (order: ProcessSortKey[]) => void;
+    setProcessFilters: (filters: ProcessFilters) => void;
     setHideXpmProcesses: (hide: boolean) => void;
     startProcess: (server: RegisteredServer, process: ProcessCommandTarget) => Promise<ApiResponse<ProcessSummary[]>>;
     stopProcess: (server: RegisteredServer, process: ProcessCommandTarget) => Promise<ApiResponse<ProcessSummary[]>>;
@@ -54,7 +61,11 @@ interface DashboardState {
 /** The slice kept in localStorage (see `partialize`). */
 type PersistedDashboardState = Pick<
     DashboardState,
-    "servers" | "serversFetchedAt" | "sortOrder" | "hideXpmProcesses"
+    | "servers"
+    | "serversFetchedAt"
+    | "sortOrder"
+    | "processFilters"
+    | "hideXpmProcesses"
 >;
 
 /**
@@ -307,6 +318,9 @@ export const useDashboardStore = create<DashboardState>()(
                 // Status (severity grouping) is on by default, pinned to the
                 // front of the order, but the user can uncheck and recheck it.
                 sortOrder: ["status"],
+                // The Dashboard starts with every server, namespace and
+                // status included; filters only narrow the list on request.
+                processFilters: DEFAULT_PROCESS_FILTERS,
                 // XPM's own processes clutter the dashboard, so they start hidden.
                 hideXpmProcesses: true,
                 isRefreshing: false,
@@ -383,6 +397,10 @@ export const useDashboardStore = create<DashboardState>()(
                 // order survives reloads. Called by Dashboard.tsx.
                 setSortOrder: (order) => set({ sortOrder: order }),
 
+                // Stores the Dashboard's server, namespace and status filters.
+                // Persisted so a focused view survives reloads.
+                setProcessFilters: (processFilters) => set({ processFilters }),
+
                 // Stores whether XPM-owned processes are hidden. Persisted so the
                 // dashboard keeps the user's choice across reloads.
                 setHideXpmProcesses: (hide) => set({ hideXpmProcesses: hide }),
@@ -437,6 +455,7 @@ export const useDashboardStore = create<DashboardState>()(
                 servers: state.servers,
                 serversFetchedAt: state.serversFetchedAt,
                 sortOrder: state.sortOrder,
+                processFilters: state.processFilters,
                 hideXpmProcesses: state.hideXpmProcesses,
             }),
             // Sanitizes the persisted slice after hydration so corrupt data can never put
@@ -450,6 +469,9 @@ export const useDashboardStore = create<DashboardState>()(
                     serversFetchedAt:
                         typeof persisted?.serversFetchedAt === "number" ? persisted.serversFetchedAt : null,
                     sortOrder: sanitizeSortOrder(persisted?.sortOrder),
+                    processFilters: sanitizeProcessFilters(
+                        persisted?.processFilters
+                    ),
                     hideXpmProcesses:
                         typeof persisted?.hideXpmProcesses === "boolean"
                             ? persisted.hideXpmProcesses
