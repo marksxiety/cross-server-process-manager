@@ -5,6 +5,7 @@ import {
   parseLocalDateTimeInput,
   toLocalDateTimeInput,
   validateCustomRange,
+  zoomOutMetricsRange,
 } from '../../lib/time-range'
 
 const MINUTE = 60_000
@@ -46,6 +47,50 @@ describe('local datetime input conversion', () => {
 
   test('returns null for an empty input', () => {
     expect(parseLocalDateTimeInput('')).toBeNull()
+  })
+})
+
+describe('zoomOutMetricsRange', () => {
+  const now = new Date(2026, 10, 20, 12, 0).getTime()
+
+  test('doubles a relative range', () => {
+    expect(
+      zoomOutMetricsRange({ kind: 'relative', durationMs: 30 * MINUTE }, now),
+    ).toEqual({ kind: 'relative', durationMs: HOUR })
+  })
+
+  test('expands a historical absolute range around its midpoint', () => {
+    expect(
+      zoomOutMetricsRange(
+        {
+          kind: 'absolute',
+          start: new Date(2026, 10, 20, 10, 0).getTime(),
+          end: new Date(2026, 10, 20, 10, 30).getTime(),
+        },
+        now,
+      ),
+    ).toEqual({
+      kind: 'absolute',
+      start: new Date(2026, 10, 20, 9, 45).getTime(),
+      end: new Date(2026, 10, 20, 10, 45).getTime(),
+    })
+  })
+
+  test('extends backward when the expansion would reach the future', () => {
+    expect(
+      zoomOutMetricsRange(
+        {
+          kind: 'absolute',
+          start: new Date(2026, 10, 20, 11, 0).getTime(),
+          end: now,
+        },
+        now,
+      ),
+    ).toEqual({
+      kind: 'absolute',
+      start: new Date(2026, 10, 20, 10, 0).getTime(),
+      end: now,
+    })
   })
 })
 
