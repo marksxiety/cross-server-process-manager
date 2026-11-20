@@ -16,10 +16,12 @@ import { LinkButton } from '@/components/custom/link-button'
 import { PageLoader } from '@/components/custom/page-loader'
 import { ProcessesSection } from '@/components/custom/processes-section'
 import { ServerHeader } from '@/components/custom/server-header'
+import { TimeRangePicker } from '@/components/custom/time-range-picker'
 import { useAccess } from '@/hooks/use-access'
 import { DASHBOARD_AUTO_REFRESH_MS } from '@/lib/swr'
 import { cn } from '@/lib/utils'
 import { useDashboardStore, useProcessesStatus } from '@/stores/dashboard.store'
+import { useMetricsStore } from '@/stores/metrics.store'
 
 export function Dashboard() {
   const servers = useDashboardStore((state) => state.servers)
@@ -32,6 +34,8 @@ export function Dashboard() {
   const reload = useDashboardStore((state) => state.reload)
   const processesStatus = useProcessesStatus()
   const access = useAccess()
+  const metricsRange = useMetricsStore((state) => state.range)
+  const setMetricsRange = useMetricsStore((state) => state.setRange)
 
   // Flat, cross-server view of every process. Servers that are still loading or
   // unreachable are surfaced on their own tile instead.
@@ -103,7 +107,14 @@ export function Dashboard() {
           Servers Overview
         </h1>
 
-        <div className='flex items-center gap-2'>
+        <div className='flex w-full items-center gap-2 sm:w-auto'>
+          <div className='min-w-0 flex-1 sm:flex-none'>
+            <TimeRangePicker
+              value={metricsRange}
+              onChange={setMetricsRange}
+              loading={isRefreshing}
+            />
+          </div>
           <Button
             variant='ghost'
             size='icon'
