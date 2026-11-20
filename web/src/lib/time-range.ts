@@ -4,6 +4,8 @@ import type { MetricsRange } from "@/types/prometheus";
 
 export const MIN_CUSTOM_RANGE_MS = 60_000;
 
+const ZOOM_OUT_FACTOR = 2;
+
 const RANGE_DATE_TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
     month: "short",
     day: "numeric",
@@ -28,6 +30,36 @@ export function parseLocalDateTimeInput(value: string): number | null {
 
 export function formatRangeDateTime(timestamp: number): string {
     return RANGE_DATE_TIME_FORMATTER.format(timestamp);
+}
+
+/**
+ * Widens a range to twice its duration. Relative ranges keep rolling to now;
+ * absolute ranges expand around their midpoint, or backward from now when the
+ * expansion would otherwise include future time.
+ */
+export function zoomOutMetricsRange(
+    range: MetricsRange,
+    now = Date.now(),
+): MetricsRange {
+    if (range.kind === "relative") {
+        return {
+            kind: "relative",
+            durationMs: range.durationMs * ZOOM_OUT_FACTOR,
+        };
+    }
+
+    const durationMs = range.end - range.start;
+    const expandedDurationMs = durationMs * ZOOM_OUT_FACTOR;
+    const midpoint = range.start + durationMs / 2;
+    let start = midpoint - expandedDurationMs / 2;
+    let end = midpoint + expandedDurationMs / 2;
+
+    if (end > now) {
+        end = now;
+        start = end - expandedDurationMs;
+    }
+
+    return { kind: "absolute", start, end };
 }
 
 /** The label shown on the closed range control. */
