@@ -28,6 +28,24 @@ export const SORT_KEYS = [
 
 export type ProcessSortKey = (typeof SORT_KEYS)[number]
 
+/**
+ * The criteria exposed in the dashboard controls. `pm_id` stays a valid sort
+ * key for existing persisted orders but is not offered as a user-facing choice.
+ */
+export const PROCESS_SORT_OPTIONS: readonly {
+  value: ProcessSortKey
+  label: string
+}[] = [
+  { value: 'status', label: 'Status' },
+  { value: 'name', label: 'Name' },
+  { value: 'restarts', label: 'Restart Count' },
+  { value: 'memory', label: 'Memory' },
+  { value: 'cpu', label: 'CPU' },
+  { value: 'uptime', label: 'Uptime' },
+  { value: 'host', label: 'Host (Server Name)' },
+  { value: 'namespace', label: 'Namespace' },
+]
+
 // Severity order: unhealthy processes surface above healthy ones for triage.
 // Ranks come from the shared status catalog so sorting matches the Dashboard
 // labels and the metrics chart order.
