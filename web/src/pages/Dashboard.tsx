@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { RefreshCw, ServerOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Empty,
   EmptyContent,
@@ -16,13 +17,10 @@ import { LinkButton } from '@/components/custom/link-button'
 import { PageLoader } from '@/components/custom/page-loader'
 import { ProcessesSection } from '@/components/custom/processes-section'
 import { ServerHeader } from '@/components/custom/server-header'
-import { TimeRangeControl } from '@/components/custom/time-range-control'
-import { ZoomOutButton } from '@/components/custom/zoom-out-button'
 import { useAccess } from '@/hooks/use-access'
 import { DASHBOARD_AUTO_REFRESH_MS } from '@/lib/swr'
 import { cn } from '@/lib/utils'
 import { useDashboardStore, useProcessesStatus } from '@/stores/dashboard.store'
-import { useMetricsStore } from '@/stores/metrics.store'
 
 export function Dashboard() {
   const servers = useDashboardStore((state) => state.servers)
@@ -35,8 +33,6 @@ export function Dashboard() {
   const reload = useDashboardStore((state) => state.reload)
   const processesStatus = useProcessesStatus()
   const access = useAccess()
-  const metricsRange = useMetricsStore((state) => state.range)
-  const setMetricsRange = useMetricsStore((state) => state.setRange)
 
   // Flat, cross-server view of every process. Servers that are still loading or
   // unreachable are surfaced on their own tile instead.
@@ -102,112 +98,99 @@ export function Dashboard() {
     )
 
   return (
-    <div className='min-w-0'>
-      <div className='flex flex-wrap items-center justify-between gap-3'>
+    <div className='flex h-full min-h-0 flex-col overflow-hidden'>
+      <div className='flex shrink-0 items-center justify-between gap-3'>
         <h1 className='text-xl font-semibold tracking-tight sm:text-2xl'>
           Servers Overview
         </h1>
 
-        <div className='flex w-full flex-col gap-2 sm:w-auto sm:items-end'>
-          <div className='w-full min-w-0 sm:w-auto'>
-            <TimeRangeControl
-              value={metricsRange}
-              onChange={setMetricsRange}
-              loading={isRefreshing}
-            />
-          </div>
-          <div className='flex items-center justify-end gap-2'>
-            <Button
-              variant='ghost'
-              size='icon'
-              onClick={() => void reload()}
-              disabled={serversStatus === 'loading' || isRefreshing}
-              aria-label='Refresh servers and processes'
-              title='Refresh servers and processes'
-              className='size-9 lg:size-6'
-            >
-              <RefreshCw
-                strokeWidth={2}
-                className={cn(isRefreshing && 'animate-spin')}
-              />
-            </Button>
-            <ZoomOutButton
-              value={metricsRange}
-              onChange={setMetricsRange}
-              loading={isRefreshing}
-            />
-          </div>
-        </div>
+        <Button
+          variant='ghost'
+          size='icon'
+          onClick={() => void reload()}
+          disabled={serversStatus === 'loading' || isRefreshing}
+          aria-label='Refresh servers and processes'
+          title='Refresh servers and processes'
+          className='size-9 lg:size-6'
+        >
+          <RefreshCw
+            strokeWidth={2}
+            className={cn(isRefreshing && 'animate-spin')}
+          />
+        </Button>
       </div>
 
-      {serversStatus === 'loading' && (
-        <PageLoader
-          className='min-h-[40vh]'
-          title='Loading servers…'
-          description='Fetching the registered servers…'
-        />
-      )}
-      {registryRequestError && (
-        <ErrorAlert error={registryRequestError} className='mt-4' />
-      )}
+      <ScrollArea className='mt-4 min-h-0 flex-1'>
+        <div className='space-y-4 p-3'>
+          {serversStatus === 'loading' && (
+            <PageLoader
+              className='min-h-[40vh]'
+              title='Loading servers…'
+              description='Fetching the registered servers…'
+            />
+          )}
+          {registryRequestError && <ErrorAlert error={registryRequestError} />}
 
-      {serversStatus === 'success' && servers.length === 0 && (
-        <Empty className='mt-4'>
-          <EmptyHeader>
-            <EmptyMedia variant='icon'>
-              <ServerOff strokeWidth={2} />
-            </EmptyMedia>
-            <EmptyTitle>No registered servers</EmptyTitle>
-            <EmptyDescription>
-              No servers are registered yet. Register a server to start
-              monitoring its processes.
-            </EmptyDescription>
-          </EmptyHeader>
-          <EmptyContent>
-            {access.canVisit('servers') && access.canDo('server.create') ? (
-              <LinkButton to='/server'>Register a server</LinkButton>
-            ) : (
-              <p className='text-xs text-muted-foreground'>
-                You don&apos;t have permission to register a server.
-              </p>
-            )}
-          </EmptyContent>
-        </Empty>
-      )}
+          {serversStatus === 'success' && servers.length === 0 && (
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant='icon'>
+                  <ServerOff strokeWidth={2} />
+                </EmptyMedia>
+                <EmptyTitle>No registered servers</EmptyTitle>
+                <EmptyDescription>
+                  No servers are registered yet. Register a server to start
+                  monitoring its processes.
+                </EmptyDescription>
+              </EmptyHeader>
+              <EmptyContent>
+                {access.canVisit('servers') && access.canDo('server.create') ? (
+                  <LinkButton to='/server'>Register a server</LinkButton>
+                ) : (
+                  <p className='text-xs text-muted-foreground'>
+                    You don&apos;t have permission to register a server.
+                  </p>
+                )}
+              </EmptyContent>
+            </Empty>
+          )}
 
-      {serversStatus === 'success' && servers.length > 0 && (
-        <>
-          <div className='mt-4 flex flex-wrap gap-3'>
-            {servers.map((server) => {
-              const entry = processesByServer[server.server]
+          {serversStatus === 'success' && servers.length > 0 && (
+            <div className='space-y-6'>
+              <div className='flex flex-wrap gap-3'>
+                {servers.map((server) => {
+                  const entry = processesByServer[server.server]
 
-              return (
-                <Link
-                  key={server.server}
-                  to={`/server/${encodeURIComponent(server.server)}/metrics`}
-                  aria-label={`View metrics for ${server.server}`}
-                  className='@container/server block min-w-48 grow basis-[calc(20%-0.625rem)] rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring'
-                >
-                  <Card className='h-full transition-shadow hover:bg-accent/40'>
-                    <ServerHeader server={server} entry={entry} />
-                  </Card>
-                </Link>
-              )
-            })}
-          </div>
+                  return (
+                    <Link
+                      key={server.server}
+                      to={`/server/${encodeURIComponent(server.server)}/metrics`}
+                      aria-label={`View metrics for ${server.server}`}
+                      className='@container/server block min-w-48 grow basis-[calc(20%-0.625rem)] rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring'
+                    >
+                      <Card className='h-full transition-shadow hover:bg-accent/40'>
+                        <ServerHeader server={server} entry={entry} />
+                      </Card>
+                    </Link>
+                  )
+                })}
+              </div>
 
-          <ProcessesSection
-            className='mt-6'
-            items={allProcessItems}
-            processesByServer={processesByServer}
-            isLoading={processesStatus === 'loading' || processesStatus === 'idle'}
-            isError={processesStatus === 'error'}
-            empty={processEmptyState}
-            loadingDescription='Fetching processes from the registered servers…'
-            controlVariant='dialog'
-          />
-        </>
-      )}
+              <ProcessesSection
+                items={allProcessItems}
+                processesByServer={processesByServer}
+                isLoading={
+                  processesStatus === 'loading' || processesStatus === 'idle'
+                }
+                isError={processesStatus === 'error'}
+                empty={processEmptyState}
+                loadingDescription='Fetching processes from the registered servers…'
+                controlVariant='dialog'
+              />
+            </div>
+          )}
+        </div>
+      </ScrollArea>
     </div>
   )
 }
