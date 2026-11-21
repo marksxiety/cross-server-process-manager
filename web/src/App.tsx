@@ -37,6 +37,28 @@ function AppLayout() {
     void toggleFullscreen()
   }
 
+  const pageContent = (
+    <div
+      className={cn(
+        'flex w-full min-w-0 flex-col px-4 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6',
+        isDashboard ? 'h-full min-h-0' : 'min-h-full',
+        !isDashboard &&
+          (isServerMetrics
+            ? 'mx-auto max-w-[90rem]'
+            : 'mx-auto max-w-7xl'),
+      )}
+    >
+      <div
+        className={cn(
+          'min-w-0',
+          isDashboard ? 'flex min-h-0 flex-1 flex-col' : 'flex-1',
+        )}
+      >
+        <Outlet />
+      </div>
+    </div>
+  )
+
   return (
     <>
       {!isFullscreen && <AppSidebar />}
@@ -75,23 +97,13 @@ function AppLayout() {
           </div>
         </header>
 
-        {/* Scrollable Page Content */}
+        {/* Page Content */}
         <div className="min-h-0 flex-1 overflow-hidden bg-muted/30">
-          <ScrollArea className="h-full">
-            <div
-              className={cn(
-                'flex min-h-full w-full min-w-0 flex-col px-4 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6',
-                !isDashboard &&
-                  (isServerMetrics
-                    ? 'mx-auto max-w-[90rem]'
-                    : 'mx-auto max-w-7xl'),
-              )}
-            >
-              <div className="min-w-0 flex-1">
-                <Outlet />
-              </div>
-            </div>
-          </ScrollArea>
+          {isDashboard ? (
+            pageContent
+          ) : (
+            <ScrollArea className="h-full">{pageContent}</ScrollArea>
+          )}
         </div>
       </SidebarInset>
     </>
