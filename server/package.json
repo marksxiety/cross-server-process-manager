@@ -1,6 +1,6 @@
 {
   "name": "xpm-server",
-  "version": "2.2.0",
+  "version": "2.4.1",
   "private": true,
   "description": "",
   "main": "dist/src/index.js",
