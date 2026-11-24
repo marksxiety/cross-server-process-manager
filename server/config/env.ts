@@ -13,6 +13,9 @@ dotenv.config({
         path.resolve(__dirname, '../../../.env'),
         path.resolve(__dirname, '../.env'),
     ],
+    // The root .env is the source of truth. Without this, PM2/OS values already
+    // present in process.env win and a normal PM2 restart keeps stale settings.
+    override: true,
 });
 
 export {};
